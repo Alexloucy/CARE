@@ -10,17 +10,17 @@ On Mac/Linux:
 
 ```bash
 python3 -m venv .venv
-pip install -r requirements.txt
 source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
 On Windows (with Cuda 12.8):
 
 ```
 python3 -m venv .venv
+.venv\Scripts\activate.bat
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 pip install -r requirements-win32.txt
-.venv\Scripts\activate.bat
 ```
 
 To install new packages:
