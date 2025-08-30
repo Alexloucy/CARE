@@ -13,10 +13,12 @@ if not defined VIRTUAL_ENV (
 :: Check if model files exist
 set "model[0]=models\vit_care.yml"
 set "model[1]=models\CARE_Traced.pt"
-set "model[2]=models\Detector.pt"
-set "model[3]=models\Detector_GPU.pt"
-set "model[4]=models\CARE_Traced_GPUv.pt"
-for /L %%i in (0,1,4) do (
+set "model[2]=models\md\md_v1000.0.0-redwood.pt"
+set "model[3]=models\dino\dino_binary_classifier_v3.pt"
+set "model[4]=models\dino\dino_species_classifier.pt"
+set "model[5]=models\dino\dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth"
+set "model[6]=models\CARE_Traced_GPUv.pt"
+for /L %%i in (0,1,6) do (
     call set "current_model=%%model[%%i]%%"
     if not exist "%SCRIPT_DIR%%current_model%" (
         echo %current_model% must exist. Contact project owners for model files.
@@ -38,9 +40,11 @@ pyinstaller ^
     --distpath ..\care-electron\resources\ ^
     --add-data models\vit_care.yml;models ^
     --add-data models\CARE_Traced.pt;models ^
+    --add-data models\md\md_v1000.0.0-redwood.pt;models ^
+    --add-data models\dino\dino_binary_classifier_v3.pt;models ^
+    --add-data models\dino\dino_species_classifier.pt;models ^
+    --add-data models\dino\dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth;models ^
     --add-data models\CARE_Traced_GPUv.pt;models ^
-    --add-data models\Detector.pt;models ^
-    --add-data models\Detector_GPU.pt;models ^
     main.py
 
 endlocal
