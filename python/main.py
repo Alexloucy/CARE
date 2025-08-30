@@ -39,6 +39,7 @@ import detection_cpu
 import detection_gpu
 import reid_cpu
 import reid_gpu
+import detection_dino
 
 
 def main():
@@ -70,10 +71,8 @@ def main():
                 "json_output_dir",
                 "log_dir",
             ]
-            if torch.cuda.is_available():
-                run = detection_gpu.run
-            else:
-                run = detection_cpu.run
+            # Use DINO detection for both GPU and CPU
+            run = detection_dino.run
         case _:
             print(f"Invalid option {task}")
             sys.exit(1)

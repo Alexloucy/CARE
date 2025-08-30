@@ -11,8 +11,10 @@ fi
 models=(
     "models/vit_care.yml"
     "models/CARE_Traced.pt"
-    "models/Detector.pt"
-    "models/Detector_GPU.pt"
+    "models/md/md_v1000.0.0-redwood.pt"
+    "models/dino/dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth"
+    "models/dino/dino_species_classifier.pt"
+    "models/dino/dino_binary_classifier_v3.pt"
     "models/CARE_Traced_GPUv.pt"
 )
 
@@ -32,6 +34,8 @@ pyinstaller \
     --add-data models/vit_care.yml:models \
     --add-data models/CARE_Traced.pt:models \
     --add-data models/CARE_Traced_GPUv.pt:models \
-    --add-data models/Detector.pt:models \
-    --add-data models/Detector_GPU.pt:models \
+    --add-data models/md/md_v1000.0.0-redwood.pt:models/md \
+    --add-data models/dino/dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth:models/dino \
+    --add-data models/dino/dino_species_classifier.pt:models/dino \
+    --add-data models/dino/dino_binary_classifier_v3.pt:models/dino \
     main.py
