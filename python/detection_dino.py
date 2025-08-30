@@ -556,16 +556,16 @@ def run(original_images_dir, output_images_dir, json_output_dir, log_dir=''):
 
 def main():
     # for testing
-    original_images_dir = "/Users/alexlou/Downloads/cow"
-    json_output_dir = "/Users/alexlou/Downloads/cow_result/"
-    image_output_dir = json_output_dir  # Save visualized images in the same folder as JSON outputs
+    # original_images_dir = "/Users/alexlou/Downloads/cow"
+    # json_output_dir = "/Users/alexlou/Downloads/cow_result/"
+    # image_output_dir = json_output_dir  # Save visualized images in the same folder as JSON outputs
 
-    # if len(sys.argv) != 4:
-    #     print("Usage: python detection_dino.py <input_folder> <output_folder> <json_output_folder>", flush=True)
-    #     sys.exit(1)
-    # original_images_dir = sys.argv[1]
-    # image_output_dir = sys.argv[2]
-    # json_output_dir = sys.argv[3]
+    if len(sys.argv) != 4:
+        print("Usage: python detection_dino.py <input_folder> <output_folder> <json_output_folder>", flush=True)
+        sys.exit(1)
+    original_images_dir = sys.argv[1]
+    image_output_dir = sys.argv[2]
+    json_output_dir = sys.argv[3]
 
     run(original_images_dir, image_output_dir, json_output_dir)
 

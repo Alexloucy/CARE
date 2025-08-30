@@ -83,18 +83,19 @@ def save_detection_results(predictions, image_output_path, original_images_dir, 
                         "source": source
                     })
 
-                    x1, y1, x2, y2 = list(map(int, bounding_box))
-                    cv2.rectangle(image, (x1, y1), (x2, y2), (0, 0, 255), 15)
-                    label_text = f"{label} ({conf:.2f})"
-                    font = cv2.FONT_HERSHEY_SIMPLEX
-                    font_scale = 3.5
-                    thickness = 10
-                    text_size = cv2.getTextSize(label_text, font, font_scale, thickness)[0]
-                    text_x = x1
-                    text_y = y1 - 10 if y1 - text_size[1] - 10 >= 0 else y2 + text_size[1] + 10
-                    cv2.rectangle(image, (text_x, text_y - text_size[1] - 10),
-                                (text_x + text_size[0], text_y + 10), (0, 0, 255), -1)
-                    cv2.putText(image, label_text, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
+                    if label != 'blank':
+                        x1, y1, x2, y2 = list(map(int, bounding_box))
+                        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 0, 255), 15)
+                        label_text = f"{label} ({conf:.2f})"
+                        font = cv2.FONT_HERSHEY_SIMPLEX
+                        font_scale = 3.5
+                        thickness = 10
+                        text_size = cv2.getTextSize(label_text, font, font_scale, thickness)[0]
+                        text_x = x1
+                        text_y = y1 - 10 if y1 - text_size[1] - 10 >= 0 else y2 + text_size[1] + 10
+                        cv2.rectangle(image, (text_x, text_y - text_size[1] - 10),
+                                    (text_x + text_size[0], text_y + 10), (0, 0, 255), -1)
+                        cv2.putText(image, label_text, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
                 image_to_save = image
                 save_message = f"Marked image '{image_filename}' has been saved to '{output_path}'."
 
