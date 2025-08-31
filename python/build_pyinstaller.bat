@@ -13,10 +13,10 @@ if not defined VIRTUAL_ENV (
 :: Check if model files exist
 set "model[0]=models\vit_care.yml"
 set "model[1]=models\CARE_Traced.pt"
-set "model[2]=models\md\md_v1000.0.0-redwood.pt"
-set "model[3]=models\dino\dino_binary_classifier_v3.pt"
-set "model[4]=models\dino\dino_species_classifier.pt"
-set "model[5]=models\dino\dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth"
+set "model[2]=models\md_v1000.0.0-redwood.pt"
+set "model[3]=models\dino_binary_classifier_v3.pt"
+set "model[4]=models\dino_species_classifier.pt"
+set "model[5]=models\dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth"
 set "model[6]=models\CARE_Traced_GPUv.pt"
 for /L %%i in (0,1,6) do (
     call set "current_model=%%model[%%i]%%"
@@ -24,6 +24,12 @@ for /L %%i in (0,1,6) do (
         echo %current_model% must exist. Contact project owners for model files.
         exit /b 1
     )
+)
+
+:: Check if dinov3 folder exists
+if not exist "%SCRIPT_DIR%dinov3" (
+    echo dinov3 folder must exist. Contact project owners for dinov3 files.
+    exit /b 1
 )
 
 :: Don't use Conda; it's multiprocessing implementation is broken.
@@ -40,11 +46,12 @@ pyinstaller ^
     --distpath ..\care-electron\resources\ ^
     --add-data models\vit_care.yml;models ^
     --add-data models\CARE_Traced.pt;models ^
-    --add-data models\md\md_v1000.0.0-redwood.pt;models ^
-    --add-data models\dino\dino_binary_classifier_v3.pt;models ^
-    --add-data models\dino\dino_species_classifier.pt;models ^
-    --add-data models\dino\dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth;models ^
+    --add-data models\md_v1000.0.0-redwood.pt;models ^
+    --add-data models\dino_binary_classifier_v3.pt;models ^
+    --add-data models\dino_species_classifier.pt;models ^
+    --add-data models\dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth;models ^
     --add-data models\CARE_Traced_GPUv.pt;models ^
+    --add-data dinov3;. ^
     main.py
 
 endlocal

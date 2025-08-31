@@ -29,7 +29,7 @@ def md_detection(image_folder: str, output_file: str, logfile) -> None:
         log_message(logfile, f"The path '{image_folder}' does not exist.")
         return
     
-    detector_filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models/md/md_v1000.0.0-redwood.pt')
+    detector_filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models/md_v1000.0.0-redwood.pt')
 
     # Ensure the output directory exists
     output_dir = os.path.dirname(output_file)
@@ -91,7 +91,7 @@ def create_linear_input(x_tokens_list, use_n_blocks, use_avgpool):
 def load_dino_model(device):
     """Load DINO model for feature extraction"""
     repo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dinov3")
-    weights_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models/dino/dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth")
+    weights_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models/dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth")
     model = torch.hub.load(
         repo, 
         'dinov3_vith16plus', 
@@ -323,8 +323,8 @@ def predict_multiple_species_batched(detection_filepath: str,
     
     print("Loading models...")
     # Load the state dictionary and create the linear classifier
-    species_classifier_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models/dino/dino_species_classifier.pt')
-    binary_classifier_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models/dino/dino_binary_classifier_v3.pt')
+    species_classifier_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models/dino_species_classifier.pt')
+    binary_classifier_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models/dino_binary_classifier_v3.pt')
     
     dino_state_dict = torch.load(species_classifier_path, map_location=device)
     
@@ -531,7 +531,11 @@ def run(original_images_dir, output_images_dir, json_output_dir, log_dir=''):
     # Step 1: Run MegaDetector
     print("Running MegaDetector...")
     log_message(log_file, "Running MegaDetector...")
-    md_detection(original_images_dir, detection_filepath, log_file)
+    try:
+        md_detection(original_images_dir, detection_filepath, log_file)
+    except Exception as e:
+        log_message(log_file, f"Error running MegaDetector: {str(e)}")
+        raise e
 
     # Configurable batch sizes - adjust based on GPU memory
     feature_batch_size = 8 if device.type == 'cuda' else 4  # For feature extraction (more memory intensive)
@@ -539,7 +543,8 @@ def run(original_images_dir, output_images_dir, json_output_dir, log_dir=''):
     
     log_message(log_file, f"Starting species classification with batch sizes: feature={feature_batch_size}, classification={classification_batch_size}")
     
-    predict_multiple_species_batched(
+    try:
+        predict_multiple_species_batched(
         detection_filepath,
         json_output_dir,
         output_images_dir,
@@ -548,7 +553,10 @@ def run(original_images_dir, output_images_dir, json_output_dir, log_dir=''):
         feature_batch_size=feature_batch_size,
         classification_batch_size=classification_batch_size,
         log_file=log_file
-    )
+        )
+    except Exception as e:
+        log_message(log_file, f"Error running DINO detection pipeline: {str(e)}")
+        raise e
     
     print("STATUS: DONE", flush=True)
     log_message(log_file, "DINO detection pipeline completed successfully")
