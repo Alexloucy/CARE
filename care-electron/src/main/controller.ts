@@ -587,26 +587,34 @@ export async function browseDetectImage(
 
         // Step 4: Filtering logic based on the query parameters
         const isLabelNoDetection = filterLabel === 'No Detection' // Check if filterLabel is the string "NoDetection"
-        
+
         // Check if label represents "no detection" - can be null, empty array, or array containing 'blank'
-        const labelIsNoDetection = !predictions || predictions.length === 0 ||
+        const labelIsNoDetection =
+          !predictions ||
+          predictions.length === 0 ||
           (predictions[0] && predictions[0].label === null) ||
-          predictions.every(l => l && l.label === 'blank')
-        
+          predictions.every((l) => l && l.label === 'blank')
+
+        // Keep the prediction array when one of the predictions has the filterLabel
         const isLabelMatch = isLabelNoDetection
           ? labelIsNoDetection
-          : !filterLabel || (
-              Array.isArray(predictions)
-                ? predictions.some(l => l && l.label === filterLabel)
-                : predictions && predictions.label === filterLabel
-            )
+          : !filterLabel ||
+            (Array.isArray(predictions)
+              ? predictions.some((l) => l && l.label === filterLabel)
+              : predictions && predictions.label === filterLabel)
 
         // Apply confidence filtering only if filterLabel is not "null"
         // keep the prediction array when one of the predictions has a confidence within the range
         const isConfidenceMatch =
           !isLabelNoDetection &&
           Array.isArray(predictions) &&
-          predictions.some(l => l && typeof l.confidence === 'number' && l.confidence >= confLow && l.confidence <= confHigh)
+          predictions.some(
+            (l) =>
+              l &&
+              typeof l.confidence === 'number' &&
+              l.confidence >= confLow &&
+              l.confidence <= confHigh
+          )
 
         if (isLabelMatch && (isLabelNoDetection || isConfidenceMatch)) {
           return { name: file, isDirectory: false, path: path.join(folderPath, file) }
@@ -677,22 +685,23 @@ async function getDetectFilePaths(
       // Step 3: Extract label and confidence from the corresponding JSON file
       const predictions = await extractLabelAndConfidence(jsonFilePath)
       if (predictions) {
-
         // Step 4: Filtering logic based on the query parameters
         const isLabelNoDetection = filterLabel === 'No Detection' // Check if filterLabel is the string "NoDetection"
-        
+
         // Check if label represents "no detection" - can be null, empty array, or array containing only 'blank'
-        const labelIsNoDetection = !predictions || predictions.length === 0 ||
+        const labelIsNoDetection =
+          !predictions ||
+          predictions.length === 0 ||
           (predictions[0] && predictions[0].label === null) ||
-          predictions.every(l => l && l.label === 'blank')
-        
+          predictions.every((l) => l && l.label === 'blank')
+
+        // keep the prediction array when one of the predictions has the filterLabel
         const isLabelMatch = isLabelNoDetection
           ? labelIsNoDetection
-          : !filterLabel || (
-              Array.isArray(predictions)
-                ? predictions.some(l => l && l.label === filterLabel)
-                : predictions && predictions.label === filterLabel
-            )
+          : !filterLabel ||
+            (Array.isArray(predictions)
+              ? predictions.some((l) => l && l.label === filterLabel)
+              : predictions && predictions.label === filterLabel)
         console.log('isLabelMatch: ', isLabelMatch)
         console.log('filepath: ', filePath)
         // Apply confidence filtering only if filterLabel is not "null"
@@ -700,7 +709,7 @@ async function getDetectFilePaths(
         const isConfidenceMatch =
           !isLabelNoDetection &&
           Array.isArray(predictions) &&
-          predictions.some(l => l && l.confidence >= confLow && l.confidence <= confHigh)
+          predictions.some((l) => l && l.confidence >= confLow && l.confidence <= confHigh)
         console.log('isConfidenceMatch: ', isConfidenceMatch)
         if (isLabelMatch && (isLabelNoDetection || isConfidenceMatch)) {
           const relativePath = path.relative(baseDir, filePath)
