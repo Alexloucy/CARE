@@ -71,8 +71,10 @@ def main():
                 "json_output_dir",
                 "log_dir",
             ]
-            # Use DINO detection for both GPU and CPU
-            run = detection_dino.run
+            if torch.cuda.is_available() or torch.backends.mps.is_available():
+                run = detection_gpu.run
+            else:
+                run = detection_cpu.run
         case _:
             print(f"Invalid option {task}")
             sys.exit(1)
