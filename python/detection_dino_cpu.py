@@ -147,7 +147,7 @@ def filter_bboxes(detections, iou_threshold=0.3):
 def make_inference_detection(path_to_img, output_dir, original_root, log_file):
     global md_model, dino_model, dino_binary_classifier, dino_species_classifier, img_transform, device
     
-    image_filename = os.path.basename(path_to_img)
+    image_filename = path_to_img
     dino_class_to_idx = {'Hedgehog': 0, 'bird': 1, 'cat': 2, 'deer': 3, 'dog': 4, 'ferret': 5, 'goat': 6, 'kea': 7, 'kiwi': 8, 'lagomorph': 9, 'livestock': 10, 'parakeet': 11, 'pig': 12, 'possum': 13, 'pukeko': 14, 'rodent': 15, 'stoat': 16, 'takahe': 17, 'tomtit': 18, 'tui': 19, 'wallaby': 20, 'weasel': 21, 'weka': 22, 'yellow_eyed_penguin': 23}
     idx_to_dino_class = {v: k for k, v in dino_class_to_idx.items()}
 
@@ -158,21 +158,13 @@ def make_inference_detection(path_to_img, output_dir, original_root, log_file):
 
         # Run MegaDetector on single image
         results = load_and_run_detector_batch(md_model, [path_to_img])
-        
-        if not results or 'images' not in results or not results['images']:
+
+        if not results:
             log_message(log_file, f"No MegaDetector results for image '{image_filename}'.")
             return None
-            
-        image_result = results['images'][0]
-        detections = image_result.get('detections', [])
-        
-        if not detections:
-            log_message(log_file, f"No detections in image '{image_filename}'.")
-            return {
-                "image": image_filename,
-                "boxes": [{"label": None, "confidence": 0, "bbox": []}]
-            }
-        
+
+        detections = results[0].get('detections', [])
+
         # Filter bounding boxes
         bbox_list_filtered, bbox_conf_list_filtered = filter_bboxes(detections)
         
@@ -201,7 +193,7 @@ def make_inference_detection(path_to_img, output_dir, original_root, log_file):
                     binary_output = dino_binary_classifier(features)
                     binary_pred = torch.argmax(binary_output, dim=1).item()
                     binary_conf = F.softmax(binary_output, dim=1).max().item()
-                    
+
                     if binary_pred == 1:  # Animal detected
                         # Species classification
                         species_output = dino_species_classifier(features)
@@ -213,7 +205,7 @@ def make_inference_detection(path_to_img, output_dir, original_root, log_file):
                     else:  # Blank detection
                         predicted_class = 'blank'
                         confidence = binary_conf
-                
+
                 bounding_boxes.append({
                     "label": predicted_class,
                     "confidence": float(confidence),
@@ -227,14 +219,13 @@ def make_inference_detection(path_to_img, output_dir, original_root, log_file):
                     "confidence": 0,
                     "bbox": [float(coord) for coord in bbox]
                 })
-
         return {
             "image": image_filename,
             "boxes": bounding_boxes
         }
 
     except Exception as e:
-        log_message(log_file, f"Error processing image '{image_filename}': {str(e)}")
+        log_message(log_file, f"Error processing imagev during detection '{image_filename}': {e}")
         return None
 
 
@@ -267,7 +258,7 @@ def worker_process(args):
                     })
             
             # Use save_detection_results from detection_utils
-            save_detection_results([prediction_result], output_dir, original_root, json_output_dir, log_file)
+            save_detection_results(prediction_result['predictions'], output_dir, original_root, json_output_dir, log_file)
             
             log_message(log_file, f"Detection info for '{detection_info['image']}' has been processed and saved.")
         else:

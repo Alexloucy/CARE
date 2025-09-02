@@ -48,7 +48,7 @@ def md_detection(image_folder: str, output_file: str, logfile) -> None:
         log_message(logfile, f"No images found in the specified folder '{image_folder}'.")
         return
 
-    # This will automatically download MDv5a; you can also specify a filename.
+
     results = load_and_run_detector_batch(detector_filename, image_file_names)
 
     # Write results to a format that Timelapse and other downstream tools like.
