@@ -7,11 +7,60 @@ import sys
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
+import torch.nn as nn
 
 from config import cfg
 from datetime import datetime
 from PIL import Image
 from pathlib import Path
+
+class DinoStudent(nn.Module):
+    def __init__(
+        self,
+        cfg,
+        student_backbone,
+        dimention_student,
+        dimention_teacher,
+        num_classes_per_domain,
+    ):
+        super().__init__()
+        self.backbone = student_backbone
+        self.cfg = cfg
+        self.proj = nn.Linear(dimention_student, dimention_teacher, bias=False)
+        self.classifiers = nn.ModuleDict(
+            {
+                f"domain_{int(domain)}": nn.Linear(
+                    dimention_student, int(num_classes)
+                )
+                for domain, num_classes in num_classes_per_domain.items()
+            }
+        )
+
+    def forward(self, x):
+        feature_student = create_linear_input(
+            self.backbone.get_intermediate_layers(x, n=1, return_class_token=True),
+            1,
+            False,
+        )
+        feature_student_teacher_space = self.proj(feature_student)
+        return feature_student_teacher_space, feature_student
+
+    # def classifier_logits(self, features, domains):
+    #     if len(domains) == 0:
+    #         raise ValueError("Expected at least one domain entry to compute logits.")
+    #     domain = domains[0]
+    #     if isinstance(domain, torch.Tensor):
+    #         domain = domain.item()
+    #     for dom in domains:
+    #         dom_val = dom.item() if isinstance(dom, torch.Tensor) else dom
+    #         if dom_val != domain:
+    #             raise ValueError(
+    #                 "Mixed-domain batches are not supported for DinoStudent classifiers."
+    #             )
+    #     classifier_key = f"domain_{int(domain)}"
+    #     if classifier_key not in self.classifiers:
+    #         raise KeyError(f"No classifier registered for {classifier_key}.")
+    #     return self.classifiers[classifier_key](features)
 
 def create_log_file(log_dir: str = '') -> str:
     """
@@ -61,14 +110,23 @@ def create_linear_input(x_tokens_list, use_n_blocks, use_avgpool):
         output = output.reshape(output.shape[0], -1)
     return output.float()
 
-
-def get_dino_embedding(model, image, device):
+def get_dino_finetune_embedding(model, image, device):
     with torch.no_grad():
+        image = image.to(device)
+        _, feature = model(image)
+        feature = feature.to(device)
+        feature = nn.functional.normalize(feature, dim=-1, eps=1e-6)
+    return feature
+
+def get_dino_zeroshot_embedding(model, image, device):
+    with torch.no_grad():
+        image = image.to(device)
         x_tokens_list = model.get_intermediate_layers(
             image, n=1, return_class_token=True
         )
         feature = create_linear_input(x_tokens_list, 1, False)
         feature = feature.to(device)
+        feature = nn.functional.normalize(feature, dim=-1, eps=1e-6)
     return feature
 
 def compute_distances(model, query_image, gallery_images, is_duplicate, device):
@@ -76,11 +134,11 @@ def compute_distances(model, query_image, gallery_images, is_duplicate, device):
     Compute the distances between the query image and the gallery images.
     """
     list_of_dist = []
-    query_embedding = get_dino_embedding(query_image)    # forward pass to get the embedding of the query image
+    query_embedding = get_dino_finetune_embedding(model, query_image, device)    # forward pass to get the embedding of the query image
 
     # Calculate the similarity and distance.
     for index in range(len(gallery_images)):
-        gallery_embedding = get_dino_embedding(gallery_images[index])    # forward pass to get the embedding of the gallery image
+        gallery_embedding = get_dino_finetune_embedding(model, gallery_images[index], device)    # forward pass to get the embedding of the gallery image
         similarity = F.cosine_similarity(query_embedding, gallery_embedding)
         dist = 1 - similarity
         list_of_dist.append(dist.cpu().detach().numpy()[0])
@@ -278,8 +336,9 @@ def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = ''):
     log_file = create_log_file(log_dir)
     clear_cropped_folder(output_dir, log_file)
 
-    model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth")
-    cfg_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "vit_care.yml")
+    zeroshot_model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth")
+    model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "dino_finetune_distill-weights-only.pth")
+    cfg_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "dinodistill.yaml")
 
     print("STATUS: BEGIN", flush=True)
 
@@ -297,6 +356,7 @@ def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = ''):
         log_message(log_file, 'Using CPU. Note: Using CPU may be slow.')
 
     # Read and import the cfg file.
+    cfg.set_new_allowed(True)
     cfg.merge_from_file(cfg_file_path)
     cfg.merge_from_list([])
     cfg.freeze()
@@ -304,14 +364,35 @@ def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = ''):
     # Load the traced reid model.
     try:
         repo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dinov3")
-        dino_model = torch.hub.load(
-                        repo, 
-                        'dinov3_vith16plus', 
-                        source='local', 
-                        weights=model_path
-                    )
-        dino_model = dino_model.to(DEVICE)
-        dino_model.eval()    # set the model in evaluation mode
+        # dino_zeroshot_model = torch.hub.load(
+        #                 repo, 
+        #                 'dinov3_vith16plus', 
+        #                 source='local', 
+        #                 weights=model_path
+        #             )
+        # dino_zeroshot_model = dino_zeroshot_model.to(DEVICE)
+        # dino_zeroshot_model.eval()    # set the model in evaluation mode
+
+        dino_finetuned_model = DinoStudent(
+            cfg,
+            student_backbone=torch.hub.load(
+                repo,
+                "dinov3_vith16plus",
+                source="local",
+                weights=zeroshot_model_path,
+            ),
+            dimention_student=1280,
+            dimention_teacher=4096,
+            num_classes_per_domain={"0": 22},
+        )
+        checkpoint = torch.load(model_path, map_location="cpu")
+        missing, unexpected = dino_finetuned_model.backbone.load_state_dict(
+            checkpoint, strict=False
+        )
+        print("Missing", missing)
+        print("Unexpected", unexpected)
+        dino_finetuned_model = dino_finetuned_model.to(DEVICE)
+        dino_finetuned_model.eval()    # set the model in evaluation mode
     except Exception as e:
         log_message(log_file, f'Errors: {e}')
         raise e
@@ -332,7 +413,7 @@ def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = ''):
 
     # Compute the similarity of each matched image pair.
     for index in range(total_images):
-        dist = compute_distances(model = dino_model,
+        dist = compute_distances(model = dino_finetuned_model,
                                  query_image = cropped_images[index],
                                  gallery_images = cropped_images,
                                  is_duplicate = True,    # check whether the query image has a duplicate in Gallery

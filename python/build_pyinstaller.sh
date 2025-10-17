@@ -9,13 +9,14 @@ if [ ! -n "$VIRTUAL_ENV" ]; then
 fi
 
 models=(
-    "models/vit_care.yml"
-    "models/CARE_Traced.pt"
+    # "models/vit_care.yml"
+    # "models/CARE_Traced.pt"
     "models/md_v1000.0.0-redwood.pt"
     "models/dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth"
     "models/dino_species_classifier.pt"
     "models/dino_binary_classifier_v3.pt"
-    "models/CARE_Traced_GPUv.pt"
+    "models/dino_finetune_distill.pth.tar-weights-only.pth"
+    "models/dinodistill.yaml"
 )
 
 for model in "${models[@]}"; do
@@ -37,12 +38,14 @@ pyinstaller \
     --noconfirm \
     --name care-detect-reid \
     --distpath ../care-electron/resources/ \
-    --add-data models/vit_care.yml:models \
-    --add-data models/CARE_Traced.pt:models \
-    --add-data models/CARE_Traced_GPUv.pt:models \
+    # --add-data models/vit_care.yml:models \
+    # --add-data models/CARE_Traced.pt:models \
+    # --add-data models/CARE_Traced_GPUv.pt:models \
     --add-data models/md_v1000.0.0-redwood.pt:models \
     --add-data models/dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth:models \
     --add-data models/dino_species_classifier.pt:models \
     --add-data models/dino_binary_classifier_v3.pt:models \
     --add-data dinov3:dinov3 \
+    --add-data models/dino_finetune_distill.pth.tar-weights-only.pth:models \
+    --add-data models/dinodistill.yaml:models \
     main.py

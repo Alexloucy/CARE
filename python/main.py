@@ -39,6 +39,7 @@ import logging
 import traceback
 
 import detection_dino_cpu
+import reid_dino
 import reid_cpu
 import reid_gpu
 import detection_dino
@@ -80,9 +81,9 @@ def main():
                     "log_dir",
                 ]
                 if torch.cuda.is_available():
-                    run = reid_gpu.run
+                    run = reid_dino.run
                 else:
-                    run = reid_cpu.run
+                    run = reid_dino.run
             case "detection":
                 args = [
                     "original_images_dir",
