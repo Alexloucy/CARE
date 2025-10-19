@@ -702,15 +702,15 @@ async function getDetectFilePaths(
             (Array.isArray(predictions)
               ? predictions.some((l) => l && l.label === filterLabel)
               : predictions && predictions.label === filterLabel)
-        console.log('isLabelMatch: ', isLabelMatch)
-        console.log('filepath: ', filePath)
+        // console.log('isLabelMatch: ', isLabelMatch)
+        // console.log('filepath: ', filePath)
         // Apply confidence filtering only if filterLabel is not "null"
         // keep the prediction array when one of the predictions has a confidence within the range
         const isConfidenceMatch =
           !isLabelNoDetection &&
           Array.isArray(predictions) &&
           predictions.some((l) => l && l.confidence >= confLow && l.confidence <= confHigh)
-        console.log('isConfidenceMatch: ', isConfidenceMatch)
+        // console.log('isConfidenceMatch: ', isConfidenceMatch)
         if (isLabelMatch && (isLabelNoDetection || isConfidenceMatch)) {
           const relativePath = path.relative(baseDir, filePath)
           results.push(relativePath)

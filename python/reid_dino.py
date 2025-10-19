@@ -186,7 +186,7 @@ def process_dist_mat_v2(dist_mat):
     for r in range(len(dist_mat)):
         row = dist_mat[r]
         min_dist = np.min(row)
-        candidates_bool = np.abs(row - min_dist) <= 0.05
+        candidates_bool = np.abs(row - min_dist) <= 0.03
         candidates_index = np.where(candidates_bool)[0]
         candidates_key = keys[candidates_index]
         current_counter = np.max(keys)
