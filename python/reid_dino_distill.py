@@ -45,23 +45,6 @@ class DinoStudent(nn.Module):
         feature_student_teacher_space = self.proj(feature_student)
         return feature_student_teacher_space, feature_student
 
-    # def classifier_logits(self, features, domains):
-    #     if len(domains) == 0:
-    #         raise ValueError("Expected at least one domain entry to compute logits.")
-    #     domain = domains[0]
-    #     if isinstance(domain, torch.Tensor):
-    #         domain = domain.item()
-    #     for dom in domains:
-    #         dom_val = dom.item() if isinstance(dom, torch.Tensor) else dom
-    #         if dom_val != domain:
-    #             raise ValueError(
-    #                 "Mixed-domain batches are not supported for DinoStudent classifiers."
-    #             )
-    #     classifier_key = f"domain_{int(domain)}"
-    #     if classifier_key not in self.classifiers:
-    #         raise KeyError(f"No classifier registered for {classifier_key}.")
-    #     return self.classifiers[classifier_key](features)
-
 def create_log_file(log_dir: str = '') -> str:
     """
     Create a log file with a timestamp.
@@ -186,7 +169,7 @@ def process_dist_mat_v2(dist_mat):
     for r in range(len(dist_mat)):
         row = dist_mat[r]
         min_dist = np.min(row)
-        candidates_bool = np.abs(row - min_dist) <= 0.03
+        candidates_bool = np.abs(row - min_dist) <= 0.01
         candidates_index = np.where(candidates_bool)[0]
         candidates_key = keys[candidates_index]
         current_counter = np.max(keys)
