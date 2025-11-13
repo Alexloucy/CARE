@@ -57,14 +57,15 @@ class CustomDino(nn.Module):
         # Get cls token from DINO
         x_tokens_list = self.dino_model.get_intermediate_layers(image, n=1, return_class_token=True)
         image_features = create_linear_input(x_tokens_list, 1, False)
-        image_features = torch.nn.functional.normalize(image_features, dim=-1, eps=1e-6)
+        # Normalize only at the end; keep raw features here
         base_features = image_features
         if isinstance(time, int):
             time = torch.tensor([time]).to(base_features.device)
         else:
             time = torch.tensor(time).to(base_features.device)
         
-        mixed_features = base_features.clone()
+        # Mix in-place; avoid cloning to save memory
+        mixed_features = base_features
 
         
         if self.day_night_adapter:
@@ -159,7 +160,7 @@ def create_linear_input(x_tokens_list, use_n_blocks, use_avgpool):
             dim=-1,
         )
         output = output.reshape(output.shape[0], -1)
-    return output.float()
+    return output
 
 def get_dino_with_adapter_embedding(model, image, device, is_day_list=None):
     with torch.no_grad(), autocast(device_type=device.type, dtype=torch.float16, enabled=_fp16_supported(device)):
@@ -229,8 +230,8 @@ def process_dist_mat_v2(dist_mat):
     for r in range(len(dist_mat)):
         row = dist_mat[r]
         print(f"Row {r} distances: {row}")
-        min_dist = np.min(row)
-        candidates_bool = np.abs(row - min_dist) <= 0.001
+        min_dist = 0
+        candidates_bool = np.abs(row - min_dist) <= 0.005
         candidates_index = np.where(candidates_bool)[0]
         candidates_key = keys[candidates_index]
         current_counter = np.max(keys)
@@ -381,7 +382,7 @@ def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = ''):
     clear_cropped_folder(output_dir, log_file)
 
     dino_backbone_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth")
-    adapter_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "DinoAdapter_Stoat_day_night_mixed_precision.pth")
+    adapter_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "DinoAdapter_Stoat_day_night_mixed_eval.pth.tar25")
     cfg_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "dinoadapter_inference.yaml")
 
     print("STATUS: BEGIN", flush=True)
