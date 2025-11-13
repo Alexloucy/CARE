@@ -15,8 +15,8 @@ models=(
     "models/dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth"
     "models/dino_species_classifier.pt"
     "models/dino_binary_classifier_v3.pt"
-    "models/dino_finetune_distill.pth.tar-weights-only.pth"
-    "models/dinodistill.yaml"
+    "models/DinoAdapter_Stoat_day_night_mixed_precision.pth"
+    "models/dinoadapter_inference.yaml"
 )
 
 for model in "${models[@]}"; do
@@ -46,6 +46,6 @@ pyinstaller \
     --add-data models/dino_species_classifier.pt:models \
     --add-data models/dino_binary_classifier_v3.pt:models \
     --add-data dinov3:dinov3 \
-    --add-data models/dino_finetune_distill.pth.tar-weights-only.pth:models \
-    --add-data models/dinodistill.yaml:models \
+    --add-data models/DinoAdapter_Stoat_day_night_mixed_precision.pth:models \
+    --add-data models/dinoadapter_inference.yaml:models \
     main.py
