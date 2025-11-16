@@ -15,7 +15,7 @@ models=(
     "models/dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth"
     "models/dino_species_classifier.pt"
     "models/dino_binary_classifier_v3.pt"
-    “models/DinoAdapter_Stoat_day_night_mixed_eval.pth.tar25"
+    “models/DinoAdapter_Stoat_day_night_mixed_precision.pth.tar25"
     "models/dinoadapter_inference.yaml"
 )
 
@@ -46,6 +46,6 @@ pyinstaller \
     --add-data models/dino_species_classifier.pt:models \
     --add-data models/dino_binary_classifier_v3.pt:models \
     --add-data dinov3:dinov3 \
-    --add-data models/DinoAdapter_Stoat_day_night_mixed_eval.pth.tar25:models \
+    --add-data models/DinoAdapter_Stoat_day_night_mixed_precision.pth.tar25:models \
     --add-data models/dinoadapter_inference.yaml:models \
     main.py

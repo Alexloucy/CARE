@@ -190,7 +190,7 @@ def compute_distances(model, query_image, gallery_images, is_duplicate, device, 
     list_of_dist = np.array(list_of_dist)
 
     if is_duplicate:
-        list_of_dist[np.argmin(list_of_dist)] = list_of_dist[np.argmax(list_of_dist)] + 1
+        list_of_dist[np.argmin(list_of_dist)] = np.inf  # set the distance to itself as infinity to avoid matching
     return list_of_dist
 
 
@@ -230,8 +230,8 @@ def process_dist_mat_v2(dist_mat):
     for r in range(len(dist_mat)):
         row = dist_mat[r]
         print(f"Row {r} distances: {row}")
-        min_dist = 0
-        candidates_bool = np.abs(row - min_dist) <= 0.005
+        min_dist = np.min(row)
+        candidates_bool = np.abs(row - min_dist) <= 0.001
         candidates_index = np.where(candidates_bool)[0]
         candidates_key = keys[candidates_index]
         current_counter = np.max(keys)
@@ -382,7 +382,7 @@ def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = ''):
     clear_cropped_folder(output_dir, log_file)
 
     dino_backbone_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth")
-    adapter_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "DinoAdapter_Stoat_day_night_mixed_eval.pth.tar25")
+    adapter_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "DinoAdapter_Stoat_day_night_mixed_precision.pth.tar25")
     cfg_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "dinoadapter_inference.yaml")
 
     print("STATUS: BEGIN", flush=True)
