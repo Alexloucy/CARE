@@ -64,6 +64,7 @@ class CustomDino(nn.Module):
         else:
             time = torch.tensor(time).to(base_features.device)
         
+        unique_times = torch.unique(time)
         # Mix in-place; avoid cloning to save memory
         mixed_features = base_features
 
@@ -74,7 +75,7 @@ class CustomDino(nn.Module):
             day_adapter = self.adapter_dict["adapter_0_day"]
             night_adapter = self.adapter_dict["adapter_0_night"]
             # iterate through day and night adapters
-            for t in time.tolist():
+            for t in unique_times.tolist():
                 idx = (time == t).nonzero(as_tuple=False).squeeze(1)
                 sub_base_features = base_features.index_select(0, idx)
                 if t == 1:  # day
@@ -173,51 +174,71 @@ def _fp16_supported(device):
     fp16_supported = device.type == "cuda" or (device.type == "mps" and torch.backends.mps.is_built())
     return fp16_supported
 
-def compute_distances(model, query_image, gallery_images, is_duplicate, device, query_time, gallery_time):
+
+def compute_embeddings_batched(model, images, times, device, batch_size: int) -> np.ndarray:
     """
-    Compute the distances between the query image and the gallery images.
+    Compute L2-normalized embeddings for all images in mini-batches.
+
+    Args:
+        model: DINO+adapter model.
+        images: list of tensors, each of shape [1, C, H, W].
+        times: list of day/night flags aligned with images.
+        device: torch.device to run on.
+        batch_size: batch size for inference.
+
+    Returns:
+        embeddings: NumPy array of shape [N, D].
     """
-    list_of_dist = []
-    query_embedding = get_dino_with_adapter_embedding(model, query_image, device, query_time)    # forward pass to get the embedding of the query image
+    embeddings = []
+    total = len(images)
+    processed = 0
 
-    # Calculate the similarity and distance.
-    for index in range(len(gallery_images)):
-        gallery_embedding = get_dino_with_adapter_embedding(model, gallery_images[index], device, gallery_time[index])    # forward pass to get the embedding of the gallery image
-        similarity = F.cosine_similarity(query_embedding, gallery_embedding)
-        dist = 1 - similarity
-        list_of_dist.append(dist.cpu().detach().numpy()[0])
+    for start in range(0, total, batch_size):
+        end = min(start + batch_size, total)
+        batch_images = images[start:end]
+        batch_times = times[start:end]
 
-    list_of_dist = np.array(list_of_dist)
+        # Concatenate into a single batch tensor: [B, C, H, W]
+        batch_tensor = torch.cat(batch_images, dim=0)
 
-    if is_duplicate:
-        list_of_dist[np.argmin(list_of_dist)] = np.inf  # set the distance to itself as infinity to avoid matching
-    return list_of_dist
+        batch_embedding = get_dino_with_adapter_embedding(
+            model,
+            batch_tensor,
+            device,
+            batch_times,
+        )
+        # batch_embedding: [B, D]
+        batch_np = batch_embedding.cpu().float().numpy()
+        embeddings.append(batch_np)
+
+        processed += (end - start)
+        print(f"PROCESS: {processed}/{total}", flush=True)
+
+    return np.concatenate(embeddings, axis=0)  # [N, D], L2-normalized
 
 
-def process_dist_mat(dist_mat):
-    output_dict = dict()
-    number_of_images = len(dist_mat)
-    keys = [-1] * number_of_images
-    counter = 0
-    for r in range(len(dist_mat)):
-        row = dist_mat[r]
-        matched_index = np.argmin(row)
+def compute_distance_matrix(embeddings: np.ndarray) -> np.ndarray:
+    """
+    Build a cosine distance matrix and apply the same per-row masking
+    behavior as the original compute_distances(is_duplicate=True).
 
-        if keys[r] == -1 and keys[matched_index] == -1:
-            output_dict[counter] = [r]
-            keys[r] = counter
-            output_dict[keys[r]].append(matched_index)
-            keys[matched_index] = counter
-            counter += 1
+    Args:
+        embeddings: NumPy array of shape [N, D].
 
-        elif keys[r] == -1 and keys[matched_index] != -1:
-            output_dict[keys[matched_index]].append(r)
-            keys[r] = keys[matched_index]
+    Returns:
+        distance_mat: NumPy array of shape [N, N].
+    """
+    # Cosine similarity matrix: sim[i, j] = <emb_i, emb_j>
+    sim_matrix = embeddings @ embeddings.T
+    distance_mat = 1.0 - sim_matrix
 
-        elif keys[r] != -1 and keys[matched_index] == -1:
-            output_dict[keys[r]].append(matched_index)
-            keys[matched_index] = keys[r]
-    return output_dict
+    # For each row, set the minimum-distance entry to infinity.
+    for r in range(distance_mat.shape[0]):
+        row = distance_mat[r]
+        min_idx = np.argmin(row)
+        distance_mat[r, min_idx] = np.inf
+
+    return distance_mat
 
 
 def process_dist_mat_v2(dist_mat):
@@ -377,7 +398,7 @@ def clear_cropped_folder(cropped_dir, log_file):
                 log_message(log_file, f"Error deleting directory {dir_path}: {e}")
 
 
-def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = ''):
+def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = '', batch_size: int | str = 4):
     log_file = create_log_file(log_dir)
     clear_cropped_folder(output_dir, log_file)
 
@@ -445,28 +466,35 @@ def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = ''):
         print("STATUS: DONE", flush=True)
         sys.exit(0)
 
-    distance_mat = []    # a distance matrix
-    cropped_images = [load_and_preprocess_image(img_path) for img_path in cropped_image_paths]
-    is_day_list = [is_day for _, is_day in cropped_images]
-    cropped_images = [img for img, _ in cropped_images]
+    # Load all cropped images and corresponding day/night flags
+    cropped_with_meta = [load_and_preprocess_image(img_path) for img_path in cropped_image_paths]
+    is_day_list = [is_day for _, is_day in cropped_with_meta]
+    cropped_images = [img for img, _ in cropped_with_meta]
     log_message(log_file, cropped_images)
 
     print("STATUS: PROCESSING", flush=True)
 
     total_images = len(cropped_image_paths)
 
-    # Compute the similarity of each matched image pair.
-    for index in range(total_images):
-        dist = compute_distances(model = dino_with_adapter,
-                                 query_image = cropped_images[index],
-                                 gallery_images = cropped_images,
-                                 is_duplicate = True,    # check whether the query image has a duplicate in Gallery
-                                 device = DEVICE,
-                                 query_time = is_day_list[index],
-                                 gallery_time = is_day_list)
-        distance_mat.append(dist)
+    # Ensure batch_size is an int
+    try:
+        batch_size_int = int(batch_size)
+        if batch_size_int <= 0:
+            raise ValueError
+    except (ValueError, TypeError):
+        batch_size_int = 4
+    batch_size = batch_size_int
 
-        print(f"PROCESS: {index+1}/{total_images}", flush=True)
+    # Compute embeddings in mini-batches for efficiency, then build the full distance matrix.
+    embeddings = compute_embeddings_batched(
+        dino_with_adapter,
+        cropped_images,
+        is_day_list,
+        DEVICE,
+        batch_size,
+    )
+
+    distance_mat = compute_distance_matrix(embeddings)
 
     id_dict = process_dist_mat_v2(distance_mat)
 
@@ -485,14 +513,15 @@ def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = ''):
 
 
 def main():
-    if len(sys.argv) != 5:
-        print("Usage: script.py <image_dir> <json_dir> <output_dir> <reid_output_dir>")
+    if len(sys.argv) not in (5, 6):
+        print("Usage: script.py <image_dir> <json_dir> <output_dir> <reid_output_dir> [batch_size]")
         sys.exit(1)
     image_dir = sys.argv[1]
     json_dir = sys.argv[2]
     output_dir = sys.argv[3]
     reid_output_dir = sys.argv[4]
-    run(image_dir, json_dir, output_dir, reid_output_dir)
+    batch_size = sys.argv[5] if len(sys.argv) == 6 else 4
+    run(image_dir, json_dir, output_dir, reid_output_dir, batch_size=batch_size)
 
 
 if __name__ == "__main__":
