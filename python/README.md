@@ -22,6 +22,10 @@ python3 -m venv .venv
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 pip install -r requirements-win32.txt
 ```
+Alternative venv activation with powershell:
+```
+.\.venv\Scripts\Activate.ps1
+```
 
 To install new packages:
 
@@ -59,11 +63,29 @@ and so we can't cancel an in process run when running in Conda.
 
 To run a development version inside the electron frontend, set the env var
 `PYTHON_SCRIPT_PATH` to the path to the cpu or gpu main script when running
-the electon process, e.g.:
+the electron process.
 
-```
+On macOS/Linux:
+
+```bash
 cd care-electron
 PYTHON_SCRIPT_PATH=../python/main.py npm run dev
+```
+
+On Windows (PowerShell):
+
+```powershell
+cd care-electron
+$env:PYTHON_SCRIPT_PATH = "../python/main.py"
+npm run dev
+```
+
+On Windows (Command Prompt):
+
+```bat
+cd care-electron
+set PYTHON_SCRIPT_PATH=../python/main.py
+npm run dev
 ```
 
 Unfortunately, you still need to have built the Pyinstaller server at least once
