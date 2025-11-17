@@ -64,6 +64,7 @@ class CustomDino(nn.Module):
         else:
             time = torch.tensor(time).to(base_features.device)
         
+        unique_times = torch.unique(time)
         # Mix in-place; avoid cloning to save memory
         mixed_features = base_features
 
@@ -74,7 +75,7 @@ class CustomDino(nn.Module):
             day_adapter = self.adapter_dict["adapter_0_day"]
             night_adapter = self.adapter_dict["adapter_0_night"]
             # iterate through day and night adapters
-            for t in time.tolist():
+            for t in unique_times.tolist():
                 idx = (time == t).nonzero(as_tuple=False).squeeze(1)
                 sub_base_features = base_features.index_select(0, idx)
                 if t == 1:  # day
@@ -377,7 +378,7 @@ def clear_cropped_folder(cropped_dir, log_file):
                 log_message(log_file, f"Error deleting directory {dir_path}: {e}")
 
 
-def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = ''):
+def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = '', batch_size: int | str = 4):
     log_file = create_log_file(log_dir)
     clear_cropped_folder(output_dir, log_file)
 
@@ -455,27 +456,52 @@ def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = ''):
 
     total_images = len(cropped_image_paths)
 
-    # Compute an embedding for each image once, then build the full distance matrix.
+    # Ensure batch_size is an int
+    try:
+        batch_size_int = int(batch_size)
+        if batch_size_int <= 0:
+            raise ValueError
+    except (ValueError, TypeError):
+        batch_size_int = 4
+    batch_size = batch_size_int
+
+    # Compute embeddings in mini-batches for efficiency, then build the full distance matrix.
     embeddings = []
-    for index in range(total_images):
-        embedding = get_dino_with_adapter_embedding(
+    processed = 0
+    for start in range(0, total_images, batch_size):
+        end = min(start + batch_size, total_images)
+        batch_images = cropped_images[start:end]
+        batch_times = is_day_list[start:end]
+
+        # Concatenate into a single batch tensor: [B, C, H, W]
+        batch_tensor = torch.cat(batch_images, dim=0)
+
+        batch_embedding = get_dino_with_adapter_embedding(
             dino_with_adapter,
-            cropped_images[index],
+            batch_tensor,
             DEVICE,
-            is_day_list[index],
+            batch_times,
         )
-        # embedding shape: [1, D] -> [D]
-        embeddings.append(embedding.squeeze(0).cpu().float().numpy())
+        # batch_embedding: [B, D]
+        batch_np = batch_embedding.cpu().float().numpy()
+        embeddings.append(batch_np)
 
-        print(f"PROCESS: {index+1}/{total_images}", flush=True)
+        processed += (end - start)
+        print(f"PROCESS: {processed}/{total_images}", flush=True)
 
-    embeddings = np.stack(embeddings, axis=0)  # [N, D], L2-normalized
+    embeddings = np.concatenate(embeddings, axis=0)  # [N, D], L2-normalized
 
     # Cosine similarity matrix: sim[i, j] = <emb_i, emb_j>
     sim_matrix = embeddings @ embeddings.T
     distance_mat = 1.0 - sim_matrix
-    # Avoid self-matching by setting diagonal distances to infinity
-    np.fill_diagonal(distance_mat, np.inf)
+
+    # Replicate original behavior of compute_distances(is_duplicate=True):
+    # for each row, set the minimum-distance entry to infinity. This is NOT
+    # necessarily the diagonal element if another image is closer than self.
+    for r in range(distance_mat.shape[0]):
+        row = distance_mat[r]
+        min_idx = np.argmin(row)
+        distance_mat[r, min_idx] = np.inf
 
     id_dict = process_dist_mat_v2(distance_mat)
 
@@ -494,14 +520,15 @@ def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = ''):
 
 
 def main():
-    if len(sys.argv) != 5:
-        print("Usage: script.py <image_dir> <json_dir> <output_dir> <reid_output_dir>")
+    if len(sys.argv) not in (5, 6):
+        print("Usage: script.py <image_dir> <json_dir> <output_dir> <reid_output_dir> [batch_size]")
         sys.exit(1)
     image_dir = sys.argv[1]
     json_dir = sys.argv[2]
     output_dir = sys.argv[3]
     reid_output_dir = sys.argv[4]
-    run(image_dir, json_dir, output_dir, reid_output_dir)
+    batch_size = sys.argv[5] if len(sys.argv) == 6 else 4
+    run(image_dir, json_dir, output_dir, reid_output_dir, batch_size=batch_size)
 
 
 if __name__ == "__main__":

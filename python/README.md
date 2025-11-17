@@ -65,6 +65,15 @@ To run a development version inside the electron frontend, set the env var
 `PYTHON_SCRIPT_PATH` to the path to the cpu or gpu main script when running
 the electron process.
 
+For the Re-ID pipeline, you can optionally pass a batch size
+to `main.py` when running the `reid` task, for example:
+
+```bash
+python main.py reid <image_dir> <json_dir> <output_dir> <reid_output_dir> <log_dir> 8
+```
+
+If the optional `batch_size` argument is omitted, a default of `4` is used.
+
 On macOS/Linux:
 
 ```bash

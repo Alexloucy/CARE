@@ -80,6 +80,7 @@ def main():
                     "reid_output_dir",
                     "log_dir",
                 ]
+                optional_args = ["batch_size"]
                 if torch.cuda.is_available():
                     run = reid_dino_adapter.run
                 else:
@@ -91,6 +92,7 @@ def main():
                     "json_output_dir",
                     "log_dir",
                 ]
+                optional_args = []
                 if torch.cuda.is_available() or torch.backends.mps.is_available():
                     run = detection_dino.run
                 else:
@@ -99,19 +101,28 @@ def main():
                 print(f"Invalid option {task}")
                 sys.exit(1)
 
-        if len(sys.argv) != len(args) + 2:
-            print(f"Invalid arguments for task {task} expected {args}")
+        min_args = len(args) + 2
+        max_args = len(args) + 2 + len(optional_args)
+        if not (min_args <= len(sys.argv) <= max_args):
+            print(f"Invalid arguments for task {task} expected {args} plus optional {optional_args}")
             print(f"sys.argv={sys.argv}")
             sys.exit(1)
 
         kwargs = {k: sys.argv[2 + i] for (i, k) in enumerate(args)}
+
+        # Append optional arguments if provided
+        extra_values = sys.argv[2 + len(args):]
+        for i, value in enumerate(extra_values):
+            if i < len(optional_args):
+                kwargs[optional_args[i]] = value
         
         # Setup logging before running
         setup_logging(kwargs['log_dir'])
         logging.info(f"Starting {task} with arguments: {kwargs}")
         
-        # Verify input/output paths exist
-        for path in kwargs.values():
+        # Verify input/output paths exist for path arguments only
+        for key in args:
+            path = kwargs[key]
             if not os.path.exists(path):
                 os.makedirs(path, exist_ok=True)
                 logging.info(f"Created directory: {path}")
