@@ -89,7 +89,7 @@ class CustomDino(nn.Module):
             adapter = self.adapter_dict["adapter_0"]
             sub_adapter_features = adapter(base_features)
             sub_mixed_features = (
-                adapter_ratio * sub_adapter_features + (1 - adapter_ratio) * sub_base_features
+                adapter_ratio * sub_adapter_features + (1 - adapter_ratio) * base_features
             )
 
         # Normalize mixed features for retrieval/metric learning
@@ -138,7 +138,7 @@ def load_and_preprocess_image(file_path):
     is_day = check_day_night(img)
 
     image_transforms = T.Compose([
-        T.Resize(cfg.INPUT.SIZE_TEST),
+        T.Resize(cfg.INPUT.SIZE),
         T.ToTensor(),
         T.Normalize(mean = cfg.INPUT.PIXEL_MEAN, std = cfg.INPUT.PIXEL_STD)
     ])                                 # define transformations
@@ -231,7 +231,7 @@ def process_dist_mat_v2(dist_mat):
         row = dist_mat[r]
         print(f"Row {r} distances: {row}")
         min_dist = np.min(row)
-        candidates_bool = np.abs(row - min_dist) <= 0.001
+        candidates_bool = np.abs(row - min_dist) <= 0.0005
         candidates_index = np.where(candidates_bool)[0]
         candidates_key = keys[candidates_index]
         current_counter = np.max(keys)
