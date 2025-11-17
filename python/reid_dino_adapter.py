@@ -445,28 +445,37 @@ def run(image_dir, json_dir, output_dir, reid_output_dir, log_dir = ''):
         print("STATUS: DONE", flush=True)
         sys.exit(0)
 
-    distance_mat = []    # a distance matrix
-    cropped_images = [load_and_preprocess_image(img_path) for img_path in cropped_image_paths]
-    is_day_list = [is_day for _, is_day in cropped_images]
-    cropped_images = [img for img, _ in cropped_images]
+    # Load all cropped images and corresponding day/night flags
+    cropped_with_meta = [load_and_preprocess_image(img_path) for img_path in cropped_image_paths]
+    is_day_list = [is_day for _, is_day in cropped_with_meta]
+    cropped_images = [img for img, _ in cropped_with_meta]
     log_message(log_file, cropped_images)
 
     print("STATUS: PROCESSING", flush=True)
 
     total_images = len(cropped_image_paths)
 
-    # Compute the similarity of each matched image pair.
+    # Compute an embedding for each image once, then build the full distance matrix.
+    embeddings = []
     for index in range(total_images):
-        dist = compute_distances(model = dino_with_adapter,
-                                 query_image = cropped_images[index],
-                                 gallery_images = cropped_images,
-                                 is_duplicate = True,    # check whether the query image has a duplicate in Gallery
-                                 device = DEVICE,
-                                 query_time = is_day_list[index],
-                                 gallery_time = is_day_list)
-        distance_mat.append(dist)
+        embedding = get_dino_with_adapter_embedding(
+            dino_with_adapter,
+            cropped_images[index],
+            DEVICE,
+            is_day_list[index],
+        )
+        # embedding shape: [1, D] -> [D]
+        embeddings.append(embedding.squeeze(0).cpu().float().numpy())
 
         print(f"PROCESS: {index+1}/{total_images}", flush=True)
+
+    embeddings = np.stack(embeddings, axis=0)  # [N, D], L2-normalized
+
+    # Cosine similarity matrix: sim[i, j] = <emb_i, emb_j>
+    sim_matrix = embeddings @ embeddings.T
+    distance_mat = 1.0 - sim_matrix
+    # Avoid self-matching by setting diagonal distances to infinity
+    np.fill_diagonal(distance_mat, np.inf)
 
     id_dict = process_dist_mat_v2(distance_mat)
 
