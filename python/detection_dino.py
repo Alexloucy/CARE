@@ -355,7 +355,7 @@ def predict_multiple_species_batched(detection_filepath: str,
     # Step 1: Collect all image-bbox pairs and create mapping
     print("Collecting image-bbox pairs...")
     all_image_bbox_pairs = []
-    image_bbox_to_result_mapping = []  # (image_idx, bbox_idx, bbox, filepath, filename)
+    image_bbox_to_result_mapping = []  # (image_idx, bbox_idx, bbox, bbox_conf, filepath, filename, pair_idx)
     
     for i, prediction in enumerate(data["images"]):
         filepath = prediction["file"]
@@ -377,6 +377,7 @@ def predict_multiple_species_batched(detection_filepath: str,
                         'image_idx': i,
                         'bbox_idx': j,
                         'bbox': bbox,
+                        'bbox_conf': bbox_conf_list_filtered[j],
                         'filepath': filepath,
                         'filename': filename,
                         'pair_idx': len(all_image_bbox_pairs) - 1  # Index in all_image_bbox_pairs
@@ -459,7 +460,8 @@ def predict_multiple_species_batched(detection_filepath: str,
                 "bounding_box": bbox,
                 "predicted_class": 'blank',
                 "prediction_source": "dino_binary",
-                "confidence": float(binary_conf)
+                "pred_confidence": float(binary_conf),
+                "detection_confidence": float(mapping['bbox_conf'])
             }
         else:  # Animal detection
             species_pred = species_predictions[pair_idx]
@@ -470,7 +472,8 @@ def predict_multiple_species_batched(detection_filepath: str,
                 "bounding_box": bbox,
                 "predicted_class": predicted_class,
                 "prediction_source": "dino",
-                "confidence": float(species_conf)
+                "pred_confidence": float(species_conf),
+                "detection_confidence": float(mapping['bbox_conf'])
             }
             print(f"DINO prediction for {mapping['filepath']}: {predicted_class} with confidence {species_conf:.4f}")
         
