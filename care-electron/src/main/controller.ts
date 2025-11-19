@@ -583,7 +583,9 @@ export async function browseDetectImage(
         // Step 3: Extract label and confidence from the corresponding JSON file
         const jsonData = await extractLabelAndConfidence(jsonFilePath)
         if (!jsonData) return null // Skip if the JSON cannot be read
-        const predictions = jsonData
+        let predictions = jsonData
+        predictions = predictions.filter((p) => p.label !== 'blank') // Filter out 'blank' labels
+        console.log('predictions: ', predictions)
 
         // Step 4: Filtering logic based on the query parameters
         const isLabelNoDetection = filterLabel === 'No Detection' // Check if filterLabel is the string "NoDetection"
@@ -611,9 +613,9 @@ export async function browseDetectImage(
           predictions.some(
             (l) =>
               l &&
-              typeof l.confidence === 'number' &&
-              l.confidence >= confLow &&
-              l.confidence <= confHigh
+              typeof l.pred_conf === 'number' &&
+              l.pred_conf >= confLow &&
+              l.pred_conf <= confHigh
           )
 
         if (isLabelMatch && (isLabelNoDetection || isConfidenceMatch)) {
