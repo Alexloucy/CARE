@@ -610,10 +610,7 @@ export async function browseDetectImage(
           Array.isArray(predictions) &&
           predictions.some(
             (l) =>
-              l &&
-              typeof l.confidence === 'number' &&
-              l.confidence >= confLow &&
-              l.confidence <= confHigh
+              l && typeof l.prconf === 'number' && l.pred_conf >= confLow && l.pred_conf <= confHigh
           )
 
         if (isLabelMatch && (isLabelNoDetection || isConfidenceMatch)) {

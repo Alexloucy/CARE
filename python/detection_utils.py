@@ -67,7 +67,8 @@ def save_detection_results(predictions, image_output_path, original_images_dir, 
 
             else:
                 for pred in predictions_list:
-                    conf = round(pred['confidence'], 2)
+                    pred_conf = round(pred['pred_confidence'], 2)
+                    detection_conf = round(pred.get('detection_confidence', 0), 2)
                     label = pred['predicted_class']
                     bounding_box = pred['bounding_box']
                     source = pred.get('prediction_source', 'DINO')
@@ -78,7 +79,8 @@ def save_detection_results(predictions, image_output_path, original_images_dir, 
 
                     json_results["boxes"].append({
                         "label": label,
-                        "confidence": float(conf),
+                        "pred_conf": float(pred_conf),
+                        "detection_conf": float(detection_conf),
                         "bbox": bounding_box,
                         "source": source
                     })
@@ -86,7 +88,7 @@ def save_detection_results(predictions, image_output_path, original_images_dir, 
                     if label != 'blank':
                         x1, y1, x2, y2 = list(map(int, bounding_box))
                         cv2.rectangle(image, (x1, y1), (x2, y2), (0, 0, 255), 15)
-                        label_text = f"{label} ({conf:.2f})"
+                        label_text = f"{label} ({pred_conf:.2f})"
                         font = cv2.FONT_HERSHEY_SIMPLEX
                         font_scale = 3.5
                         thickness = 10

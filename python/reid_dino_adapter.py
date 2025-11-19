@@ -252,7 +252,7 @@ def process_dist_mat_v2(dist_mat):
         row = dist_mat[r]
         print(f"Row {r} distances: {row}")
         min_dist = np.min(row)
-        candidates_bool = np.abs(row - min_dist) <= 0.0005
+        candidates_bool = np.abs(row - min_dist) <= 0.00065
         candidates_index = np.where(candidates_bool)[0]
         candidates_key = keys[candidates_index]
         current_counter = np.max(keys)
@@ -344,6 +344,9 @@ def crop_image_from_json(image_path, json_path, output_dir, original_root, log_f
         os.makedirs(output_dir_with_subfolders)
 
     base_name = os.path.splitext(os.path.basename(image_path))[0]
+
+    top_bbox = max(crop_info['boxes'], key=lambda x: x.get('detection_confidence', 0))
+    crop_info['boxes'] = [top_bbox]
 
     for i, bbox_info in enumerate(crop_info['boxes']):
         bbox = bbox_info['bbox']
