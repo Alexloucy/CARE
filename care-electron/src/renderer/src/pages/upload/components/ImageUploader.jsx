@@ -176,7 +176,7 @@ export default function ImageUploader() {
     } else {
       dispatch(
         add_message({
-          message: `Not all files were added. Accepted file types are jpeg and png.`,
+          message: `Not all files were added. Accepted file type is jpeg.`,
           status: bannerStatuses.error
         })
       )
