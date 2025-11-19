@@ -9,8 +9,25 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
-asarUnpack:
-  - resources/**
+extraResources:
+  - from: ../../pyenv
+    to: pyenv
+    filter:
+      - "**/*"
+  - from: ../python
+    to: python_src
+    filter:
+      - "**/*"
+      - "!**/__pycache__/**"
+      - "!**/*.pyc"
+      - "!build/**"
+      - "!dist/**"
+      - "!**/*.spec"
+      - "!_internal/**"
+      - "!**/_det_*/**"
+      - "!**/_reid_*/**"
+      - "!**/_logs_*/**"
+      - "!**/.venv/**"
 win:
   executableName: care-electron
 nsis:

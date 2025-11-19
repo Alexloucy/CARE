@@ -24,6 +24,9 @@ import {
   viewImage
 } from './controller'
 
+// Disable GPU Acceleration to save VRAM for PyTorch models
+app.disableHardwareAcceleration()
+
 let mainWindow: BrowserWindow
 
 function appIcon(): string {

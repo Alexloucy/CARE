@@ -18,6 +18,17 @@ function getAppDataDir() {
 
 const userProfileDir = getAppDataDir()
 
+function logToFile(message: string) {
+  try {
+    const logPath = path.join(getAppDataDir(), 'main.log')
+    fs.ensureDirSync(path.dirname(logPath))
+    const timestamp = new Date().toISOString()
+    fs.appendFileSync(logPath, `[${timestamp}] ${message}\n`)
+  } catch (e) {
+    // Ignore logging errors
+  }
+}
+
 export async function uploadImage(relativePath: string, file: Uint8Array) {
   try {
     if (file === undefined || file.length === 0) {
@@ -390,8 +401,10 @@ function conda(): boolean {
 }
 
 function spawnPythonSubprocess(args: string[]) {
+  logToFile(`spawnPythonSubprocess called with args: ${args.join(' ')}`)
   let ps: ChildProcess | null = null
   let python = ''
+  const env = { ...process.env }
 
   console.log(`process.resourcesPath=${process.resourcesPath}`)
   if (process.env.PYTHON_SCRIPT_PATH) {
@@ -412,27 +425,98 @@ function spawnPythonSubprocess(args: string[]) {
       console.log(`Spawning Conda Python subprocess.`)
     }
   } else {
-    // Want: C:\Users\chris\AppData\Local\Programs\care-electron\resources\app.asar.unpacked\resources\care-detect-reid
-    // GOT: C:\Users\chris\AppData\Local\Programs\resources\care-detect-reid
-    console.log('Running Pyinstaller Python')
+    // Packaged runtime (no PYTHON_SCRIPT_PATH override).
     if (app.isPackaged) {
-      const ext = os.platform() == 'win32' ? '.exe' : ''
-      python = path.join(
-        process.resourcesPath,
-        'app.asar.unpacked',
-        'resources',
-        'care-detect-reid',
-        `care-detect-reid${ext}`
-      )
+      const resourcesRoot = path.join(process.resourcesPath)
+
+      if (os.platform() === 'win32') {
+        // Use the bundled portable Python environment
+        const pythonEnv = path.join(resourcesRoot, 'pyenv', 'python.exe')
+        const pythonScript = path.join(resourcesRoot, 'python_src', 'main.py')
+
+        if (fs.existsSync(pythonEnv) && fs.existsSync(pythonScript)) {
+          console.log('Running bundled portable Python environment')
+          logToFile(`Found portable python at ${pythonEnv}`)
+          python = pythonEnv
+          args = [pythonScript, ...args]
+
+          // Clean env vars
+          env.PYTHONHOME = ''
+          env.PYTHONPATH = ''
+          
+          // Set TORCH_HOME. Check for portable cache first.
+          const portableCache = path.join(path.dirname(process.execPath), 'torch_cache')
+          if (fs.existsSync(portableCache)) {
+            logToFile(`Using portable torch_cache at ${portableCache}`)
+            env.TORCH_HOME = portableCache
+          } else {
+            // Default to AppData to prevent C: drive fullness if possible, but allow it if no portable cache.
+            env.TORCH_HOME = path.join(getAppDataDir(), 'torch_cache')
+            fs.ensureDirSync(env.TORCH_HOME)
+          }
+
+          // Add python Scripts and root to path
+          const pyenvDir = path.dirname(pythonEnv)
+          env.PATH = pyenvDir + path.delimiter + path.join(pyenvDir, 'Scripts') + path.delimiter + (env.PATH || '')
+        } else {
+          logToFile(`Portable python NOT found at ${pythonEnv}`)
+          // Fallback to legacy PyInstaller bundle.
+          console.log('Embedded CARE runtime not found, falling back to PyInstaller bundle')
+          const ext = '.exe'
+          python = path.join(resourcesRoot, 'care-detect-reid', `care-detect-reid${ext}`)
+        }
+      } else {
+        // Non-Windows packaged runtime still uses the PyInstaller bundle.
+        console.log('Running Pyinstaller Python (non-Windows)')
+        const ext = os.platform() == 'win32' ? '.exe' : ''
+        python = path.join(resourcesRoot, 'care-detect-reid', `care-detect-reid${ext}`)
+      }
     } else {
-      python = path.join(__dirname, `../../resources/care-detect-reid/care-detect-reid`)
+      // Development build without PYTHON_SCRIPT_PATH.
+      console.log('Running Local Python Source (dev)')
+      
+      // In dev mode, process.cwd() is typically the 'care-electron' folder
+      // d:\Projects\CARE\CARE\care-electron
+      // pyenv is at d:\Projects\CARE\pyenv (../../pyenv)
+      // source is at d:\Projects\CARE\CARE\python (../python)
+
+      const pyenvPath = path.resolve('../../pyenv/python.exe')
+      const scriptPath = path.resolve('../python/main.py')
+
+      if (fs.existsSync(pyenvPath) && fs.existsSync(scriptPath)) {
+        console.log(`Found local dev pyenv at ${pyenvPath}`)
+        python = pyenvPath
+        args = [scriptPath, ...args]
+        
+        // In DEV mode, use the project-level torch_cache on D: drive
+        // This avoids C: drive space issues and reuses the cache we already built
+        env.TORCH_HOME = path.resolve('../../torch_cache')
+        
+        env.PYTHONHOME = ''
+        env.PYTHONPATH = ''
+        // Ensure DLLs and Scripts are in PATH
+        env.PATH = path.dirname(pyenvPath) + path.delimiter + path.join(path.dirname(pyenvPath), 'Scripts') + path.delimiter + (env.PATH || '')
+      } else {
+        console.error('Could not find local pyenv or python script in dev mode')
+        console.error(`Checked: ${pyenvPath} and ${scriptPath}`)
+        // Fallback to looking for old bundle just in case
+        python = path.join(__dirname, `../../resources/care-detect-reid/care-detect-reid`)
+      }
     }
   }
   console.log(`Spawn: ${python} ${args.join(' ')}`)
+  logToFile(`Spawn command: ${python} ${args.join(' ')}`)
+  logToFile(`TORCH_HOME=${env.TORCH_HOME}`)
   try {
-    ps = spawn(python, args)
+    ps = spawn(python, args, { env })
+    if (ps) {
+      ps.on('error', (err) => {
+        logToFile(`Spawn error: ${err.message}`)
+      })
+    }
   } catch (e) {
     console.log(e)
+    logToFile(`Spawn exception: ${e}`)
     throw e
   }
   return ps
@@ -841,7 +925,8 @@ export async function runReid(selectedPaths: string[], stream: (txt: string) => 
       path.join(userProfileDir, 'data/image_cropped_json', userIdFolder),
       path.join(userProfileDir, 'temp/image_cropped_reid_pending', userIdFolder),
       path.join(userProfileDir, 'data/image_reid_output', userIdFolder),
-      path.join(userProfileDir, 'logs')
+      path.join(userProfileDir, 'logs'),
+      '1'
     ]
     let ps = spawnPythonSubprocess(args)
     if (!ps) {

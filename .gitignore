@@ -153,3 +153,8 @@ python/_logs/
 python/_reid_json_output/
 readme_media/detection_results.json
 .DS_Store
+python/_det_*
+python/_reid_*
+python/_logs_*
+care-electron/dist
+pyenv/
