@@ -412,10 +412,10 @@ function spawnPythonSubprocess(args: string[]) {
       console.log(`Spawning Conda Python subprocess.`)
     }
   } else {
-    // Want: C:\Users\chris\AppData\Local\Programs\care-electron\resources\app.asar.unpacked\resources\care-detect-reid
-    // GOT: C:\Users\chris\AppData\Local\Programs\resources\care-detect-reid
-    console.log('Running Pyinstaller Python')
     if (app.isPackaged) {
+      // Want: C:\Users\chris\AppData\Local\Programs\care-electron\resources\app.asar.unpacked\resources\care-detect-reid
+      // GOT: C:\Users\chris\AppData\Local\Programs\resources\care-detect-reid
+      console.log('Running Pyinstaller Python')
       const ext = os.platform() == 'win32' ? '.exe' : ''
       python = path.join(
         process.resourcesPath,
@@ -425,7 +425,31 @@ function spawnPythonSubprocess(args: string[]) {
         `care-detect-reid${ext}`
       )
     } else {
-      python = path.join(__dirname, `../../resources/care-detect-reid/care-detect-reid`)
+      console.log('Running Dev Mode Python')
+      // In dev mode, we are in src/main/controller.ts, so we need to go up to the project root
+      // and then into the python folder.
+      // __dirname in electron-vite dev is usually out/main or similar, so we need to be careful.
+      // However, we can use process.cwd() or relative paths from the source.
+      // Let's assume the structure:
+      // d:\Projects\CARE\care\care-electron (project root)
+      // d:\Projects\CARE\care\python (python root)
+
+      const pythonScriptPath = path.resolve(__dirname, '../../../python/main.py')
+      const venvPath = path.resolve(__dirname, '../../../python/.venv')
+
+      args = [pythonScriptPath, ...args]
+
+      if (fs.existsSync(venvPath)) {
+        if (os.platform() == 'win32') {
+          python = path.join(venvPath, 'Scripts', 'python.exe')
+        } else {
+          python = path.join(venvPath, 'bin', 'python')
+        }
+        console.log(`Using local venv at: ${python}`)
+      } else {
+        python = 'python' // Fallback to global python
+        console.log(`Using global python`)
+      }
     }
   }
   console.log(`Spawn: ${python} ${args.join(' ')}`)
@@ -601,9 +625,9 @@ export async function browseDetectImage(
         const isLabelMatch = isLabelNoDetection
           ? labelIsNoDetection
           : !filterLabel ||
-            (Array.isArray(predictions)
-              ? predictions.some((l) => l && l.label === filterLabel)
-              : predictions && predictions.label === filterLabel)
+          (Array.isArray(predictions)
+            ? predictions.some((l) => l && l.label === filterLabel)
+            : predictions && predictions.label === filterLabel)
 
         // Apply confidence filtering only if filterLabel is not "null"
         // keep the prediction array when one of the predictions has a confidence within the range
@@ -701,9 +725,9 @@ async function getDetectFilePaths(
         const isLabelMatch = isLabelNoDetection
           ? labelIsNoDetection
           : !filterLabel ||
-            (Array.isArray(predictions)
-              ? predictions.some((l) => l && l.label === filterLabel)
-              : predictions && predictions.label === filterLabel)
+          (Array.isArray(predictions)
+            ? predictions.some((l) => l && l.label === filterLabel)
+            : predictions && predictions.label === filterLabel)
         // console.log('isLabelMatch: ', isLabelMatch)
         // console.log('filepath: ', filePath)
         // Apply confidence filtering only if filterLabel is not "null"

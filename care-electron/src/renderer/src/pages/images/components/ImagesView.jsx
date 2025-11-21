@@ -47,6 +47,10 @@ export default function ImagesView({ detects, label, confLow, confHigh }) {
   }
 
   useEffect(() => {
+    setSelected(new Set())
+  }, [label, confLow, confHigh])
+
+  useEffect(() => {
     if (!currentFolder) return
 
     const fetchFiles = async () => {
