@@ -21,6 +21,8 @@ import {
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
+import StoatIconWhiteBg from '../../../assets/stoat_icon_white_bg_v3.png';
+import StoatIconDarkBg from '../../../assets/stoat_icon_dark_bg_v3.png';
 
 interface LeftSidebarProps {
     open: boolean;
@@ -45,13 +47,6 @@ const isElectron = () => {
         window.navigator.userAgent.toLowerCase().includes('electron') ||
         (window as any).windowControls
     );
-};
-
-// Mock user for display
-const MOCK_USER = {
-    displayName: 'Demo User',
-    username: 'demo',
-    profilePicture: null
 };
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
@@ -112,6 +107,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
             ModalProps={{ keepMounted: true }}
         >
             <Box
+                component="a"
+                href="https://ml4sg.auckland.ac.nz/animal-re-identification-model/"
+                target="_blank"
+                rel="noopener noreferrer"
                 sx={{
                     ...(isElectron() && { WebkitAppRegion: 'no-drag' }),
                     display: 'flex',
@@ -123,16 +122,50 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
                     gap: '8px',
                     border: 'none',
                     background: 'none',
-                    cursor: 'default',
+                    cursor: 'pointer',
                     textAlign: 'left',
+                    textDecoration: 'none',
+                    '&:hover': {
+                        bgcolor: theme.palette.mode === 'dark' ? alpha(theme.palette.common.white, 0.05) : alpha(theme.palette.common.black, 0.04),
+                    }
                 }}
             >
-                <Avatar sx={{ width: 32, height: 32, bgcolor: theme.palette.primary.main }}>
-                    {MOCK_USER.displayName.charAt(0)}
-                </Avatar>
-                <NavText noWrap color={theme.palette.text.primary} sx={{ ml: 1 }}>
-                    {MOCK_USER.displayName}
-                </NavText>
+                <Avatar
+                    src={theme.palette.mode === 'dark' ? StoatIconWhiteBg : StoatIconDarkBg}
+                    alt="RewildID"
+                    sx={{ width: 36, height: 36, bgcolor: 'transparent', borderRadius: '8px' }}
+                />
+                <Box sx={{ ml: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <Typography
+                        variant="subtitle1"
+                        sx={{
+                            fontFamily: 'Outfit, sans-serif',
+                            fontWeight: 700,
+                            lineHeight: 1.2,
+                            background: theme.palette.mode === 'dark'
+                                ? 'linear-gradient(90deg, #FFFFFF 0%, #A0A0A0 100%)'
+                                : 'linear-gradient(90deg, #1C1C1C 0%, #4A4A4A 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            letterSpacing: '-0.02em'
+                        }}
+                    >
+                        RewildID
+                    </Typography>
+                    <Typography
+                        variant="caption"
+                        sx={{
+                            fontFamily: 'Inter, sans-serif',
+                            color: theme.palette.text.secondary,
+                            fontSize: '10px',
+                            fontWeight: 500,
+                            letterSpacing: '0.05em',
+                            textTransform: 'uppercase'
+                        }}
+                    >
+                        Pro Edition
+                    </Typography>
+                </Box>
             </Box>
 
             <List sx={{ width: '100%', p: 0 }}>
