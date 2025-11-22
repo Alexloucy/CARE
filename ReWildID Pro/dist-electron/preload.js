@@ -17,11 +17,14 @@ electron_1.contextBridge.exposeInMainWorld('windowControls', {
 });
 electron_1.contextBridge.exposeInMainWorld('api', {
     browseImage: (date, folderPath) => electron_1.ipcRenderer.invoke('browseImage', date, folderPath),
-    viewImage: (date, imagePath) => electron_1.ipcRenderer.invoke('viewImage', date, imagePath),
+    viewImage: (originalPath) => electron_1.ipcRenderer.invoke('viewImage', originalPath),
     getImagePaths: (currentFolder) => electron_1.ipcRenderer.invoke('getImagePaths', currentFolder),
-    downloadSelectedGalleryImages: (selectedPaths) => electron_1.ipcRenderer.invoke('downloadSelectedGalleryImages', selectedPaths),
-    uploadImage: (relativePath, originalPath) => electron_1.ipcRenderer.invoke('uploadImage', relativePath, originalPath),
-    uploadPaths: (filePaths) => electron_1.ipcRenderer.invoke('uploadPaths', filePaths),
+    getImages: (filter) => electron_1.ipcRenderer.invoke('getImages', filter),
+    uploadPaths: (filePaths, groupName) => electron_1.ipcRenderer.invoke('uploadPaths', filePaths, groupName),
+    deleteGroup: (id) => electron_1.ipcRenderer.invoke('deleteGroup', id),
+    deleteImage: (id) => electron_1.ipcRenderer.invoke('deleteImage', id),
+    updateGroupName: (id, name) => electron_1.ipcRenderer.invoke('updateGroupName', id, name),
+    checkIsDirectory: (filePath) => electron_1.ipcRenderer.invoke('checkIsDirectory', filePath),
     detect: (selectedPaths, onStream) => {
         // Remove existing listeners to avoid duplicates
         electron_1.ipcRenderer.removeAllListeners('stream');

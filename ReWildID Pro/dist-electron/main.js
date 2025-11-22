@@ -115,11 +115,16 @@ electron_1.ipcMain.handle('window:isMaximized', () => {
 });
 // IPC handlers for backend logic
 electron_1.ipcMain.handle('browseImage', (_, date, folderPath) => (0, controller_1.browseImage)(date, folderPath));
-electron_1.ipcMain.handle('viewImage', (_, date, imagePath) => (0, controller_1.viewImage)(date, imagePath));
+electron_1.ipcMain.handle('viewImage', (_, originalPath) => (0, controller_1.viewImage)(originalPath));
 electron_1.ipcMain.handle('getImagePaths', (_, currentFolder) => (0, controller_1.getImagePaths)(currentFolder));
+electron_1.ipcMain.handle('getImages', (_, filter) => (0, controller_1.getImages)(filter));
 electron_1.ipcMain.handle('downloadSelectedGalleryImages', (_, selectedPaths) => (0, controller_1.downloadSelectedGalleryImages)(selectedPaths));
 electron_1.ipcMain.handle('uploadImage', (_, relativePath, originalPath) => (0, controller_1.uploadImage)(relativePath, originalPath));
-electron_1.ipcMain.handle('uploadPaths', (_, filePaths) => (0, controller_1.uploadPaths)(filePaths));
+electron_1.ipcMain.handle('uploadPaths', (_, filePaths, groupName) => (0, controller_1.uploadPaths)(filePaths, groupName));
+electron_1.ipcMain.handle('deleteGroup', (_, id) => (0, controller_1.deleteGroup)(id));
+electron_1.ipcMain.handle('deleteImage', (_, id) => (0, controller_1.deleteImage)(id));
+electron_1.ipcMain.handle('updateGroupName', (_, id, name) => (0, controller_1.updateGroupName)(id, name));
+electron_1.ipcMain.handle('checkIsDirectory', (_, filePath) => (0, controller_1.checkIsDirectory)(filePath));
 electron_1.ipcMain.handle('detect', (_, selectedPaths) => (0, controller_1.detect)(selectedPaths, stream));
 electron_1.ipcMain.handle('browseDetectImage', (_, date, folderPath, filterLabel, confLow, confHigh) => (0, controller_1.browseDetectImage)(date, folderPath, filterLabel, confLow, confHigh));
 electron_1.ipcMain.handle('viewDetectImage', (_, date, imagePath) => (0, controller_1.viewDetectImage)(date, imagePath));

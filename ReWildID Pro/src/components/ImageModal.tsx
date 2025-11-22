@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Box, Typography, Modal, IconButton, Fade, Backdrop, useTheme } from '@mui/material';
-import { X, MagnifyingGlassPlus, MagnifyingGlassMinus, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { Box, Typography, Modal, IconButton, Fade, Backdrop } from '@mui/material';
+import { X, MagnifyingGlassPlus, MagnifyingGlassMinus, CaretLeft, CaretRight, Trash } from '@phosphor-icons/react';
 import { FileDetails } from '../types/electron';
 
 interface ImageModalProps {
@@ -12,6 +12,7 @@ interface ImageModalProps {
     onPrev?: () => void;
     hasNext?: boolean;
     hasPrev?: boolean;
+    onDelete?: () => void;
 }
 
 const ImageModal: React.FC<ImageModalProps> = ({
@@ -22,13 +23,13 @@ const ImageModal: React.FC<ImageModalProps> = ({
     onNext,
     onPrev,
     hasNext,
-    hasPrev
+    hasPrev,
+    onDelete
 }) => {
     const [zoom, setZoom] = useState(1);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const dragStart = useRef({ x: 0, y: 0 });
-    const theme = useTheme();
 
     // Reset state when opening a new image
     useEffect(() => {
@@ -206,6 +207,18 @@ const ImageModal: React.FC<ImageModalProps> = ({
                             p: 0.5,
                             backdropFilter: 'blur(4px)'
                         }}>
+                            <IconButton
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm('Are you sure you want to delete this image?')) {
+                                        onDelete?.();
+                                    }
+                                }}
+                                size="small"
+                                sx={{ color: '#ff4444', '&:hover': { bgcolor: 'rgba(255,68,68,0.2)' }, mr: 1 }}
+                            >
+                                <Trash size={20} />
+                            </IconButton>
                             <IconButton
                                 onClick={() => setZoom(z => Math.max(z - 0.5, 0.5))}
                                 size="small"

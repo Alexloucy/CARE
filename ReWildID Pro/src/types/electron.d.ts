@@ -18,13 +18,28 @@ export interface ViewImageResponse {
     error?: string;
 }
 
+export interface DBImage {
+    id: number;
+    group_id: number;
+    original_path: string;
+    preview_path?: string;
+    date_added: number;
+    group_name: string;
+    group_created_at: number;
+}
+
 export interface ElectronApi {
     browseImage: (date: string, folderPath: string) => Promise<BrowseImageResponse>;
-    viewImage: (date: string, imagePath: string) => Promise<ViewImageResponse>;
+    viewImage: (originalPath: string) => Promise<ViewImageResponse>;
     getImagePaths: (currentFolder: string) => Promise<{ ok: boolean; selectAllPaths?: string[]; error?: string }>;
+    getImages: (filter?: string) => Promise<{ ok: boolean; images?: DBImage[]; error?: string }>;
     downloadSelectedGalleryImages: (selectedPaths: string[]) => Promise<{ ok: boolean; error?: string }>;
     uploadImage: (relativePath: string, originalPath: string) => Promise<{ ok: boolean; error?: string }>;
-    uploadPaths: (filePaths: string[]) => Promise<{ ok: boolean; count?: number; errors?: string[]; error?: string }>;
+    uploadPaths: (filePaths: string[], groupName?: string) => Promise<{ ok: boolean; count?: number; errors?: string[]; error?: string }>;
+    deleteGroup: (id: number) => Promise<{ ok: boolean; error?: string }>;
+    deleteImage: (id: number) => Promise<{ ok: boolean; error?: string }>;
+    updateGroupName: (id: number, name: string) => Promise<{ ok: boolean; error?: string }>;
+    checkIsDirectory: (filePath: string) => Promise<boolean>;
     detect: (selectedPaths: string[], onStream: (txt: string) => void) => Promise<{ ok: boolean; error?: string }>;
     browseDetectImage: (date: string, folderPath: string, filterLabel: string, confLow: number, confHigh: number) => Promise<BrowseImageResponse>;
     viewDetectImage: (date: string, imagePath: string) => Promise<ViewImageResponse>;

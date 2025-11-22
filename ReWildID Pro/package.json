@@ -18,6 +18,7 @@
         "@phosphor-icons/react": "^2.1.10",
         "@reduxjs/toolkit": "^2.10.1",
         "archiver": "^7.0.1",
+        "better-sqlite3": "^12.4.6",
         "core-util-is": "^1.0.3",
         "electron-squirrel-startup": "^1.0.1",
         "fs-extra": "^11.2.0",
@@ -31,6 +32,7 @@
     },
     "devDependencies": {
         "@types/archiver": "^7.0.0",
+        "@types/better-sqlite3": "^7.6.13",
         "@types/fs-extra": "^11.0.4",
         "@types/mime-types": "^3.0.1",
         "@types/react": "^18.3.12",

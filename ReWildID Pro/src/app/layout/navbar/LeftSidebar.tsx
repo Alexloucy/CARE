@@ -6,7 +6,6 @@ import {
     ListItemButton,
     ListItemIcon,
     ListItemText,
-    styled,
     Typography,
     useMediaQuery,
     useTheme,
@@ -30,16 +29,6 @@ interface LeftSidebarProps {
 }
 
 const DRAWER_WIDTH = 212;
-
-const NavText = styled(Typography)({
-    fontFamily: 'Inter, sans-serif',
-    fontSize: '14px',
-    fontStyle: 'normal',
-    fontWeight: 400,
-    lineHeight: '20px',
-    letterSpacing: '0px',
-    fontFeatureSettings: "'ss01' on, 'cv01' on"
-});
 
 const isElectron = () => {
     return !!(

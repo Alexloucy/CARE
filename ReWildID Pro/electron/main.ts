@@ -18,7 +18,12 @@ import {
     uploadImage,
     uploadPaths,
     viewDetectImage,
-    viewImage
+    viewImage,
+    deleteGroup,
+    deleteImage,
+    updateGroupName,
+    getImages,
+    checkIsDirectory
 } from './controller';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -140,11 +145,16 @@ ipcMain.handle('window:isMaximized', () => {
 
 // IPC handlers for backend logic
 ipcMain.handle('browseImage', (_, date, folderPath) => browseImage(date, folderPath));
-ipcMain.handle('viewImage', (_, date, imagePath) => viewImage(date, imagePath));
+ipcMain.handle('viewImage', (_, originalPath) => viewImage(originalPath));
 ipcMain.handle('getImagePaths', (_, currentFolder) => getImagePaths(currentFolder));
+ipcMain.handle('getImages', (_, filter) => getImages(filter));
 ipcMain.handle('downloadSelectedGalleryImages', (_, selectedPaths) => downloadSelectedGalleryImages(selectedPaths));
 ipcMain.handle('uploadImage', (_, relativePath, originalPath) => uploadImage(relativePath, originalPath));
-ipcMain.handle('uploadPaths', (_, filePaths) => uploadPaths(filePaths));
+ipcMain.handle('uploadPaths', (_, filePaths, groupName) => uploadPaths(filePaths, groupName));
+ipcMain.handle('deleteGroup', (_, id) => deleteGroup(id));
+ipcMain.handle('deleteImage', (_, id) => deleteImage(id));
+ipcMain.handle('updateGroupName', (_, id, name) => updateGroupName(id, name));
+ipcMain.handle('checkIsDirectory', (_, filePath) => checkIsDirectory(filePath));
 ipcMain.handle('detect', (_, selectedPaths) => detect(selectedPaths, stream));
 ipcMain.handle('browseDetectImage', (_, date, folderPath, filterLabel, confLow, confHigh) =>
     browseDetectImage(date, folderPath, filterLabel, confLow, confHigh)

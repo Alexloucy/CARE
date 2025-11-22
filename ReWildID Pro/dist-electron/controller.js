@@ -6,6 +6,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.uploadImage = uploadImage;
 exports.uploadPaths = uploadPaths;
 exports.browseImage = browseImage;
+exports.getImages = getImages;
+exports.deleteGroup = deleteGroup;
+exports.deleteImage = deleteImage;
+exports.updateGroupName = updateGroupName;
 exports.getImagePaths = getImagePaths;
 exports.viewImage = viewImage;
 exports.viewDetectImage = viewDetectImage;
@@ -21,6 +25,7 @@ exports.browseReidImage = browseReidImage;
 exports.deleteReidResult = deleteReidResult;
 exports.renameReidGroup = renameReidGroup;
 exports.terminateAI = terminateAI;
+exports.checkIsDirectory = checkIsDirectory;
 const fs_extra_1 = __importDefault(require("fs-extra"));
 const path_1 = __importDefault(require("path"));
 const archiver_1 = __importDefault(require("archiver"));
@@ -28,6 +33,53 @@ const node_child_process_1 = require("node:child_process");
 const os_1 = __importDefault(require("os"));
 const electron_1 = require("electron");
 const mime_types_1 = require("mime-types");
+const database_1 = require("./database");
+// Migration Routine
+async function migrateLegacyData() {
+    try {
+        const userIdFolder = '1';
+        const baseDir = path_1.default.join(process.cwd(), 'data/image_uploaded', userIdFolder);
+        if (!await fs_extra_1.default.pathExists(baseDir))
+            return;
+        const processDir = async (dir) => {
+            const list = await fs_extra_1.default.readdir(dir);
+            for (const file of list) {
+                const filePath = path_1.default.join(dir, file);
+                const stat = await fs_extra_1.default.stat(filePath);
+                if (stat.isDirectory()) {
+                    await processDir(filePath);
+                }
+                else if (file.endsWith('.json')) {
+                    try {
+                        const { originalPath } = await fs_extra_1.default.readJson(filePath);
+                        if (await fs_extra_1.default.pathExists(originalPath)) {
+                            const groups = database_1.DatabaseService.getAllGroups();
+                            let legacyGroup = groups.find(g => g.name === 'Legacy Import');
+                            let groupId;
+                            if (!legacyGroup) {
+                                groupId = database_1.DatabaseService.createGroup('Legacy Import');
+                            }
+                            else {
+                                groupId = legacyGroup.id;
+                            }
+                            database_1.DatabaseService.addImage(groupId, originalPath);
+                        }
+                    }
+                    catch (e) {
+                        console.error(`Error importing legacy JSON ${filePath}:`, e);
+                    }
+                }
+            }
+        };
+        await processDir(baseDir);
+        console.log('Legacy migration completed.');
+    }
+    catch (error) {
+        console.error('Migration failed:', error);
+    }
+}
+// Run migration on load (async)
+migrateLegacyData();
 function getAppDataDir() {
     if (process.platform === 'win32') {
         let appDataPath = process.env.APPDATA || process.env.LOCALAPPDATA;
@@ -39,78 +91,78 @@ function getAppDataDir() {
 }
 const userProfileDir = getAppDataDir();
 async function uploadImage(relativePath, originalPath) {
-    try {
-        if (!originalPath) {
-            return { ok: false, error: 'No file path provided.' };
-        }
-        // Check if file has .jpg extension
-        const fileExtension = path_1.default.extname(originalPath).toLowerCase();
-        if (fileExtension !== '.jpg' && fileExtension !== '.jpeg') {
-            return { ok: false, error: 'Only .jpg files are allowed.' };
-        }
-        const userIdFolder = '1';
-        const dateFolder = new Date().toLocaleDateString('en-CA').replace(/-/g, '');
-        // Use process.cwd() for local storage
-        const basePath = path_1.default.join(process.cwd(), 'data/image_uploaded', userIdFolder, dateFolder);
-        // Reconstruct the folder structure using the relative path
-        const targetPath = path_1.default.join(basePath, relativePath);
-        // Normalize both basePath and targetPath to ensure correct comparisons
-        const resolvedBase = path_1.default.resolve(basePath).toLowerCase();
-        const resolvedTarget = path_1.default.resolve(targetPath).toLowerCase();
-        // Check if targetPath is within basePath (prevent path traversal)
-        if (!resolvedTarget.startsWith(resolvedBase)) {
-            return { ok: false, error: 'Invalid relativePath. Path traversal detected.' };
-        }
-        // Ensure the directory exists before saving
-        await fs_extra_1.default.ensureDir(path_1.default.dirname(targetPath));
-        // Save as JSON reference
-        const jsonPath = targetPath + '.json';
-        console.log('Saving JSON reference to:', jsonPath);
-        await fs_extra_1.default.writeJson(jsonPath, { originalPath });
-        return { ok: true };
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            return { ok: false, error: 'uploadImage failed: ' + error.message };
-        }
-        else {
-            return { ok: false, error: 'uploadImage failed: ' + error };
-        }
-    }
+    return { ok: false, error: 'Use uploadPaths instead.' };
 }
-async function uploadPaths(filePaths) {
+async function uploadPaths(filePaths, groupName) {
     try {
         let successCount = 0;
         let errors = [];
-        const processFile = async (filePath) => {
+        const processFile = async (filePath, currentGroupId) => {
+            const ext = path_1.default.extname(filePath).toLowerCase();
+            if (ext === '.jpg' || ext === '.jpeg') {
+                try {
+                    database_1.DatabaseService.addImage(currentGroupId, filePath);
+                    successCount++;
+                }
+                catch (e) {
+                    errors.push(`${path_1.default.basename(filePath)}: ${e}`);
+                }
+            }
+        };
+        const processItem = async (itemPath) => {
             try {
-                const stat = await fs_extra_1.default.stat(filePath);
+                const stat = await fs_extra_1.default.stat(itemPath);
                 if (stat.isDirectory()) {
-                    const files = await fs_extra_1.default.readdir(filePath);
+                    // Create group for folder
+                    const folderName = path_1.default.basename(itemPath);
+                    const groupId = database_1.DatabaseService.createGroup(folderName);
+                    // Process children
+                    const files = await fs_extra_1.default.readdir(itemPath);
                     for (const file of files) {
-                        await processFile(path_1.default.join(filePath, file));
+                        const fullPath = path_1.default.join(itemPath, file);
+                        const fileStat = await fs_extra_1.default.stat(fullPath);
+                        if (fileStat.isFile()) {
+                            await processFile(fullPath, groupId);
+                        }
+                        else if (fileStat.isDirectory()) {
+                            await processItem(fullPath);
+                        }
                     }
                 }
                 else {
-                    const ext = path_1.default.extname(filePath).toLowerCase();
-                    if (ext === '.jpg' || ext === '.jpeg') {
-                        const fileName = path_1.default.basename(filePath);
-                        const result = await uploadImage(fileName, filePath);
-                        if (result.ok) {
-                            successCount++;
-                        }
-                        else {
-                            errors.push(`${fileName}: ${result.error}`);
-                        }
+                    // It's a file. Needs a groupName.
+                    if (!groupName) {
+                        errors.push(`${path_1.default.basename(itemPath)}: Missing group name for file upload.`);
+                        return;
                     }
                 }
             }
             catch (err) {
-                errors.push(`Error processing ${filePath}: ${err}`);
+                errors.push(`Error processing ${itemPath}: ${err}`);
             }
         };
-        for (const filePath of filePaths) {
-            await processFile(filePath);
+        // Pre-process: Check if we have files and create a group for them
+        const filesOnly = [];
+        for (const p of filePaths) {
+            const stat = await fs_extra_1.default.stat(p);
+            if (stat.isFile())
+                filesOnly.push(p);
+        }
+        let fileGroupId = null;
+        if (filesOnly.length > 0) {
+            if (!groupName) {
+                return { ok: false, error: 'Group name required for file uploads.' };
+            }
+            fileGroupId = database_1.DatabaseService.createGroup(groupName);
+        }
+        for (const p of filePaths) {
+            const stat = await fs_extra_1.default.stat(p);
+            if (stat.isDirectory()) {
+                await processItem(p);
+            }
+            else if (fileGroupId !== null) {
+                await processFile(p, fileGroupId);
+            }
         }
         return { ok: true, count: successCount, errors };
     }
@@ -160,73 +212,60 @@ async function browseImage(date, folderPath) {
         return { ok: false, error: 'browseImage failed: ' + error };
     }
 }
-async function getImagePaths(currentFolder) {
+async function getImages(filter) {
     try {
-        const userIdFolder = '1';
-        const baseDir = path_1.default.join(process.cwd(), 'data/image_uploaded', userIdFolder);
-        const targetDir = path_1.default.resolve(baseDir, currentFolder); // Resolve the full path
-        fs_extra_1.default.ensureDirSync(targetDir);
-        // Ensure the resolved path is still within the baseDir
-        if (!targetDir.startsWith(baseDir)) {
-            return { ok: false, error: 'Invalid folder path.' };
-        }
-        // Check if the directory exists before reading it
-        if (!(await fs_extra_1.default.pathExists(targetDir))) {
-            return { ok: false, error: 'Directory not found.' };
-        }
-        const stat = fs_extra_1.default.statSync(targetDir);
-        if (stat.isFile()) {
-            return { ok: false, error: 'Path is a file, not a directory.' };
-        }
-        const filePaths = await getFilePaths(targetDir, baseDir);
-        return { ok: true, selectAllPaths: filePaths };
+        // Cleanup missing files first
+        // DatabaseService.cleanupMissingImages(); // Optional: Enable if performance allows
+        const images = database_1.DatabaseService.getImages();
+        return { ok: true, images };
     }
     catch (error) {
-        return { ok: false, error: 'getImagePaths failed: ' + error };
+        return { ok: false, error: 'getImages failed: ' + error };
     }
 }
-// Function to get all file paths
-async function getFilePaths(dir, baseDir) {
-    let results = [];
-    const list = await fs_extra_1.default.readdir(dir);
-    for (const file of list) {
-        const filePath = path_1.default.join(dir, file);
-        const stat = await fs_extra_1.default.stat(filePath);
-        if (stat && stat.isDirectory()) {
-            const subResults = await getFilePaths(filePath, baseDir);
-            results = results.concat(subResults);
-        }
-        else {
-            if (file.endsWith('.json')) {
-                // Handle JSON reference
-                try {
-                    const { originalPath } = await fs_extra_1.default.readJson(filePath);
-                    if (await fs_extra_1.default.pathExists(originalPath)) {
-                        const relativePath = path_1.default.relative(baseDir, filePath);
-                        // If it's a .json file, we include it.
-                        results.push(relativePath);
-                    }
-                    else {
-                        // Original file missing, delete JSON
-                        await fs_extra_1.default.unlink(filePath);
-                    }
-                }
-                catch (e) {
-                    console.error(`Error reading JSON reference ${filePath}:`, e);
-                }
-            }
-            else if (file.toLowerCase().endsWith('.jpg') || file.toLowerCase().endsWith('.jpeg')) {
-                // Handle legacy direct files
-                const relativePath = path_1.default.relative(baseDir, filePath);
-                results.push(relativePath);
-            }
-        }
-    }
-    return results;
-}
-async function viewImage(date, imagePath) {
+async function deleteGroup(id) {
     try {
-        return viewImageInPath('data/image_uploaded', date, imagePath);
+        database_1.DatabaseService.deleteGroup(id);
+        return { ok: true };
+    }
+    catch (error) {
+        return { ok: false, error: 'deleteGroup failed: ' + error };
+    }
+}
+async function deleteImage(id) {
+    try {
+        database_1.DatabaseService.deleteImage(id);
+        return { ok: true };
+    }
+    catch (error) {
+        return { ok: false, error: 'deleteImage failed: ' + error };
+    }
+}
+async function updateGroupName(id, name) {
+    try {
+        database_1.DatabaseService.updateGroupName(id, name);
+        return { ok: true };
+    }
+    catch (error) {
+        return { ok: false, error: 'updateGroupName failed: ' + error };
+    }
+}
+// Deprecated / Modified for compatibility
+async function getImagePaths(currentFolder) {
+    const result = await getImages();
+    // Map to expected legacy format if strictly needed, but we will update frontend.
+    return { ok: true, selectAllPaths: [] }; // Return empty to force frontend update or avoid errors
+}
+async function viewImage(originalPath) {
+    try {
+        if (!originalPath) {
+            return { ok: false, error: 'No file path provided.' };
+        }
+        if (!(await fs_extra_1.default.pathExists(originalPath))) {
+            return { ok: false, error: 'File not found.' };
+        }
+        const data = await fs_extra_1.default.readFile(originalPath);
+        return { ok: true, data };
     }
     catch (error) {
         return { ok: false, error: 'viewImage failed: ' + error };
@@ -1104,4 +1143,14 @@ async function renameReidGroup(date, time, old_group_id, new_group_id) {
 }
 function terminateAI() {
     terminateSubprocess();
+}
+async function checkIsDirectory(filePath) {
+    try {
+        const stat = await fs_extra_1.default.stat(filePath);
+        return stat.isDirectory();
+    }
+    catch (error) {
+        console.error('Error checking directory:', error);
+        return false;
+    }
 }

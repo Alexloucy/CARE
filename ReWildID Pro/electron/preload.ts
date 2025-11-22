@@ -17,11 +17,14 @@ contextBridge.exposeInMainWorld('windowControls', {
 
 contextBridge.exposeInMainWorld('api', {
     browseImage: (date: string, folderPath: string) => ipcRenderer.invoke('browseImage', date, folderPath),
-    viewImage: (date: string, imagePath: string) => ipcRenderer.invoke('viewImage', date, imagePath),
+    viewImage: (originalPath: string) => ipcRenderer.invoke('viewImage', originalPath),
     getImagePaths: (currentFolder: string) => ipcRenderer.invoke('getImagePaths', currentFolder),
-    downloadSelectedGalleryImages: (selectedPaths: string[]) => ipcRenderer.invoke('downloadSelectedGalleryImages', selectedPaths),
-    uploadImage: (relativePath: string, originalPath: string) => ipcRenderer.invoke('uploadImage', relativePath, originalPath),
-    uploadPaths: (filePaths: string[]) => ipcRenderer.invoke('uploadPaths', filePaths),
+    getImages: (filter?: string) => ipcRenderer.invoke('getImages', filter),
+    uploadPaths: (filePaths: string[], groupName?: string) => ipcRenderer.invoke('uploadPaths', filePaths, groupName),
+    deleteGroup: (id: number) => ipcRenderer.invoke('deleteGroup', id),
+    deleteImage: (id: number) => ipcRenderer.invoke('deleteImage', id),
+    updateGroupName: (id: number, name: string) => ipcRenderer.invoke('updateGroupName', id, name),
+    checkIsDirectory: (filePath: string) => ipcRenderer.invoke('checkIsDirectory', filePath),
     detect: (selectedPaths: string[], onStream: (txt: string) => void) => {
         // Remove existing listeners to avoid duplicates
         ipcRenderer.removeAllListeners('stream');
