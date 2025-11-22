@@ -41,7 +41,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     boxSizing: 'border-box',
                     borderLeft: '1px solid',
                     borderColor: 'divider',
-                    backgroundColor: theme.palette.mode === 'dark' ? '#121212' : theme.palette.background.default,
+                    backgroundColor: theme.palette.mode === 'dark' ? '#121212' : '#F9F9F9',
                     transition: theme.transitions.create('width', {
                         easing: theme.transitions.easing.sharp,
                         duration: theme.transitions.duration.shorter,
@@ -59,7 +59,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     px: 2,
-                    backgroundColor: theme.palette.mode === 'dark' ? '#121212' : theme.palette.background.default,
+                    backgroundColor: theme.palette.mode === 'dark' ? '#121212' : '#F9F9F9',
                 }}
             >
                 <Typography variant="h6" sx={{ fontWeight: 500 }}>
@@ -78,7 +78,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
             </Box>
             <Box sx={{
                 p: 2,
-                backgroundColor: theme.palette.mode === 'dark' ? '#121212' : theme.palette.background.default,
+                backgroundColor: theme.palette.mode === 'dark' ? '#121212' : '#F9F9F9',
                 height: '100%'
             }}>
                 {children || (

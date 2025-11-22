@@ -126,7 +126,7 @@ export default function Navbar({
 
     let customBreadcrumbItems;
     if (location.pathname === '/') {
-        customBreadcrumbItems = [{ label: 'Home', path: '/' }];
+        customBreadcrumbItems = undefined;
     } else {
         customBreadcrumbItems = undefined;
     }
