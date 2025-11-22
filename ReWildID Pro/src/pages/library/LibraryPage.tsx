@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Box, Typography, Grid, Card, CardMedia, Fade, useTheme, Skeleton } from '@mui/material';
+import { Box, Typography, Card, CardMedia, Fade, useTheme, Skeleton } from '@mui/material';
 import { FileDetails } from '../../types/electron';
 import ImageModal from '../../components/ImageModal';
 import { UploadSimple } from '@phosphor-icons/react';
@@ -366,13 +366,15 @@ const LibraryPage: React.FC = () => {
             </Box>
 
             {loading ? (
-                <Grid container spacing={2}>
+                <Box sx={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                    gap: 2
+                }}>
                     {[...Array(12)].map((_, i) => (
-                        <Grid item xs={6} sm={4} md={3} lg={2} xl={2} key={i}>
-                            <Skeleton variant="rectangular" height={200} sx={{ borderRadius: 3 }} />
-                        </Grid>
+                        <Skeleton key={i} variant="rectangular" sx={{ borderRadius: 3, aspectRatio: '1/1', height: 'auto' }} />
                     ))}
-                </Grid>
+                </Box>
             ) : (
                 <Box>
                     {groups.length === 0 ? (
@@ -403,11 +405,15 @@ const LibraryPage: React.FC = () => {
                                 <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary', fontWeight: 500 }}>
                                     {formatDate(group.date)}
                                 </Typography>
-                                <Grid container spacing={2}>
+                                <Box sx={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                                    gap: 2
+                                }}>
                                     {group.files.map((file) => {
                                         const key = `${group.date}/${file.path}`;
                                         return (
-                                            <Grid item xs={6} sm={4} md={3} lg={2} xl={2} key={key}>
+                                            <Box key={key}>
                                                 <ImageCard
                                                     file={file}
                                                     date={group.date}
@@ -419,10 +425,10 @@ const LibraryPage: React.FC = () => {
                                                         }
                                                     }}
                                                 />
-                                            </Grid>
+                                            </Box>
                                         );
                                     })}
-                                </Grid>
+                                </Box>
                             </Box>
                         ))
                     )}
