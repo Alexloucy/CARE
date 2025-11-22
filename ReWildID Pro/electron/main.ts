@@ -23,7 +23,9 @@ import {
     deleteImage,
     updateGroupName,
     getImages,
-    checkIsDirectory
+    checkIsDirectory,
+    openFileDialog,
+    saveImages
 } from './controller';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -155,6 +157,8 @@ ipcMain.handle('deleteGroup', (_, id) => deleteGroup(id));
 ipcMain.handle('deleteImage', (_, id) => deleteImage(id));
 ipcMain.handle('updateGroupName', (_, id, name) => updateGroupName(id, name));
 ipcMain.handle('checkIsDirectory', (_, filePath) => checkIsDirectory(filePath));
+ipcMain.handle('openFileDialog', () => openFileDialog());
+ipcMain.handle('saveImages', (_, sourcePaths) => saveImages(sourcePaths));
 ipcMain.handle('detect', (_, selectedPaths) => detect(selectedPaths, stream));
 ipcMain.handle('browseDetectImage', (_, date, folderPath, filterLabel, confLow, confHigh) =>
     browseDetectImage(date, folderPath, filterLabel, confLow, confHigh)

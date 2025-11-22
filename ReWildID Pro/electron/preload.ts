@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('api', {
     deleteImage: (id: number) => ipcRenderer.invoke('deleteImage', id),
     updateGroupName: (id: number, name: string) => ipcRenderer.invoke('updateGroupName', id, name),
     checkIsDirectory: (filePath: string) => ipcRenderer.invoke('checkIsDirectory', filePath),
+    openFileDialog: () => ipcRenderer.invoke('openFileDialog'),
+    saveImages: (sourcePaths: string[]) => ipcRenderer.invoke('saveImages', sourcePaths),
     detect: (selectedPaths: string[], onStream: (txt: string) => void) => {
         // Remove existing listeners to avoid duplicates
         ipcRenderer.removeAllListeners('stream');

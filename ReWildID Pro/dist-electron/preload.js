@@ -25,6 +25,8 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     deleteImage: (id) => electron_1.ipcRenderer.invoke('deleteImage', id),
     updateGroupName: (id, name) => electron_1.ipcRenderer.invoke('updateGroupName', id, name),
     checkIsDirectory: (filePath) => electron_1.ipcRenderer.invoke('checkIsDirectory', filePath),
+    openFileDialog: () => electron_1.ipcRenderer.invoke('openFileDialog'),
+    saveImages: (sourcePaths) => electron_1.ipcRenderer.invoke('saveImages', sourcePaths),
     detect: (selectedPaths, onStream) => {
         // Remove existing listeners to avoid duplicates
         electron_1.ipcRenderer.removeAllListeners('stream');

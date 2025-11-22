@@ -40,6 +40,8 @@ export interface ElectronApi {
     deleteImage: (id: number) => Promise<{ ok: boolean; error?: string }>;
     updateGroupName: (id: number, name: string) => Promise<{ ok: boolean; error?: string }>;
     checkIsDirectory: (filePath: string) => Promise<boolean>;
+    openFileDialog: () => Promise<{ canceled: boolean; filePaths: string[] }>;
+    saveImages: (sourcePaths: string[]) => Promise<{ ok: boolean; successCount?: number; failCount?: number; error?: string }>;
     detect: (selectedPaths: string[], onStream: (txt: string) => void) => Promise<{ ok: boolean; error?: string }>;
     browseDetectImage: (date: string, folderPath: string, filterLabel: string, confLow: number, confHigh: number) => Promise<BrowseImageResponse>;
     viewDetectImage: (date: string, imagePath: string) => Promise<ViewImageResponse>;

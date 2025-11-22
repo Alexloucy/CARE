@@ -1309,3 +1309,52 @@ export async function checkIsDirectory(filePath: string) {
         return false;
     }
 }
+
+export async function openFileDialog() {
+    const result = await dialog.showOpenDialog({
+        properties: ['openFile', 'openDirectory', 'multiSelections'],
+        filters: [
+            { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'] }
+        ]
+    });
+
+    if (result.canceled) {
+        return { canceled: true, filePaths: [] };
+    } else {
+        return { canceled: false, filePaths: result.filePaths };
+    }
+}
+
+export async function saveImages(sourcePaths: string[]) {
+    try {
+        const result = await dialog.showOpenDialog({
+            title: 'Select Destination Folder',
+            properties: ['openDirectory', 'createDirectory']
+        });
+
+        if (result.canceled || result.filePaths.length === 0) {
+            return { ok: false, error: 'Operation canceled' };
+        }
+
+        const destDir = result.filePaths[0];
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const srcPath of sourcePaths) {
+            try {
+                const fileName = path.basename(srcPath);
+                const destPath = path.join(destDir, fileName);
+                await fs.copy(srcPath, destPath);
+                successCount++;
+            } catch (err) {
+                console.error(`Failed to copy ${srcPath}:`, err);
+                failCount++;
+            }
+        }
+
+        return { ok: true, successCount, failCount };
+    } catch (error) {
+        console.error('Error saving images:', error);
+        return { ok: false, error: String(error) };
+    }
+}

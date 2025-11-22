@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Box, Typography, useTheme, Skeleton, Fade, IconButton, Menu, MenuItem, Divider } from '@mui/material';
+import { Box, Typography, useTheme, Skeleton, Fade, IconButton, Menu, MenuItem, Divider, Button, Tooltip } from '@mui/material';
 import { DBImage, FileDetails } from '../../types/electron';
 import ImageModal from '../../components/ImageModal';
 import ImageCard from '../../components/ImageCard';
-import { UploadIcon, UploadSimple, DotsThreeVertical, Trash, PencilSimple } from '@phosphor-icons/react';
+import { UploadIcon, UploadSimple, DotsThreeVertical, Trash, PencilSimple, CheckSquare, DownloadSimple, X, Plus } from '@phosphor-icons/react';
 import { GroupNameDialog } from '../../components/GroupNameDialog';
 
 interface GroupData {
@@ -24,6 +24,10 @@ const LibraryPage: React.FC = () => {
     const [imageUrls, setImageUrls] = useState<Record<number, string>>({}); // Map ID -> URL
     const [isDragging, setIsDragging] = useState(false);
     const theme = useTheme();
+
+    // Selection State
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedImageIds, setSelectedImageIds] = useState<Set<number>>(new Set());
 
     // Modal State
     const [selectedImage, setSelectedImage] = useState<{ image: DBImage, url: string } | null>(null);
@@ -177,7 +181,17 @@ const LibraryPage: React.FC = () => {
         if (files.length === 0) return;
 
         const paths = files.map(file => window.api.getPathForFile(file));
+        processUploadPaths(paths);
+    };
 
+    const handleUploadClick = async () => {
+        const result = await window.api.openFileDialog();
+        if (!result.canceled && result.filePaths.length > 0) {
+            processUploadPaths(result.filePaths);
+        }
+    };
+
+    const processUploadPaths = async (paths: string[]) => {
         // Check if all paths are directories
         const areAllDirectories = await Promise.all(paths.map(path => window.api.checkIsDirectory(path)));
         const allDirs = areAllDirectories.every(isDir => isDir);
@@ -278,13 +292,80 @@ const LibraryPage: React.FC = () => {
         await fetchLibrary();
     };
 
+    // Selection Logic
+    const toggleSelectionMode = () => {
+        setIsSelectionMode(!isSelectionMode);
+        setSelectedImageIds(new Set());
+    };
+
+    const toggleImageSelection = (id: number) => {
+        const newSet = new Set(selectedImageIds);
+        if (newSet.has(id)) {
+            newSet.delete(id);
+        } else {
+            newSet.add(id);
+        }
+        setSelectedImageIds(newSet);
+    };
+
+    const handleBatchDelete = async () => {
+        if (selectedImageIds.size === 0) return;
+        if (window.confirm(`Are you sure you want to delete ${selectedImageIds.size} images?`)) {
+            setLoading(true);
+            try {
+                for (const id of selectedImageIds) {
+                    await window.api.deleteImage(id);
+                }
+                await fetchLibrary();
+                setSelectedImageIds(new Set());
+                setIsSelectionMode(false);
+            } catch (error) {
+                console.error('Batch delete error:', error);
+            } finally {
+                setLoading(false);
+            }
+        }
+    };
+
+    const handleBatchSave = async () => {
+        if (selectedImageIds.size === 0) return;
+
+        // Collect paths
+        const paths: string[] = [];
+        allImages.forEach(img => {
+            if (selectedImageIds.has(img.id)) {
+                paths.push(img.original_path);
+            }
+        });
+
+        if (paths.length === 0) return;
+
+        setLoading(true);
+        try {
+            const result = await window.api.saveImages(paths);
+            if (result.ok) {
+                alert(`Successfully saved ${result.successCount} images.`);
+                setSelectedImageIds(new Set());
+                setIsSelectionMode(false);
+            } else if (result.error !== 'Operation canceled') {
+                alert(`Save failed: ${result.error}`);
+            }
+        } catch (error) {
+            console.error('Batch save error:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <Box
             sx={{
                 height: '100%',
                 position: 'relative',
                 outline: 'none',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column'
             }}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -312,17 +393,53 @@ const LibraryPage: React.FC = () => {
                 </Box>
             </Fade>
 
-            <Box sx={{ p: 4, height: '100%', overflowY: 'auto' }}>
-                <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="h4" fontWeight="bold">Library</Typography>
+            {/* Header */}
+            <Box sx={{
+                p: 3,
+                px: 4,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                // Removed borderBottom for cleaner look
+                bgcolor: theme.palette.background.default,
+                zIndex: 10
+            }}>
+                <Typography variant="h4" fontWeight="bold">Library</Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Tooltip title={isSelectionMode ? "Cancel Selection" : "Select Items"}>
+                        <IconButton
+                            onClick={toggleSelectionMode}
+                            color={isSelectionMode ? "primary" : "default"}
+                            sx={{
+                                bgcolor: isSelectionMode ? (theme.palette.mode === 'light' ? 'rgba(25, 118, 210, 0.08)' : 'rgba(144, 202, 249, 0.16)') : 'transparent',
+                                '&:hover': {
+                                    bgcolor: isSelectionMode ? (theme.palette.mode === 'light' ? 'rgba(25, 118, 210, 0.12)' : 'rgba(144, 202, 249, 0.24)') : theme.palette.action.hover
+                                }
+                            }}
+                        >
+                            {isSelectionMode ? <X weight="bold" /> : <CheckSquare weight="regular" />}
+                        </IconButton>
+                    </Tooltip>
+                    <Button
+                        variant="contained"
+                        startIcon={<Plus />}
+                        onClick={handleUploadClick}
+                        sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}
+                    >
+                        Upload
+                    </Button>
                 </Box>
+            </Box>
 
+            {/* Content */}
+            <Box sx={{ flex: 1, overflowY: 'auto', p: 4, pt: 0 }}>
                 {
                     loading ? (
                         <Box sx={{
                             display: 'grid',
                             gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                            gap: 2
+                            gap: 2,
+                            mt: 2
                         }}>
                             {[...Array(12)].map((_, i) => (
                                 <Skeleton key={i} variant="rectangular" sx={{ borderRadius: 3, aspectRatio: '1/1', height: 'auto' }} />
@@ -346,25 +463,31 @@ const LibraryPage: React.FC = () => {
                                         No images yet
                                     </Typography>
                                     <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-                                        Drag and drop to start
+                                        Drag and drop or click Upload to start
                                     </Typography>
                                 </Box>
                             ) : (
                                 dateSections.map((section) => (
-                                    <Box key={section.date} sx={{ mb: 6 }}>
-                                        <Typography variant="h5" sx={{ mb: 3, fontWeight: 600, color: theme.palette.text.primary }}>
+                                    <Box key={section.date} sx={{ mb: 5, mt: 2 }}>
+                                        <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, color: theme.palette.text.secondary, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.875rem' }}>
                                             {formatDate(section.date)}
                                         </Typography>
 
                                         {section.groups.map(group => (
-                                            <Box key={group.id} sx={{ mb: 4, ml: 2 }}>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                                    <Typography variant="h6" sx={{ color: theme.palette.text.secondary, fontWeight: 500, mr: 2 }}>
-                                                        {group.name}
-                                                    </Typography>
+                                            <Box key={group.id} sx={{ mb: 4 }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                                            {group.name}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary" sx={{ bgcolor: theme.palette.action.selected, px: 1, py: 0.5, borderRadius: 1 }}>
+                                                            {group.images.length}
+                                                        </Typography>
+                                                    </Box>
                                                     <IconButton
                                                         size="small"
                                                         onClick={(e) => handleMenuOpen(e, group.id)}
+                                                        sx={{ opacity: 0.6, '&:hover': { opacity: 1 } }}
                                                     >
                                                         <DotsThreeVertical size={20} />
                                                     </IconButton>
@@ -376,7 +499,6 @@ const LibraryPage: React.FC = () => {
                                                     gap: 2
                                                 }}>
                                                     {group.images.map((img) => {
-                                                        // Convert DBImage to FileDetails for ImageCard
                                                         const fileDetails: FileDetails = {
                                                             name: img.original_path.split(/[\\/]/).pop() || 'image.jpg',
                                                             path: img.original_path,
@@ -391,10 +513,15 @@ const LibraryPage: React.FC = () => {
                                                                     loadImage={() => loadImage(img)}
                                                                     imageUrl={imageUrls[img.id]}
                                                                     onClick={() => {
-                                                                        if (imageUrls[img.id]) {
+                                                                        if (isSelectionMode) {
+                                                                            toggleImageSelection(img.id);
+                                                                        } else if (imageUrls[img.id]) {
                                                                             setSelectedImage({ image: img, url: imageUrls[img.id] });
                                                                         }
                                                                     }}
+                                                                    selectable={isSelectionMode}
+                                                                    selected={selectedImageIds.has(img.id)}
+                                                                    onToggleSelection={() => toggleImageSelection(img.id)}
                                                                 />
                                                             </Box>
                                                         );
@@ -402,7 +529,6 @@ const LibraryPage: React.FC = () => {
                                                 </Box>
                                             </Box>
                                         ))}
-                                        <Divider sx={{ mt: 4 }} />
                                     </Box>
                                 ))
                             )}
@@ -410,6 +536,42 @@ const LibraryPage: React.FC = () => {
                     )
                 }
             </Box>
+
+            {/* Selection Toolbar */}
+            <Fade in={isSelectionMode && selectedImageIds.size > 0}>
+                <Box sx={{
+                    position: 'absolute',
+                    bottom: 32,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    bgcolor: theme.palette.mode === 'dark' ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.9)',
+                    backdropFilter: 'blur(12px)',
+                    borderRadius: 4,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+                    p: 1.5,
+                    px: 3,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    zIndex: 100,
+                    border: `1px solid ${theme.palette.divider}`
+                }}>
+                    <Typography variant="subtitle2" fontWeight="600">
+                        {selectedImageIds.size} Selected
+                    </Typography>
+                    <Divider orientation="vertical" flexItem sx={{ height: 20, my: 'auto' }} />
+                    <Tooltip title="Save Selected">
+                        <IconButton onClick={handleBatchSave} color="primary" size="small">
+                            <DownloadSimple weight="bold" size={20} />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete Selected">
+                        <IconButton onClick={handleBatchDelete} color="error" size="small">
+                            <Trash weight="bold" size={20} />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
+            </Fade>
 
             {/* Image Modal */}
             <ImageModal

@@ -26,6 +26,8 @@ exports.deleteReidResult = deleteReidResult;
 exports.renameReidGroup = renameReidGroup;
 exports.terminateAI = terminateAI;
 exports.checkIsDirectory = checkIsDirectory;
+exports.openFileDialog = openFileDialog;
+exports.saveImages = saveImages;
 const fs_extra_1 = __importDefault(require("fs-extra"));
 const path_1 = __importDefault(require("path"));
 const archiver_1 = __importDefault(require("archiver"));
@@ -1152,5 +1154,50 @@ async function checkIsDirectory(filePath) {
     catch (error) {
         console.error('Error checking directory:', error);
         return false;
+    }
+}
+async function openFileDialog() {
+    const result = await electron_1.dialog.showOpenDialog({
+        properties: ['openFile', 'openDirectory', 'multiSelections'],
+        filters: [
+            { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'] }
+        ]
+    });
+    if (result.canceled) {
+        return { canceled: true, filePaths: [] };
+    }
+    else {
+        return { canceled: false, filePaths: result.filePaths };
+    }
+}
+async function saveImages(sourcePaths) {
+    try {
+        const result = await electron_1.dialog.showOpenDialog({
+            title: 'Select Destination Folder',
+            properties: ['openDirectory', 'createDirectory']
+        });
+        if (result.canceled || result.filePaths.length === 0) {
+            return { ok: false, error: 'Operation canceled' };
+        }
+        const destDir = result.filePaths[0];
+        let successCount = 0;
+        let failCount = 0;
+        for (const srcPath of sourcePaths) {
+            try {
+                const fileName = path_1.default.basename(srcPath);
+                const destPath = path_1.default.join(destDir, fileName);
+                await fs_extra_1.default.copy(srcPath, destPath);
+                successCount++;
+            }
+            catch (err) {
+                console.error(`Failed to copy ${srcPath}:`, err);
+                failCount++;
+            }
+        }
+        return { ok: true, successCount, failCount };
+    }
+    catch (error) {
+        console.error('Error saving images:', error);
+        return { ok: false, error: String(error) };
     }
 }
