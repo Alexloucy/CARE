@@ -79,7 +79,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
             open={open}
             onClose={onClose}
             sx={{
-                ...(isElectron() && { WebkitUserSelect: 'none', WebkitAppRegion: 'drag' }),
+                ...(isElectron() && { WebkitUserSelect: 'none' }),
                 width: open ? DRAWER_WIDTH : 0,
                 flexShrink: 0,
                 overflowX: 'hidden',
@@ -109,7 +109,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
             <Box
                 onClick={() => navigate('/')}
                 sx={{
-                    ...(isElectron() && { WebkitAppRegion: 'no-drag' }),
+                    // ...(isElectron() && { WebkitAppRegion: 'no-drag' }),
                     display: 'flex',
                     alignItems: 'center',
                     width: '100%',
@@ -175,7 +175,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
                                 selected={isActive}
                                 onClick={() => handleNavigate(item.path)}
                                 sx={{
-                                    ...(isElectron() && { WebkitAppRegion: 'no-drag' }),
+                                    // ...(isElectron() && { WebkitAppRegion: 'no-drag' }),
                                     display: 'flex',
                                     justifyContent: 'space-between',
                                     alignItems: 'center',
