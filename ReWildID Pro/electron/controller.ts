@@ -18,24 +18,22 @@ function getAppDataDir() {
 
 const userProfileDir = getAppDataDir()
 
-export async function uploadImage(relativePath: string, file: Uint8Array) {
+export async function uploadImage(relativePath: string, originalPath: string) {
     try {
-        if (file === undefined || file.length === 0) {
-            return { ok: false, error: 'No file was uploaded.' }
+        if (!originalPath) {
+            return { ok: false, error: 'No file path provided.' }
         }
 
         // Check if file has .jpg extension
-        const fileExtension = path.extname(relativePath).toLowerCase()
-        if (fileExtension !== '.jpg') {
+        const fileExtension = path.extname(originalPath).toLowerCase()
+        if (fileExtension !== '.jpg' && fileExtension !== '.jpeg') {
             return { ok: false, error: 'Only .jpg files are allowed.' }
         }
 
-        const tempPath = path.join(userProfileDir, 'temp')
-        fs.ensureDirSync(tempPath)
-
         const userIdFolder = '1'
         const dateFolder = new Date().toLocaleDateString('en-CA').replace(/-/g, '')
-        const basePath = path.join(userProfileDir, 'data/image_uploaded', userIdFolder, dateFolder)
+        // Use process.cwd() for local storage
+        const basePath = path.join(process.cwd(), 'data/image_uploaded', userIdFolder, dateFolder)
 
         // Reconstruct the folder structure using the relative path
         const targetPath = path.join(basePath, relativePath)
@@ -52,7 +50,11 @@ export async function uploadImage(relativePath: string, file: Uint8Array) {
         // Ensure the directory exists before saving
         await fs.ensureDir(path.dirname(targetPath))
 
-        await fs.writeFile(targetPath, file)
+        // Save as JSON reference
+        const jsonPath = targetPath + '.json'
+        console.log('Saving JSON reference to:', jsonPath)
+        await fs.writeJson(jsonPath, { originalPath })
+
         return { ok: true }
     } catch (error: unknown) {
         if (error instanceof Error) {
@@ -60,6 +62,46 @@ export async function uploadImage(relativePath: string, file: Uint8Array) {
         } else {
             return { ok: false, error: 'uploadImage failed: ' + error }
         }
+    }
+}
+
+export async function uploadPaths(filePaths: string[]) {
+    try {
+        let successCount = 0
+        let errors: string[] = []
+
+        const processFile = async (filePath: string) => {
+            try {
+                const stat = await fs.stat(filePath)
+                if (stat.isDirectory()) {
+                    const files = await fs.readdir(filePath)
+                    for (const file of files) {
+                        await processFile(path.join(filePath, file))
+                    }
+                } else {
+                    const ext = path.extname(filePath).toLowerCase()
+                    if (ext === '.jpg' || ext === '.jpeg') {
+                        const fileName = path.basename(filePath)
+                        const result = await uploadImage(fileName, filePath)
+                        if (result.ok) {
+                            successCount++
+                        } else {
+                            errors.push(`${fileName}: ${result.error}`)
+                        }
+                    }
+                }
+            } catch (err) {
+                errors.push(`Error processing ${filePath}: ${err}`)
+            }
+        }
+
+        for (const filePath of filePaths) {
+            await processFile(filePath)
+        }
+
+        return { ok: true, count: successCount, errors }
+    } catch (error: unknown) {
+        return { ok: false, error: 'uploadPaths failed: ' + error }
     }
 }
 
@@ -115,7 +157,7 @@ export async function browseImage(date: string, folderPath: string) {
 export async function getImagePaths(currentFolder: string) {
     try {
         const userIdFolder = '1'
-        const baseDir = path.join(userProfileDir, 'data/image_uploaded', userIdFolder)
+        const baseDir = path.join(process.cwd(), 'data/image_uploaded', userIdFolder)
         const targetDir = path.resolve(baseDir, currentFolder) // Resolve the full path
 
         fs.ensureDirSync(targetDir)
@@ -155,8 +197,26 @@ async function getFilePaths(dir: string, baseDir: string): Promise<string[]> {
             const subResults = await getFilePaths(filePath, baseDir)
             results = results.concat(subResults)
         } else {
-            const relativePath = path.relative(baseDir, filePath)
-            results.push(relativePath)
+            if (file.endsWith('.json')) {
+                // Handle JSON reference
+                try {
+                    const { originalPath } = await fs.readJson(filePath)
+                    if (await fs.pathExists(originalPath)) {
+                        const relativePath = path.relative(baseDir, filePath)
+                        // If it's a .json file, we include it.
+                        results.push(relativePath)
+                    } else {
+                        // Original file missing, delete JSON
+                        await fs.unlink(filePath)
+                    }
+                } catch (e) {
+                    console.error(`Error reading JSON reference ${filePath}:`, e)
+                }
+            } else if (file.toLowerCase().endsWith('.jpg') || file.toLowerCase().endsWith('.jpeg')) {
+                // Handle legacy direct files
+                const relativePath = path.relative(baseDir, filePath)
+                results.push(relativePath)
+            }
         }
     }
 
@@ -178,7 +238,7 @@ async function viewImageInPath(dir: string, date: string, imagePath: string) {
         return { ok: false, error: 'Missing date or imagePath parameters.' }
     } else {
         const userIdFolder = '1'
-        baseDir = path.join(userProfileDir, dir, userIdFolder, date)
+        baseDir = path.join(process.cwd(), dir, userIdFolder, date)
         targetDir = path.resolve(baseDir, imagePath) // Resolve the full path
     }
 
@@ -187,9 +247,31 @@ async function viewImageInPath(dir: string, date: string, imagePath: string) {
         return { ok: false, error: 'Invalid folder path.' }
     }
 
-    // Check if the directory exists before reading it
+    // Check for JSON reference first
+    const jsonPath = targetDir + '.json'
+    // Also check if the targetDir itself ends in .json (if the frontend requested the json file directly)
+    const isJsonRequest = targetDir.endsWith('.json')
+    const pathToCheck = isJsonRequest ? targetDir : jsonPath
+
+    if (await fs.pathExists(pathToCheck)) {
+        try {
+            const { originalPath } = await fs.readJson(pathToCheck)
+            if (await fs.pathExists(originalPath)) {
+                const data = await fs.readFile(originalPath)
+                return { ok: true, data: data }
+            } else {
+                // Broken link
+                await fs.unlink(pathToCheck)
+                return { ok: false, error: 'Original file not found.' }
+            }
+        } catch (e) {
+            console.error(`Error reading JSON reference ${pathToCheck}:`, e)
+        }
+    }
+
+    // Fallback: Check if the directory/file exists directly (Legacy support)
     if (!(await fs.pathExists(targetDir))) {
-        return { ok: false, error: 'Directory not found.' }
+        return { ok: false, error: 'File not found.' }
     }
 
     const stat = fs.statSync(targetDir)
@@ -199,12 +281,7 @@ async function viewImageInPath(dir: string, date: string, imagePath: string) {
 
     const mimeType = lookup(targetDir)
     if (!mimeType || !mimeType.startsWith('image/')) {
-        return { ok: false, error: 'The requested file is not an image.' }
-    }
-
-    // Ensure the file exists before sending it
-    if (!fs.existsSync(targetDir)) {
-        return { ok: false, error: 'Image not found.' }
+        return { ok: false, error: 'File is not an image.' }
     }
 
     const data = await fs.readFile(targetDir)

@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.uploadImage = uploadImage;
+exports.uploadPaths = uploadPaths;
 exports.browseImage = browseImage;
 exports.getImagePaths = getImagePaths;
 exports.viewImage = viewImage;
@@ -37,21 +38,20 @@ function getAppDataDir() {
     return path_1.default.join(os_1.default.homedir(), '.ml4sg-care');
 }
 const userProfileDir = getAppDataDir();
-async function uploadImage(relativePath, file) {
+async function uploadImage(relativePath, originalPath) {
     try {
-        if (file === undefined || file.length === 0) {
-            return { ok: false, error: 'No file was uploaded.' };
+        if (!originalPath) {
+            return { ok: false, error: 'No file path provided.' };
         }
         // Check if file has .jpg extension
-        const fileExtension = path_1.default.extname(relativePath).toLowerCase();
-        if (fileExtension !== '.jpg') {
+        const fileExtension = path_1.default.extname(originalPath).toLowerCase();
+        if (fileExtension !== '.jpg' && fileExtension !== '.jpeg') {
             return { ok: false, error: 'Only .jpg files are allowed.' };
         }
-        const tempPath = path_1.default.join(userProfileDir, 'temp');
-        fs_extra_1.default.ensureDirSync(tempPath);
         const userIdFolder = '1';
         const dateFolder = new Date().toLocaleDateString('en-CA').replace(/-/g, '');
-        const basePath = path_1.default.join(userProfileDir, 'data/image_uploaded', userIdFolder, dateFolder);
+        // Use process.cwd() for local storage
+        const basePath = path_1.default.join(process.cwd(), 'data/image_uploaded', userIdFolder, dateFolder);
         // Reconstruct the folder structure using the relative path
         const targetPath = path_1.default.join(basePath, relativePath);
         // Normalize both basePath and targetPath to ensure correct comparisons
@@ -63,7 +63,10 @@ async function uploadImage(relativePath, file) {
         }
         // Ensure the directory exists before saving
         await fs_extra_1.default.ensureDir(path_1.default.dirname(targetPath));
-        await fs_extra_1.default.writeFile(targetPath, file);
+        // Save as JSON reference
+        const jsonPath = targetPath + '.json';
+        console.log('Saving JSON reference to:', jsonPath);
+        await fs_extra_1.default.writeJson(jsonPath, { originalPath });
         return { ok: true };
     }
     catch (error) {
@@ -73,6 +76,46 @@ async function uploadImage(relativePath, file) {
         else {
             return { ok: false, error: 'uploadImage failed: ' + error };
         }
+    }
+}
+async function uploadPaths(filePaths) {
+    try {
+        let successCount = 0;
+        let errors = [];
+        const processFile = async (filePath) => {
+            try {
+                const stat = await fs_extra_1.default.stat(filePath);
+                if (stat.isDirectory()) {
+                    const files = await fs_extra_1.default.readdir(filePath);
+                    for (const file of files) {
+                        await processFile(path_1.default.join(filePath, file));
+                    }
+                }
+                else {
+                    const ext = path_1.default.extname(filePath).toLowerCase();
+                    if (ext === '.jpg' || ext === '.jpeg') {
+                        const fileName = path_1.default.basename(filePath);
+                        const result = await uploadImage(fileName, filePath);
+                        if (result.ok) {
+                            successCount++;
+                        }
+                        else {
+                            errors.push(`${fileName}: ${result.error}`);
+                        }
+                    }
+                }
+            }
+            catch (err) {
+                errors.push(`Error processing ${filePath}: ${err}`);
+            }
+        };
+        for (const filePath of filePaths) {
+            await processFile(filePath);
+        }
+        return { ok: true, count: successCount, errors };
+    }
+    catch (error) {
+        return { ok: false, error: 'uploadPaths failed: ' + error };
     }
 }
 async function browseImage(date, folderPath) {
@@ -120,7 +163,7 @@ async function browseImage(date, folderPath) {
 async function getImagePaths(currentFolder) {
     try {
         const userIdFolder = '1';
-        const baseDir = path_1.default.join(userProfileDir, 'data/image_uploaded', userIdFolder);
+        const baseDir = path_1.default.join(process.cwd(), 'data/image_uploaded', userIdFolder);
         const targetDir = path_1.default.resolve(baseDir, currentFolder); // Resolve the full path
         fs_extra_1.default.ensureDirSync(targetDir);
         // Ensure the resolved path is still within the baseDir
@@ -154,8 +197,29 @@ async function getFilePaths(dir, baseDir) {
             results = results.concat(subResults);
         }
         else {
-            const relativePath = path_1.default.relative(baseDir, filePath);
-            results.push(relativePath);
+            if (file.endsWith('.json')) {
+                // Handle JSON reference
+                try {
+                    const { originalPath } = await fs_extra_1.default.readJson(filePath);
+                    if (await fs_extra_1.default.pathExists(originalPath)) {
+                        const relativePath = path_1.default.relative(baseDir, filePath);
+                        // If it's a .json file, we include it.
+                        results.push(relativePath);
+                    }
+                    else {
+                        // Original file missing, delete JSON
+                        await fs_extra_1.default.unlink(filePath);
+                    }
+                }
+                catch (e) {
+                    console.error(`Error reading JSON reference ${filePath}:`, e);
+                }
+            }
+            else if (file.toLowerCase().endsWith('.jpg') || file.toLowerCase().endsWith('.jpeg')) {
+                // Handle legacy direct files
+                const relativePath = path_1.default.relative(baseDir, filePath);
+                results.push(relativePath);
+            }
         }
     }
     return results;
@@ -175,16 +239,38 @@ async function viewImageInPath(dir, date, imagePath) {
     }
     else {
         const userIdFolder = '1';
-        baseDir = path_1.default.join(userProfileDir, dir, userIdFolder, date);
+        baseDir = path_1.default.join(process.cwd(), dir, userIdFolder, date);
         targetDir = path_1.default.resolve(baseDir, imagePath); // Resolve the full path
     }
     // Ensure the resolved path is still within the baseDir
     if (!targetDir.startsWith(baseDir)) {
         return { ok: false, error: 'Invalid folder path.' };
     }
-    // Check if the directory exists before reading it
+    // Check for JSON reference first
+    const jsonPath = targetDir + '.json';
+    // Also check if the targetDir itself ends in .json (if the frontend requested the json file directly)
+    const isJsonRequest = targetDir.endsWith('.json');
+    const pathToCheck = isJsonRequest ? targetDir : jsonPath;
+    if (await fs_extra_1.default.pathExists(pathToCheck)) {
+        try {
+            const { originalPath } = await fs_extra_1.default.readJson(pathToCheck);
+            if (await fs_extra_1.default.pathExists(originalPath)) {
+                const data = await fs_extra_1.default.readFile(originalPath);
+                return { ok: true, data: data };
+            }
+            else {
+                // Broken link
+                await fs_extra_1.default.unlink(pathToCheck);
+                return { ok: false, error: 'Original file not found.' };
+            }
+        }
+        catch (e) {
+            console.error(`Error reading JSON reference ${pathToCheck}:`, e);
+        }
+    }
+    // Fallback: Check if the directory/file exists directly (Legacy support)
     if (!(await fs_extra_1.default.pathExists(targetDir))) {
-        return { ok: false, error: 'Directory not found.' };
+        return { ok: false, error: 'File not found.' };
     }
     const stat = fs_extra_1.default.statSync(targetDir);
     if (stat.isDirectory()) {
@@ -192,11 +278,7 @@ async function viewImageInPath(dir, date, imagePath) {
     }
     const mimeType = (0, mime_types_1.lookup)(targetDir);
     if (!mimeType || !mimeType.startsWith('image/')) {
-        return { ok: false, error: 'The requested file is not an image.' };
-    }
-    // Ensure the file exists before sending it
-    if (!fs_extra_1.default.existsSync(targetDir)) {
-        return { ok: false, error: 'Image not found.' };
+        return { ok: false, error: 'File is not an image.' };
     }
     const data = await fs_extra_1.default.readFile(targetDir);
     return { ok: true, data: data };

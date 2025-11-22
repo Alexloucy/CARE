@@ -20,7 +20,8 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     viewImage: (date, imagePath) => electron_1.ipcRenderer.invoke('viewImage', date, imagePath),
     getImagePaths: (currentFolder) => electron_1.ipcRenderer.invoke('getImagePaths', currentFolder),
     downloadSelectedGalleryImages: (selectedPaths) => electron_1.ipcRenderer.invoke('downloadSelectedGalleryImages', selectedPaths),
-    uploadImage: (relativePath, data) => electron_1.ipcRenderer.invoke('uploadImage', relativePath, data),
+    uploadImage: (relativePath, originalPath) => electron_1.ipcRenderer.invoke('uploadImage', relativePath, originalPath),
+    uploadPaths: (filePaths) => electron_1.ipcRenderer.invoke('uploadPaths', filePaths),
     detect: (selectedPaths, onStream) => {
         // Remove existing listeners to avoid duplicates
         electron_1.ipcRenderer.removeAllListeners('stream');
@@ -41,5 +42,6 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     downloadReidImages: (date, time) => electron_1.ipcRenderer.invoke('downloadReidImages', date, time),
     deleteReidResult: (date, time) => electron_1.ipcRenderer.invoke('deleteReidResult', date, time),
     renameReidGroup: (date, time, old_group_id, new_group_id) => electron_1.ipcRenderer.invoke('renameReidGroup', date, time, old_group_id, new_group_id),
-    terminateAI: () => electron_1.ipcRenderer.invoke('terminateAI')
+    terminateAI: () => electron_1.ipcRenderer.invoke('terminateAI'),
+    getPathForFile: (file) => electron_1.webUtils.getPathForFile(file)
 });

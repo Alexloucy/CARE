@@ -1,133 +1,14 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Box, Typography, Card, CardMedia, Fade, useTheme, Skeleton } from '@mui/material';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Box, Typography, useTheme, Skeleton, Fade } from '@mui/material';
 import { FileDetails } from '../../types/electron';
 import ImageModal from '../../components/ImageModal';
-import { UploadSimple } from '@phosphor-icons/react';
+import ImageCard from '../../components/ImageCard';
+import { UploadIcon, UploadSimple } from '@phosphor-icons/react';
 
 interface DateGroup {
     date: string;
     files: FileDetails[];
 }
-
-// --- Image Card Component ---
-const ImageCard: React.FC<{
-    file: FileDetails;
-    date: string;
-    loadImage: (date: string, path: string) => Promise<void>;
-    imageUrl?: string;
-    onClick: () => void;
-}> = ({ file, date, loadImage, imageUrl, onClick }) => {
-    const theme = useTheme();
-    const [showImage, setShowImage] = useState(false);
-    const [isLoaded, setIsLoaded] = useState(false);
-    const cardRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                setShowImage(entry.isIntersecting);
-                if (!entry.isIntersecting) {
-                    setIsLoaded(false);
-                }
-            },
-            {
-                rootMargin: '600px',
-                threshold: 0
-            }
-        );
-
-        if (cardRef.current) {
-            observer.observe(cardRef.current);
-        }
-
-        return () => {
-            observer.disconnect();
-        };
-    }, []);
-
-    useEffect(() => {
-        if (showImage && !imageUrl) {
-            loadImage(date, file.path);
-        }
-    }, [showImage, imageUrl, date, file.path, loadImage]);
-
-    return (
-        <Card
-            ref={cardRef}
-            onClick={onClick}
-            sx={{
-                borderRadius: 3,
-                overflow: 'hidden',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                aspectRatio: '1/1',
-                position: 'relative',
-                bgcolor: theme.palette.action.hover,
-                cursor: 'pointer',
-                group: 'true',
-                '&:hover': {
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                }
-            }}
-        >
-            {imageUrl && showImage && (
-                <Fade in={isLoaded} timeout={800}>
-                    <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
-                        <CardMedia
-                            component="img"
-                            image={imageUrl}
-                            alt={file.name}
-                            onLoad={() => setIsLoaded(true)}
-                            sx={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                transition: 'filter 0.3s ease',
-                                '.MuiCard-root:hover &': {
-                                    filter: 'brightness(0.85)'
-                                }
-                            }}
-                        />
-
-                        <Box sx={{
-                            position: 'absolute',
-                            inset: 0,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            opacity: 0,
-                            transition: 'opacity 0.3s ease',
-                            '.MuiCard-root:hover &': {
-                                opacity: 1
-                            }
-                        }}>
-                            <Box sx={{
-                                height: '40px',
-                                background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%)'
-                            }} />
-
-                            <Box sx={{
-                                p: 1.5,
-                                background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
-                                color: 'white'
-                            }}>
-                                <Typography
-                                    variant="body2"
-                                    noWrap
-                                    sx={{
-                                        fontWeight: 500,
-                                        textShadow: '0 1px 2px rgba(0,0,0,0.5)'
-                                    }}
-                                >
-                                    {file.name}
-                                </Typography>
-                            </Box>
-                        </Box>
-                    </Box>
-                </Fade>
-            )}
-        </Card>
-    );
-};
 
 const LibraryPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
@@ -279,6 +160,9 @@ const LibraryPage: React.FC = () => {
 
     const handleDragLeave = (e: React.DragEvent) => {
         e.preventDefault();
+        if (e.currentTarget.contains(e.relatedTarget as Node)) {
+            return;
+        }
         setIsDragging(false);
     };
 
@@ -289,50 +173,41 @@ const LibraryPage: React.FC = () => {
         const files = Array.from(e.dataTransfer.files);
         if (files.length === 0) return;
 
-        // Filter for images
-        const imageFiles = files.filter(file => file.type.startsWith('image/') || file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.jpeg'));
-
-        if (imageFiles.length === 0) {
-            alert('Please upload valid image files (JPG).');
-            return;
-        }
-
         setLoading(true);
-        let successCount = 0;
 
-        for (const file of imageFiles) {
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                const uint8Array = new Uint8Array(arrayBuffer);
+        try {
+            // Get paths for all dropped items (files or folders)
+            const paths = files.map(file => window.api.getPathForFile(file));
+            console.log('Uploading paths:', paths);
 
-                // Use file name as relative path for now (uploads to current date folder)
-                const response = await window.api.uploadImage(file.name, uint8Array);
+            const response = await window.api.uploadPaths(paths);
 
-                if (response.ok) {
-                    successCount++;
-                } else {
-                    console.error(`Failed to upload ${file.name}:`, response.error);
+            if (response.ok) {
+                console.log(`Successfully uploaded ${response.count} images.`);
+                if (response.errors && response.errors.length > 0) {
+                    console.warn('Some errors occurred:', response.errors);
                 }
-            } catch (error) {
-                console.error(`Error uploading ${file.name}:`, error);
+                // Refresh library if any images were uploaded
+                if (response.count && response.count > 0) {
+                    await fetchLibrary();
+                }
+            } else {
+                console.error('Upload failed:', response.error);
             }
+        } catch (error) {
+            console.error('Error in handleDrop:', error);
         }
 
-        if (successCount > 0) {
-            // Refresh library
-            await fetchLibrary();
-        }
         setLoading(false);
     };
 
     return (
         <Box
             sx={{
-                p: 4,
                 height: '100%',
-                overflowY: 'auto',
                 position: 'relative',
-                outline: 'none'
+                outline: 'none',
+                overflow: 'hidden'
             }}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -341,99 +216,99 @@ const LibraryPage: React.FC = () => {
             {/* Drag Overlay */}
             <Fade in={isDragging}>
                 <Box sx={{
-                    position: 'absolute',
+                    position: 'fixed',
                     inset: 0,
-                    zIndex: 100,
+                    zIndex: 9999,
                     bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)',
+                    backdropFilter: 'blur(8px)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backdropFilter: 'blur(4px)',
-                    border: `3px dashed ${theme.palette.primary.main}`,
-                    borderRadius: 4,
-                    m: 2
+                    transition: 'all 0.2s ease',
+                    pointerEvents: 'none'
                 }}>
-                    <UploadSimple size={64} color={theme.palette.primary.main} />
-                    <Typography variant="h5" sx={{ mt: 2, fontWeight: 600, color: theme.palette.primary.main }}>
-                        Drop images to upload
+                    <UploadIcon size={80} color={theme.palette.primary.main} weight="regular" />
+                    <Typography variant="h3" sx={{ mt: 4, fontWeight: 400, color: theme.palette.text.primary }}>
+                        Drop to Upload
                     </Typography>
                 </Box>
             </Fade>
 
-            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="h4" fontWeight="bold">Library</Typography>
-            </Box>
-
-            {loading ? (
-                <Box sx={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                    gap: 2
-                }}>
-                    {[...Array(12)].map((_, i) => (
-                        <Skeleton key={i} variant="rectangular" sx={{ borderRadius: 3, aspectRatio: '1/1', height: 'auto' }} />
-                    ))}
+            <Box sx={{ p: 4, height: '100%', overflowY: 'auto' }}>
+                <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h4" fontWeight="bold">Library</Typography>
                 </Box>
-            ) : (
-                <Box>
-                    {groups.length === 0 ? (
-                        <Box
-                            sx={{
-                                mt: 10,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                opacity: 0.6,
-                                border: '2px dashed',
-                                borderColor: 'divider',
-                                borderRadius: 4,
-                                p: 8
-                            }}
-                        >
-                            <UploadSimple size={48} />
-                            <Typography variant="h6" sx={{ mt: 2 }}>
-                                No images yet
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Drag and drop images here to get started
-                            </Typography>
+
+                {
+                    loading ? (
+                        <Box sx={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                            gap: 2
+                        }}>
+                            {[...Array(12)].map((_, i) => (
+                                <Skeleton key={i} variant="rectangular" sx={{ borderRadius: 3, aspectRatio: '1/1', height: 'auto' }} />
+                            ))}
                         </Box>
                     ) : (
-                        groups.map((group) => (
-                            <Box key={group.date} sx={{ mb: 5 }}>
-                                <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary', fontWeight: 500 }}>
-                                    {formatDate(group.date)}
-                                </Typography>
-                                <Box sx={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                                    gap: 2
-                                }}>
-                                    {group.files.map((file) => {
-                                        const key = `${group.date}/${file.path}`;
-                                        return (
-                                            <Box key={key}>
-                                                <ImageCard
-                                                    file={file}
-                                                    date={group.date}
-                                                    loadImage={loadImage}
-                                                    imageUrl={imageUrls[key]}
-                                                    onClick={() => {
-                                                        if (imageUrls[key]) {
-                                                            setSelectedFile({ file, url: imageUrls[key], date: group.date });
-                                                        }
-                                                    }}
-                                                />
-                                            </Box>
-                                        );
-                                    })}
+                        <Box>
+                            {groups.length === 0 ? (
+                                <Box
+                                    sx={{
+                                        height: '60vh',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        opacity: 0.6
+                                    }}
+                                >
+                                    <UploadSimple size={64} color={theme.palette.text.primary} weight="thin" />
+                                    <Typography variant="h5" fontWeight="500" sx={{ mt: 3, color: 'text.primary' }}>
+                                        No images yet
+                                    </Typography>
+                                    <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
+                                        Drag and drop to start
+                                    </Typography>
                                 </Box>
-                            </Box>
-                        ))
-                    )}
-                </Box>
-            )}
+                            ) : (
+                                groups.map((group) => (
+                                    <Box key={group.date} sx={{ mb: 5 }}>
+                                        <Typography variant="h6" sx={{ mb: 2, color: 'text.secondary', fontWeight: 500 }}>
+                                            {formatDate(group.date)}
+                                        </Typography>
+                                        <Box sx={{
+                                            display: 'grid',
+                                            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                                            gap: 2
+                                        }}>
+                                            {group.files.map((file) => {
+                                                const key = `${group.date}/${file.path}`;
+                                                return (
+                                                    <Box key={key}>
+                                                        <ImageCard
+                                                            file={file}
+                                                            date={group.date}
+                                                            loadImage={loadImage}
+                                                            imageUrl={imageUrls[key]}
+                                                            onClick={() => {
+                                                                if (imageUrls[key]) {
+                                                                    setSelectedFile({ file, url: imageUrls[key], date: group.date });
+                                                                }
+                                                            }}
+                                                        />
+                                                    </Box>
+                                                );
+                                            })}
+                                        </Box>
+                                    </Box>
+                                ))
+                            )}
+                        </Box>
+                    )
+                }
+            </Box>
 
             {/* Image Modal */}
             <ImageModal
@@ -446,7 +321,7 @@ const LibraryPage: React.FC = () => {
                 hasNext={selectedFile ? allFiles.findIndex(f => f.path === selectedFile.file.path && f.date === selectedFile.date) < allFiles.length - 1 : false}
                 hasPrev={selectedFile ? allFiles.findIndex(f => f.path === selectedFile.file.path && f.date === selectedFile.date) > 0 : false}
             />
-        </Box>
+        </Box >
     );
 };
 

@@ -16,6 +16,7 @@ import {
     runReid,
     terminateAI,
     uploadImage,
+    uploadPaths,
     viewDetectImage,
     viewImage
 } from './controller';
@@ -142,7 +143,8 @@ ipcMain.handle('browseImage', (_, date, folderPath) => browseImage(date, folderP
 ipcMain.handle('viewImage', (_, date, imagePath) => viewImage(date, imagePath));
 ipcMain.handle('getImagePaths', (_, currentFolder) => getImagePaths(currentFolder));
 ipcMain.handle('downloadSelectedGalleryImages', (_, selectedPaths) => downloadSelectedGalleryImages(selectedPaths));
-ipcMain.handle('uploadImage', (_, relativePath, data) => uploadImage(relativePath, data));
+ipcMain.handle('uploadImage', (_, relativePath, originalPath) => uploadImage(relativePath, originalPath));
+ipcMain.handle('uploadPaths', (_, filePaths) => uploadPaths(filePaths));
 ipcMain.handle('detect', (_, selectedPaths) => detect(selectedPaths, stream));
 ipcMain.handle('browseDetectImage', (_, date, folderPath, filterLabel, confLow, confHigh) =>
     browseDetectImage(date, folderPath, filterLabel, confLow, confHigh)

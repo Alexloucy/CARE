@@ -153,3 +153,4 @@ python/_logs/
 python/_reid_json_output/
 readme_media/detection_results.json
 .DS_Store
+data

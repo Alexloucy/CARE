@@ -23,7 +23,8 @@ export interface ElectronApi {
     viewImage: (date: string, imagePath: string) => Promise<ViewImageResponse>;
     getImagePaths: (currentFolder: string) => Promise<{ ok: boolean; selectAllPaths?: string[]; error?: string }>;
     downloadSelectedGalleryImages: (selectedPaths: string[]) => Promise<{ ok: boolean; error?: string }>;
-    uploadImage: (relativePath: string, data: Uint8Array) => Promise<{ ok: boolean; error?: string }>;
+    uploadImage: (relativePath: string, originalPath: string) => Promise<{ ok: boolean; error?: string }>;
+    uploadPaths: (filePaths: string[]) => Promise<{ ok: boolean; count?: number; errors?: string[]; error?: string }>;
     detect: (selectedPaths: string[], onStream: (txt: string) => void) => Promise<{ ok: boolean; error?: string }>;
     browseDetectImage: (date: string, folderPath: string, filterLabel: string, confLow: number, confHigh: number) => Promise<BrowseImageResponse>;
     viewDetectImage: (date: string, imagePath: string) => Promise<ViewImageResponse>;
@@ -36,6 +37,7 @@ export interface ElectronApi {
     deleteReidResult: (date: string, time: string) => Promise<{ ok: boolean; error?: string }>;
     renameReidGroup: (date: string, time: string, old_group_id: string, new_group_id: string) => Promise<{ ok: boolean; error?: string }>;
     terminateAI: () => Promise<void>;
+    getPathForFile: (file: File) => string;
 }
 
 declare global {

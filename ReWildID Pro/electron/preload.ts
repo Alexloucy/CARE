@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 contextBridge.exposeInMainWorld('windowControls', {
     minimize: () => ipcRenderer.invoke('window:minimize'),
@@ -20,7 +20,8 @@ contextBridge.exposeInMainWorld('api', {
     viewImage: (date: string, imagePath: string) => ipcRenderer.invoke('viewImage', date, imagePath),
     getImagePaths: (currentFolder: string) => ipcRenderer.invoke('getImagePaths', currentFolder),
     downloadSelectedGalleryImages: (selectedPaths: string[]) => ipcRenderer.invoke('downloadSelectedGalleryImages', selectedPaths),
-    uploadImage: (relativePath: string, data: Uint8Array) => ipcRenderer.invoke('uploadImage', relativePath, data),
+    uploadImage: (relativePath: string, originalPath: string) => ipcRenderer.invoke('uploadImage', relativePath, originalPath),
+    uploadPaths: (filePaths: string[]) => ipcRenderer.invoke('uploadPaths', filePaths),
     detect: (selectedPaths: string[], onStream: (txt: string) => void) => {
         // Remove existing listeners to avoid duplicates
         ipcRenderer.removeAllListeners('stream');
@@ -45,5 +46,6 @@ contextBridge.exposeInMainWorld('api', {
     deleteReidResult: (date: string, time: string) => ipcRenderer.invoke('deleteReidResult', date, time),
     renameReidGroup: (date: string, time: string, old_group_id: string, new_group_id: string) =>
         ipcRenderer.invoke('renameReidGroup', date, time, old_group_id, new_group_id),
-    terminateAI: () => ipcRenderer.invoke('terminateAI')
+    terminateAI: () => ipcRenderer.invoke('terminateAI'),
+    getPathForFile: (file: File) => webUtils.getPathForFile(file)
 });
