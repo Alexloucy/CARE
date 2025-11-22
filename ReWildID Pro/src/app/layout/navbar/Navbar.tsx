@@ -6,7 +6,8 @@ import {
     Sun,
     Moon,
     Bell,
-    House,
+    CaretLeft,
+    CaretRight,
     SignOut,
     Gear,
     X,
@@ -50,6 +51,23 @@ export default function Navbar({
     const navigate = useNavigate();
     const isMdUp = useMediaQuery(muiTheme.breakpoints.up('md'));
     const [isMaximized, setIsMaximized] = useState(false);
+    const [canGoBack, setCanGoBack] = useState(false);
+    const [canGoForward, setCanGoForward] = useState(false);
+
+    useEffect(() => {
+        // Function to update navigation state based on history
+        const updateNavigationState = () => {
+            const state = window.history.state;
+            // React Router uses 'idx' in history state to track position
+            const idx = state?.idx ?? 0;
+
+            setCanGoBack(idx > 0);
+            setCanGoForward(idx < window.history.length - 1);
+        };
+
+        // Update on mount and location change
+        updateNavigationState();
+    }, [location]);
 
     const inElectron = isElectron();
     const windowControls = inElectron ? (window as any).windowControls : null;
@@ -179,15 +197,40 @@ export default function Navbar({
                         <Sidebar size={24} />
                     </IconButton>
 
-                    <Tooltip title="Go to Home">
-                        <IconButton
-                            color="inherit"
-                            aria-label="home"
-                            onClick={() => navigate('/')}
-                            sx={{ padding: 1, fontSize: { xs: 20, sm: 24 } }}
-                        >
-                            <House size={24} />
-                        </IconButton>
+                    <Tooltip title="Go Back">
+                        <span>
+                            <IconButton
+                                color="inherit"
+                                aria-label="go back"
+                                onClick={() => navigate(-1)}
+                                disabled={!canGoBack}
+                                sx={{
+                                    padding: 1,
+                                    fontSize: { xs: 20, sm: 24 },
+                                    opacity: canGoBack ? 1 : 0.3
+                                }}
+                            >
+                                <CaretLeft size={24} />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+
+                    <Tooltip title="Go Forward">
+                        <span>
+                            <IconButton
+                                color="inherit"
+                                aria-label="go forward"
+                                onClick={() => navigate(1)}
+                                disabled={!canGoForward}
+                                sx={{
+                                    padding: 1,
+                                    fontSize: { xs: 20, sm: 24 },
+                                    opacity: canGoForward ? 1 : 0.3
+                                }}
+                            >
+                                <CaretRight size={24} />
+                            </IconButton>
+                        </span>
                     </Tooltip>
 
                     {isMdUp && (

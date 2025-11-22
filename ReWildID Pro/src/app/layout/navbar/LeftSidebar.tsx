@@ -107,10 +107,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
             ModalProps={{ keepMounted: true }}
         >
             <Box
-                component="a"
-                href="https://ml4sg.auckland.ac.nz/animal-re-identification-model/"
-                target="_blank"
-                rel="noopener noreferrer"
+                onClick={() => navigate('/')}
                 sx={{
                     ...(isElectron() && { WebkitAppRegion: 'no-drag' }),
                     display: 'flex',
@@ -224,7 +221,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
 
             <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', p: 2 }}>
                 <Typography variant="h6" sx={{ fontFamily: 'Inter, sans-serif', fontWeight: 500, color: theme.palette.mode === 'dark' ? 'white' : '#1C1C1C', opacity: 0.7, fontSize: '16px' }}>
-                    RewildID Pro
+                    MARS Lab
                 </Typography>
             </Box>
 
