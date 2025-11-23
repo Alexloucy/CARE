@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Box, Typography, useTheme, Skeleton, IconButton, Button, Tooltip, Menu, MenuItem, Card } from '@mui/material';
+import { Box, Typography, useTheme, Skeleton, IconButton, Button, Tooltip, Menu, MenuItem, Card, GlobalStyles } from '@mui/material';
 import { Plus, PencilSimple, Trash, CheckSquare, X } from '@phosphor-icons/react';
 import { DBImage } from '../../types/electron';
 
@@ -16,6 +16,7 @@ import { GroupNameDialog } from '../../components/GroupNameDialog';
 import { DragDropOverlay } from '../../components/library/DragDropOverlay';
 import { SelectionToolbar } from '../../components/library/SelectionToolbar';
 import { DateGroupList } from '../../components/library/DateGroupList';
+import { Timeline } from '../../components/library/Timeline';
 
 const LibraryPage: React.FC = () => {
     const theme = useTheme();
@@ -62,6 +63,36 @@ const LibraryPage: React.FC = () => {
     // 6. Local State
     const [selectedImage, setSelectedImage] = useState<{ image: DBImage, url: string } | null>(null);
     const [isDragging, setIsDragging] = useState(false);
+    const [activeId, setActiveId] = useState<string>('');
+
+    // Scroll Observer
+    useEffect(() => {
+        if (loading || dateSections.length === 0) return;
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    setActiveId(entry.target.id);
+                }
+            });
+        }, {
+            rootMargin: '-10% 0px -80% 0px', // Trigger when element is near the top
+            threshold: 0
+        });
+
+        // Observe all dates and groups
+        dateSections.forEach(section => {
+            const dateEl = document.getElementById(`date-${section.date}`);
+            if (dateEl) observer.observe(dateEl);
+            
+            section.groups.forEach(group => {
+                const groupEl = document.getElementById(`group-${group.id}`);
+                if (groupEl) observer.observe(groupEl);
+            });
+        });
+
+        return () => observer.disconnect();
+    }, [loading, dateSections]);
 
     // Derived State
     const allImages = useMemo(() => {
@@ -102,6 +133,20 @@ const LibraryPage: React.FC = () => {
             const prevImage = allImages[currentIndex - 1];
             if (!imageUrls[prevImage.id]) loadImage(prevImage);
             setSelectedImage({ image: prevImage, url: fullImageUrls[prevImage.id] || imageUrls[prevImage.id] || '' });
+        }
+    };
+
+    const handleDateClick = (date: string) => {
+        const element = document.getElementById(`date-${date}`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+
+    const handleGroupClick = (groupId: number) => {
+        const element = document.getElementById(`group-${groupId}`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth' });
         }
     };
 
@@ -166,12 +211,39 @@ const LibraryPage: React.FC = () => {
 
     return (
         <Box
-            sx={{ height: '100%', position: 'relative', outline: 'none', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+            sx={{ 
+                height: '100%', 
+                position: 'relative', 
+                outline: 'none', 
+                overflow: 'hidden', 
+                display: 'flex', 
+                flexDirection: 'column',
+            }}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
+            <GlobalStyles styles={{
+                '*::-webkit-scrollbar': {
+                  width: '0px',
+                  height: '0px',
+                  display: 'none'
+                },
+                '*': {
+                    scrollbarWidth: 'none',
+                    '-ms-overflow-style': 'none',
+                }
+            }} />
             <DragDropOverlay isDragging={isDragging} />
+            
+            {!loading && dateSections.length > 0 && (
+                <Timeline 
+                    dateSections={dateSections}
+                    onDateClick={handleDateClick}
+                    onGroupClick={handleGroupClick}
+                    activeId={activeId}
+                />
+            )}
 
             {/* Header */}
             <Box sx={{ p: 3, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: theme.palette.background.default, zIndex: 10 }}>
@@ -196,7 +268,14 @@ const LibraryPage: React.FC = () => {
             </Box>
 
             {/* Content */}
-            <Box sx={{ flex: 1, overflowY: 'auto', p: 4, pt: 0 }}>
+            <Box sx={{ 
+                flex: 1, 
+                overflowY: 'auto', 
+                p: 4, 
+                pt: 0,
+                '&::-webkit-scrollbar': { display: 'none' },
+                scrollbarWidth: 'none',
+            }}>
                 {loading ? (
                     <Box sx={{ mt: 2 }}>
                         {/* Date Header Skeleton */}

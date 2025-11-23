@@ -74,7 +74,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
     return (
         <Box>
             {dateSections.map((section) => (
-                <Box key={section.date} sx={{ mb: 5, mt: 2 }}>
+                <Box key={section.date} id={`date-${section.date}`} sx={{ mb: 5, mt: 2, scrollMarginTop: '100px' }}>
                     <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, color: theme.palette.text.secondary, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.875rem' }}>
                         {formatDate(section.date)}
                     </Typography>
@@ -82,7 +82,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                     {section.groups.map(group => {
                         const isCollapsed = collapsedGroups.has(group.id);
                         return (
-                            <Box key={group.id} sx={{ mb: 4 }}>
+                            <Box key={group.id} id={`group-${group.id}`} sx={{ mb: 4, scrollMarginTop: '100px' }}>
                                 <Box sx={{ 
                                     display: 'flex', 
                                     alignItems: 'center', 
