@@ -52,7 +52,9 @@ const LibraryPage: React.FC = () => {
         selectedIds: selectedImageIds, 
         toggleSelectionMode, 
         toggleItem: toggleImageSelection, 
-        clearSelection
+        clearSelection,
+        setIsSelectionMode,
+        setSelection
     } = useSelection<number>();
 
     // 4. Upload Logic
@@ -357,6 +359,9 @@ const LibraryPage: React.FC = () => {
                         isSelectionMode={isSelectionMode}
                         selectedImageIds={selectedImageIds}
                         onToggleSelection={toggleImageSelection}
+                        onSetSelection={setSelection}
+                        onEnableSelectionMode={() => setIsSelectionMode(true)}
+                        allImages={allImages}
                         onImageClick={(img) => {
                             if (isSelectionMode) toggleImageSelection(img.id);
                             else if (imageUrls[img.id]) setSelectedImage({ image: img, url: imageUrls[img.id] });

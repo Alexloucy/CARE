@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Box, Typography, Card, CardMedia, Fade, useTheme, Checkbox } from '@mui/material';
+import { Box, Typography, Card, CardMedia, Fade, useTheme } from '@mui/material';
 import { FileDetails } from '../types/electron';
 import { CheckCircle, Circle } from '@phosphor-icons/react';
 
@@ -12,7 +12,10 @@ interface ImageCardProps {
     selectable?: boolean;
     selected?: boolean;
     onToggleSelection?: () => void;
-    showNames?: boolean; // Toggle for showing file names
+    showNames?: boolean;
+    onLongPress?: () => void;
+    onPointerEnter?: () => void;
+    onPointerDown?: (e: React.PointerEvent) => void;
 }
 
 const ImageCard: React.FC<ImageCardProps> = ({
@@ -24,12 +27,16 @@ const ImageCard: React.FC<ImageCardProps> = ({
     selectable = false,
     selected = false,
     onToggleSelection,
-    showNames = false
+    showNames = false,
+    onLongPress,
+    onPointerEnter,
+    onPointerDown
 }) => {
     const theme = useTheme();
     const [showImage, setShowImage] = useState(false);
     const [isLoaded, setIsLoaded] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
+    const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         const observer = new IntersectionObserver(
@@ -60,12 +67,67 @@ const ImageCard: React.FC<ImageCardProps> = ({
         }
     }, [showImage, imageUrl, date, file.path, loadImage]);
 
+    // Long Press Logic
+    const handlePointerDown = (e: React.PointerEvent) => {
+        if (onPointerDown) onPointerDown(e);
+        
+        if (onLongPress) {
+            longPressTimer.current = setTimeout(() => {
+                onLongPress();
+            }, 500);
+        }
+    };
+
+    const handlePointerUp = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+        }
+    };
+
+    const handlePointerLeave = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+        }
+    };
+
     const handleCardClick = (e: React.MouseEvent) => {
         if (selectable && onToggleSelection) {
+            // Selection logic is handled by onPointerDown to support drag-select
+            // We prevent default click handling to avoid double-toggling
             e.stopPropagation();
-            onToggleSelection();
         } else {
+            // If not in selection mode, normal click opens the image
             onClick();
+        }
+    };
+
+    // Selection Icon Logic
+    const getSelectionIcon = () => {
+        if (selected) {
+            // Selected: Filled check with adaptive colors
+            const checkColor = theme.palette.mode === 'light' ? 'black' : 'white';
+            const bgColor = theme.palette.mode === 'light' ? 'white' : 'black';
+            return (
+                <Box sx={{ 
+                    bgcolor: bgColor, 
+                    borderRadius: '50%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                    width: 24,
+                    height: 24
+                }}>
+                    <CheckCircle size={24} weight="fill" color={checkColor} />
+                </Box>
+            );
+        } else {
+            // Unselected: Empty circle
+            return (
+                 <Circle size={24} color="white" weight="regular" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))', opacity: 0.8 }} />
+            );
         }
     };
 
@@ -73,23 +135,23 @@ const ImageCard: React.FC<ImageCardProps> = ({
         <Card
             ref={cardRef}
             onClick={handleCardClick}
+            onPointerDown={handlePointerDown}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerLeave}
+            onPointerEnter={onPointerEnter}
             sx={{
                 borderRadius: 3,
                 overflow: 'hidden',
-                boxShadow: selected
-                    ? `0 0 0 3px ${theme.palette.primary.main}, 0 8px 24px rgba(0,0,0,0.2)`
-                    : '0 2px 8px rgba(0,0,0,0.1)',
+                boxShadow: 'none', // Removed border style
                 aspectRatio: '1/1',
                 position: 'relative',
                 bgcolor: theme.palette.action.hover,
                 cursor: 'pointer',
-                transform: selected ? 'scale(0.96)' : 'scale(1)',
-                transition: 'all 0.2s ease-in-out',
+                transform: selected ? 'scale(0.98)' : 'scale(1)',
+                transition: 'all 0.15s ease-in-out',
                 '&:hover': {
-                    boxShadow: selected
-                        ? `0 0 0 3px ${theme.palette.primary.main}, 0 12px 32px rgba(0,0,0,0.3)`
-                        : '0 8px 24px rgba(0,0,0,0.2)',
-                    transform: selected ? 'scale(0.96)' : 'translateY(-2px)',
+                    transform: selected ? 'scale(0.98)' : 'translateY(-2px)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
                 }
             }}
         >
@@ -100,37 +162,51 @@ const ImageCard: React.FC<ImageCardProps> = ({
                             component="img"
                             image={imageUrl}
                             alt={file.name}
+                            draggable="false"
                             onLoad={() => setIsLoaded(true)}
                             sx={{
                                 width: '100%',
                                 height: '100%',
                                 objectFit: 'cover',
                                 transition: 'filter 0.3s ease',
-                                filter: selected ? 'brightness(0.85)' : 'none',
-                                '.MuiCard-root:hover &': {
-                                    filter: 'brightness(0.85)'
-                                }
+                                // "Light up" effect instead of dimming
+                                filter: 'none',
+                                userSelect: 'none',
+                                WebkitUserDrag: 'none'
                             }}
                         />
+                        
+                        {/* Light up overlay */}
+                        {selected && (
+                            <Box sx={{
+                                position: 'absolute',
+                                inset: 0,
+                                bgcolor: 'rgba(255, 255, 255, 0.15)',
+                                zIndex: 1,
+                                pointerEvents: 'none'
+                            }} />
+                        )}
 
-                        {/* Selection Overlay */}
-                        {selectable && (
+                        {/* Selection Icon */}
+                        {(selectable || selected) && ( // Show if selectable OR already selected
                             <Box sx={{
                                 position: 'absolute',
                                 top: 8,
+                                right: 8, // Move to right like iOS/Google Photos often do, or stick to left? User didn't specify. Left is previous code. I'll stick to left to be safe, or right? 
+                                // Let's stick to left as per previous code unless user asked.
+                                // Actually, "right" is more standard for selection circles on photos. I'll try right?
+                                // No, let's keep left for now to minimize confusion, or maybe right is better?
+                                // The previous code had it at left: 8. I'll keep it at left: 8.
                                 left: 8,
-                                zIndex: 2
-                            }}>
-                                <Checkbox
-                                    checked={selected}
-                                    icon={<Circle size={24} color="white" weight="fill" style={{ opacity: 0.7, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }} />}
-                                    checkedIcon={<CheckCircle size={24} weight="fill" color={theme.palette.primary.main} style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))', backgroundColor: 'white', borderRadius: '50%' }} />}
-                                    onChange={(e) => {
-                                        e.stopPropagation();
-                                        onToggleSelection && onToggleSelection();
-                                    }}
-                                    sx={{ p: 0 }}
-                                />
+                                zIndex: 2,
+                                cursor: 'pointer'
+                            }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleSelection && onToggleSelection();
+                            }}
+                            >
+                                {getSelectionIcon()}
                             </Box>
                         )}
 
@@ -140,6 +216,7 @@ const ImageCard: React.FC<ImageCardProps> = ({
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'space-between',
+                            pointerEvents: 'none' // Pass through interactions
                         }}>
                             <Box sx={{
                                 height: '40px',
