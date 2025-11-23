@@ -107,10 +107,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
                     onClick={(e) => e.stopPropagation()}
                     sx={{
                         position: 'relative',
-                        width: 'auto',
-                        height: 'auto',
-                        maxWidth: '90vw',
-                        maxHeight: '90vh',
+                        width: '90vw',
+                        height: '90vh',
                         bgcolor: 'background.paper',
                         borderRadius: 4,
                         overflow: 'hidden',
@@ -130,8 +128,6 @@ const ImageModal: React.FC<ImageModalProps> = ({
                             alignItems: 'center',
                             justifyContent: 'center',
                             bgcolor: 'black',
-                            minWidth: '400px',
-                            minHeight: '300px',
                             cursor: isDragging ? 'grabbing' : 'grab'
                         }}
                         onWheel={handleWheel}
@@ -144,8 +140,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
                             src={imageUrl}
                             alt={file.name}
                             style={{
-                                maxWidth: '100%',
-                                maxHeight: '90vh',
+                                width: '100%',
+                                height: '100%',
                                 objectFit: 'contain',
                                 transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
                                 transition: isDragging ? 'none' : 'transform 0.1s ease-out',

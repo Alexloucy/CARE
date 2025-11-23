@@ -1,6 +1,6 @@
-import React from 'react';
-import { Box, Typography, IconButton, useTheme } from '@mui/material';
-import { DotsThreeVertical, UploadSimple } from '@phosphor-icons/react';
+import React, { useState } from 'react';
+import { Box, Typography, IconButton, useTheme, Collapse } from '@mui/material';
+import { DotsThreeVertical, UploadSimple, CaretRight, CaretDown } from '@phosphor-icons/react';
 import ImageCard from '../ImageCard';
 import { DateSection } from '../../types/library';
 import { DBImage } from '../../types/electron';
@@ -27,6 +27,17 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
     onMenuOpen
 }) => {
     const theme = useTheme();
+    const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(new Set());
+
+    const toggleGroup = (groupId: number) => {
+        const newCollapsed = new Set(collapsedGroups);
+        if (newCollapsed.has(groupId)) {
+            newCollapsed.delete(groupId);
+        } else {
+            newCollapsed.add(groupId);
+        }
+        setCollapsedGroups(newCollapsed);
+    };
 
     const formatDate = (dateStr: string) => {
         if (dateStr.length !== 8) return dateStr;
@@ -68,57 +79,85 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                         {formatDate(section.date)}
                     </Typography>
 
-                    {section.groups.map(group => (
-                        <Box key={group.id} sx={{ mb: 4 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                        {group.name}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary" sx={{ bgcolor: theme.palette.action.selected, px: 1, py: 0.5, borderRadius: 1 }}>
-                                        {group.images.length}
-                                    </Typography>
-                                </Box>
-                                <IconButton
-                                    size="small"
-                                    onClick={(e) => onMenuOpen(e, group.id)}
-                                    sx={{ opacity: 0.6, '&:hover': { opacity: 1 } }}
-                                >
-                                    <DotsThreeVertical size={20} />
-                                </IconButton>
-                            </Box>
-
-                            <Box sx={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                                gap: 2
-                            }}>
-                                {group.images.map((img) => {
-                                    const fileDetails = {
-                                        name: img.original_path.split(/[\\/]/).pop() || 'image.jpg',
-                                        path: img.original_path,
-                                        isDirectory: false
-                                    };
-
-                                    return (
-                                        <Box key={img.id}>
-                                            <ImageCard
-                                                file={fileDetails}
-                                                date={section.date}
-                                                // @ts-ignore - Wrapper to match prop type if necessary
-                                                loadImage={() => loadImage(img)}
-                                                imageUrl={imageUrls[img.id]}
-                                                onClick={() => onImageClick(img)}
-                                                selectable={isSelectionMode}
-                                                selected={selectedImageIds.has(img.id)}
-                                                onToggleSelection={() => onToggleSelection(img.id)}
-                                            />
+                    {section.groups.map(group => {
+                        const isCollapsed = collapsedGroups.has(group.id);
+                        return (
+                            <Box key={group.id} sx={{ mb: 4 }}>
+                                <Box sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'space-between', 
+                                    mb: 2,
+                                    position: 'relative', // Establish positioning context
+                                    '&:hover .collapse-arrow': { opacity: 1, transform: 'translateX(0)' },
+                                    '& .collapse-arrow': { 
+                                        opacity: 0, 
+                                        transition: 'all 0.2s ease'
+                                    }
+                                }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}> {/* Restored gap: 2 */}
+                                        {/* Arrow positioned absolutely to the left */}
+                                        <Box sx={{ position: 'absolute', left: -32, display: 'flex', alignItems: 'center', height: '100%' }}>
+                                            <IconButton
+                                                className="collapse-arrow"
+                                                size="small"
+                                                onClick={() => toggleGroup(group.id)}
+                                                sx={{ padding: 0.5 }}
+                                            >
+                                                {isCollapsed ? <CaretRight size={20} /> : <CaretDown size={20} />}
+                                            </IconButton>
                                         </Box>
-                                    );
-                                })}
+
+                                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                            {group.name}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary" sx={{ bgcolor: theme.palette.action.selected, px: 1, py: 0.5, borderRadius: 1 }}>
+                                            {group.images.length}
+                                        </Typography>
+                                    </Box>
+                                    <IconButton
+                                        size="small"
+                                        onClick={(e) => onMenuOpen(e, group.id)}
+                                        sx={{ opacity: 0.6, '&:hover': { opacity: 1 } }}
+                                    >
+                                        <DotsThreeVertical size={20} />
+                                    </IconButton>
+                                </Box>
+
+                                <Collapse in={!isCollapsed} timeout={300}>
+                                    <Box sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                                        gap: 2
+                                    }}>
+                                        {group.images.map((img) => {
+                                            const fileDetails = {
+                                                name: img.original_path.split(/[\\/]/).pop() || 'image.jpg',
+                                                path: img.original_path,
+                                                isDirectory: false
+                                            };
+
+                                            return (
+                                                <Box key={img.id}>
+                                                    <ImageCard
+                                                        file={fileDetails}
+                                                        date={section.date}
+                                                        // @ts-ignore - Wrapper to match prop type if necessary
+                                                        loadImage={() => loadImage(img)}
+                                                        imageUrl={imageUrls[img.id]}
+                                                        onClick={() => onImageClick(img)}
+                                                        selectable={isSelectionMode}
+                                                        selected={selectedImageIds.has(img.id)}
+                                                        onToggleSelection={() => onToggleSelection(img.id)}
+                                                    />
+                                                </Box>
+                                            );
+                                        })}
+                                    </Box>
+                                </Collapse>
                             </Box>
-                        </Box>
-                    ))}
+                        );
+                    })}
                 </Box>
             ))}
         </Box>

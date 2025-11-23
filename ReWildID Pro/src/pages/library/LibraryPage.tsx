@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Box, Typography, useTheme, Skeleton, IconButton, Button, Tooltip, Menu, MenuItem } from '@mui/material';
+import { Box, Typography, useTheme, Skeleton, IconButton, Button, Tooltip, Menu, MenuItem, Card } from '@mui/material';
 import { Plus, PencilSimple, Trash, CheckSquare, X } from '@phosphor-icons/react';
 import { DBImage } from '../../types/electron';
 
@@ -198,10 +198,24 @@ const LibraryPage: React.FC = () => {
             {/* Content */}
             <Box sx={{ flex: 1, overflowY: 'auto', p: 4, pt: 0 }}>
                 {loading ? (
-                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 2, mt: 2 }}>
-                        {[...Array(12)].map((_, i) => (
-                            <Skeleton key={i} variant="rectangular" sx={{ borderRadius: 3, aspectRatio: '1/1', height: 'auto' }} />
-                        ))}
+                    <Box sx={{ mt: 2 }}>
+                        {/* Date Header Skeleton */}
+                        <Skeleton variant="text" sx={{ fontSize: '0.875rem', width: 200, mb: 2 }} />
+
+                        {/* Group Header Skeleton */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                            <Skeleton variant="text" sx={{ fontSize: '1.25rem', width: 150 }} />
+                            <Skeleton variant="rounded" width={40} height={24} />
+                        </Box>
+
+                        {/* Image Grid Skeleton */}
+                        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 2 }}>
+                            {[...Array(12)].map((_, i) => (
+                                <Card key={i} sx={{ aspectRatio: '1/1', width: '100%', borderRadius: 3, boxShadow: 'none' }}>
+                                    <Skeleton variant="rectangular" width="100%" height="100%" animation="wave" />
+                                </Card>
+                            ))}
+                        </Box>
                     </Box>
                 ) : (
                     <DateGroupList 
