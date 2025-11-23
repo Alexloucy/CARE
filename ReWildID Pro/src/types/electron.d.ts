@@ -32,7 +32,7 @@ export interface ElectronApi {
     browseImage: (date: string, folderPath: string) => Promise<BrowseImageResponse>;
     viewImage: (originalPath: string) => Promise<ViewImageResponse>;
     getImagePaths: (currentFolder: string) => Promise<{ ok: boolean; selectAllPaths?: string[]; error?: string }>;
-    getImages: (filter?: string) => Promise<{ ok: boolean; images?: DBImage[]; error?: string }>;
+    getImages: (filter?: { date?: string, groupIds?: number[], searchQuery?: string }) => Promise<{ ok: boolean; images?: DBImage[]; error?: string }>;
     downloadSelectedGalleryImages: (selectedPaths: string[]) => Promise<{ ok: boolean; error?: string }>;
     uploadImage: (relativePath: string, originalPath: string) => Promise<{ ok: boolean; error?: string }>;
     uploadPaths: (filePaths: string[], groupName?: string) => Promise<{ ok: boolean; count?: number; errors?: string[]; error?: string }>;

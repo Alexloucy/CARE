@@ -140,12 +140,12 @@ export async function browseImage(date: string, folderPath: string) {
     }
 }
 
-export async function getImages(filter?: string) {
+export async function getImages(filter?: { date?: string, groupIds?: number[], searchQuery?: string }) {
     try {
         // Cleanup missing files first
         // DatabaseService.cleanupMissingImages(); // Optional: Enable if performance allows
 
-        const images = DatabaseService.getImages();
+        const images = DatabaseService.getImages(filter);
         return { ok: true, images };
     } catch (error: unknown) {
         return { ok: false, error: 'getImages failed: ' + error }

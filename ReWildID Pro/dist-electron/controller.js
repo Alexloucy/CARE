@@ -156,7 +156,7 @@ async function getImages(filter) {
     try {
         // Cleanup missing files first
         // DatabaseService.cleanupMissingImages(); // Optional: Enable if performance allows
-        const images = database_1.DatabaseService.getImages();
+        const images = database_1.DatabaseService.getImages(filter);
         return { ok: true, images };
     }
     catch (error) {

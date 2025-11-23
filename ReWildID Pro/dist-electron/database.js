@@ -80,18 +80,35 @@ exports.DatabaseService = {
         const stmt = db.prepare('DELETE FROM images WHERE id = ?');
         stmt.run(id);
     },
-    getImages: () => {
-        // Cleanup missing files first (optional, but requested behavior)
-        // We can do this async or periodically, but for now let's do it on fetch to ensure consistency
-        // However, scanning all files might be slow. Let's do a quick check or separate method.
-        // For now, just return data. Cleanup should be explicit or background.
-        const stmt = db.prepare(`
+    getImages: (filter) => {
+        let query = `
             SELECT images.*, groups.name as group_name, groups.created_at as group_created_at
             FROM images
             JOIN groups ON images.group_id = groups.id
-            ORDER BY groups.created_at DESC, images.date_added DESC
-        `);
-        return stmt.all();
+            WHERE 1=1
+        `;
+        const params = [];
+        if (filter?.date) {
+            // date string YYYYMMDD
+            query += ` AND strftime('%Y%m%d', datetime(groups.created_at / 1000, 'unixepoch', 'localtime')) = ?`;
+            params.push(filter.date);
+        }
+        if (filter?.groupIds && filter.groupIds.length > 0) {
+            const placeholders = filter.groupIds.map(() => '?').join(',');
+            query += ` AND groups.id IN (${placeholders})`;
+            params.push(...filter.groupIds);
+        }
+        if (filter?.searchQuery) {
+            query += ` AND (
+                images.original_path LIKE ? OR 
+                groups.name LIKE ?
+            )`;
+            const likeQuery = `%${filter.searchQuery}%`;
+            params.push(likeQuery, likeQuery);
+        }
+        query += ` ORDER BY groups.created_at DESC, images.date_added DESC`;
+        const stmt = db.prepare(query);
+        return stmt.all(...params);
     },
     // --- Cleanup ---
     cleanupMissingImages: () => {

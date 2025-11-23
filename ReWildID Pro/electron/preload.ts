@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('api', {
     browseImage: (date: string, folderPath: string) => ipcRenderer.invoke('browseImage', date, folderPath),
     viewImage: (originalPath: string) => ipcRenderer.invoke('viewImage', originalPath),
     getImagePaths: (currentFolder: string) => ipcRenderer.invoke('getImagePaths', currentFolder),
-    getImages: (filter?: string) => ipcRenderer.invoke('getImages', filter),
+    getImages: (filter?: any) => ipcRenderer.invoke('getImages', filter),
     uploadPaths: (filePaths: string[], groupName?: string) => ipcRenderer.invoke('uploadPaths', filePaths, groupName),
     deleteGroup: (id: number) => ipcRenderer.invoke('deleteGroup', id),
     deleteImage: (id: number) => ipcRenderer.invoke('deleteImage', id),

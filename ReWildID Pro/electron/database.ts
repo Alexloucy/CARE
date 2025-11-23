@@ -109,19 +109,40 @@ export const DatabaseService = {
         stmt.run(id);
     },
 
-    getImages: (): (Image & { group_name: string, group_created_at: number })[] => {
-        // Cleanup missing files first (optional, but requested behavior)
-        // We can do this async or periodically, but for now let's do it on fetch to ensure consistency
-        // However, scanning all files might be slow. Let's do a quick check or separate method.
-        // For now, just return data. Cleanup should be explicit or background.
-
-        const stmt = db.prepare(`
+    getImages: (filter?: { date?: string, groupIds?: number[], searchQuery?: string }): (Image & { group_name: string, group_created_at: number })[] => {
+        let query = `
             SELECT images.*, groups.name as group_name, groups.created_at as group_created_at
             FROM images
             JOIN groups ON images.group_id = groups.id
-            ORDER BY groups.created_at DESC, images.date_added DESC
-        `);
-        return stmt.all() as (Image & { group_name: string, group_created_at: number })[];
+            WHERE 1=1
+        `;
+        const params: any[] = [];
+
+        if (filter?.date) {
+            // date string YYYYMMDD
+            query += ` AND strftime('%Y%m%d', datetime(groups.created_at / 1000, 'unixepoch', 'localtime')) = ?`;
+            params.push(filter.date);
+        }
+
+        if (filter?.groupIds && filter.groupIds.length > 0) {
+            const placeholders = filter.groupIds.map(() => '?').join(',');
+            query += ` AND groups.id IN (${placeholders})`;
+            params.push(...filter.groupIds);
+        }
+
+        if (filter?.searchQuery) {
+            query += ` AND (
+                images.original_path LIKE ? OR 
+                groups.name LIKE ?
+            )`; 
+            const likeQuery = `%${filter.searchQuery}%`;
+            params.push(likeQuery, likeQuery);
+        }
+
+        query += ` ORDER BY groups.created_at DESC, images.date_added DESC`;
+
+        const stmt = db.prepare(query);
+        return stmt.all(...params) as (Image & { group_name: string, group_created_at: number })[];
     },
 
     // --- Cleanup ---

@@ -1,10 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Box, Typography, IconButton, useTheme, Collapse, Tooltip } from '@mui/material';
-import { DotsThreeVertical, UploadSimple, CaretRight, CaretDown, Checks, Check as CheckIcon } from '@phosphor-icons/react';
-import ImageCard from '../ImageCard';
-import AiModeButton from '../AiModeButton';
-import { DateSection } from '../../types/library';
+import { Box, Collapse, IconButton, Tooltip, Typography, useTheme } from '@mui/material';
+import { CaretDown, CaretRight, Check as CheckIcon, DotsThreeVertical, UploadSimple } from '@phosphor-icons/react';
+import React, { useEffect, useRef, useState } from 'react';
 import { DBImage } from '../../types/electron';
+import { DateSection } from '../../types/library';
+import AiModeButton from '../AiModeButton';
+import ImageCard from '../ImageCard';
 
 interface DateGroupListProps {
     dateSections: DateSection[];

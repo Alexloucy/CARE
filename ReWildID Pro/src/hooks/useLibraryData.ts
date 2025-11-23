@@ -1,7 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { DateSection, GroupData } from '../types/library';
 
-export function useLibraryData() {
+export interface LibraryFilterParams {
+    date?: string | null;
+    groupIds?: Set<number> | null;
+    searchQuery?: string;
+}
+
+export function useLibraryData(filter?: LibraryFilterParams) {
     const [loading, setLoading] = useState(true);
     const [dateSections, setDateSections] = useState<DateSection[]>([]);
     const seenJobIds = useRef<Set<string>>(new Set());
@@ -9,7 +15,14 @@ export function useLibraryData() {
     const fetchLibrary = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await window.api.getImages();
+            
+            const apiFilter = {
+                date: filter?.date || undefined,
+                groupIds: filter?.groupIds ? Array.from(filter.groupIds) : undefined,
+                searchQuery: filter?.searchQuery || undefined
+            };
+
+            const response = await window.api.getImages(apiFilter);
 
             if (!response.ok || !response.images) {
                 console.error('Failed to fetch library:', response.error);
@@ -37,7 +50,13 @@ export function useLibraryData() {
             const dateMap: Record<string, GroupData[]> = {};
 
             Object.values(groupsMap).forEach(group => {
-                const date = new Date(group.created_at).toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
+                // Use Local Time to match backend SQLite 'localtime' logic
+                const d = new Date(group.created_at);
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const date = `${year}${month}${day}`;
+
                 if (!dateMap[date]) {
                     dateMap[date] = [];
                 }
@@ -57,7 +76,7 @@ export function useLibraryData() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [filter?.date, filter?.groupIds, filter?.searchQuery]);
 
     useEffect(() => {
         fetchLibrary();
