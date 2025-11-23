@@ -12,6 +12,7 @@ interface ImageCardProps {
     selectable?: boolean;
     selected?: boolean;
     onToggleSelection?: () => void;
+    showNames?: boolean; // Toggle for showing file names
 }
 
 const ImageCard: React.FC<ImageCardProps> = ({
@@ -22,7 +23,8 @@ const ImageCard: React.FC<ImageCardProps> = ({
     onClick,
     selectable = false,
     selected = false,
-    onToggleSelection
+    onToggleSelection,
+    showNames = false
 }) => {
     const theme = useTheme();
     const [showImage, setShowImage] = useState(false);
@@ -138,21 +140,26 @@ const ImageCard: React.FC<ImageCardProps> = ({
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'space-between',
-                            opacity: selected ? 1 : 0,
-                            transition: 'opacity 0.3s ease',
-                            '.MuiCard-root:hover &': {
-                                opacity: 1
-                            }
                         }}>
                             <Box sx={{
                                 height: '40px',
-                                background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%)'
+                                background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%)',
+                                opacity: selected ? 1 : 0,
+                                transition: 'opacity 0.3s ease',
+                                '.MuiCard-root:hover &': {
+                                    opacity: 1
+                                }
                             }} />
 
                             <Box sx={{
                                 p: 1.5,
                                 background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
-                                color: 'white'
+                                color: 'white',
+                                opacity: (selected || showNames) ? 1 : 0,
+                                transition: 'opacity 0.3s ease',
+                                '.MuiCard-root:hover &': {
+                                    opacity: 1
+                                }
                             }}>
                                 <Typography
                                     variant="body2"

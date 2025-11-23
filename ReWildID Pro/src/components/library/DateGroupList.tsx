@@ -14,6 +14,8 @@ interface DateGroupListProps {
     onToggleSelection: (id: number) => void;
     onImageClick: (image: DBImage) => void;
     onMenuOpen: (event: React.MouseEvent<HTMLElement>, groupId: number) => void;
+    gridItemSize?: number;
+    showNames?: boolean; // Toggle for showing file names
 }
 
 export const DateGroupList: React.FC<DateGroupListProps> = ({
@@ -24,7 +26,9 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
     selectedImageIds,
     onToggleSelection,
     onImageClick,
-    onMenuOpen
+    onMenuOpen,
+    gridItemSize = 180,
+    showNames = false
 }) => {
     const theme = useTheme();
     const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(new Set());
@@ -127,7 +131,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                 <Collapse in={!isCollapsed} timeout={300}>
                                     <Box sx={{
                                         display: 'grid',
-                                        gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                                        gridTemplateColumns: `repeat(auto-fill, minmax(${gridItemSize}px, 1fr))`,
                                         gap: 2
                                     }}>
                                         {group.images.map((img) => {
@@ -149,6 +153,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                                         selectable={isSelectionMode}
                                                         selected={selectedImageIds.has(img.id)}
                                                         onToggleSelection={() => onToggleSelection(img.id)}
+                                                        showNames={showNames}
                                                     />
                                                 </Box>
                                             );

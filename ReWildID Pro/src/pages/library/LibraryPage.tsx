@@ -1,21 +1,40 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { Box, Typography, useTheme, Skeleton, IconButton, Button, Tooltip, Menu, MenuItem, Card, GlobalStyles } from '@mui/material';
-import { Plus, PencilSimple, Trash, CheckSquare, X } from '@phosphor-icons/react';
+import {
+    Box,
+    Button,
+    Card, GlobalStyles,
+    IconButton,
+    Menu, MenuItem,
+    Skeleton,
+    Slider,
+    Tooltip,
+    Typography, useTheme,
+    Switch, Divider
+} from '@mui/material';
+import {
+    CheckSquare,
+    Gear,
+    PencilSimple,
+    Plus,
+    Trash,
+    X,
+    ArrowCounterClockwise
+} from '@phosphor-icons/react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { DBImage } from '../../types/electron';
 
 // Hooks
-import { useLibraryData } from '../../hooks/useLibraryData';
-import { useImageLoader } from '../../hooks/useImageLoader';
-import { useSelection } from '../../hooks/useSelection';
-import { useLibraryUpload } from '../../hooks/useLibraryUpload';
 import { useGroupActions } from '../../hooks/useGroupActions';
+import { useImageLoader } from '../../hooks/useImageLoader';
+import { useLibraryData } from '../../hooks/useLibraryData';
+import { useLibraryUpload } from '../../hooks/useLibraryUpload';
+import { useSelection } from '../../hooks/useSelection';
 
 // Components
-import ImageModal from '../../components/ImageModal';
 import { GroupNameDialog } from '../../components/GroupNameDialog';
+import ImageModal from '../../components/ImageModal';
+import { DateGroupList } from '../../components/library/DateGroupList';
 import { DragDropOverlay } from '../../components/library/DragDropOverlay';
 import { SelectionToolbar } from '../../components/library/SelectionToolbar';
-import { DateGroupList } from '../../components/library/DateGroupList';
 import { Timeline } from '../../components/library/Timeline';
 
 const LibraryPage: React.FC = () => {
@@ -64,6 +83,27 @@ const LibraryPage: React.FC = () => {
     const [selectedImage, setSelectedImage] = useState<{ image: DBImage, url: string } | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [activeId, setActiveId] = useState<string>('');
+    const [gridItemSize, setGridItemSize] = useState(180);
+    const [showFileNames, setShowFileNames] = useState(false);
+    const [settingsAnchorEl, setSettingsAnchorEl] = useState<null | HTMLElement>(null);
+
+    // Zoom Handler
+    const handleWheel = (e: React.WheelEvent) => {
+        if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            const delta = e.deltaY * -2.5; // Increased sensitivity
+            setGridItemSize(prev => {
+                const newVal = prev + delta;
+                return Math.min(Math.max(newVal, 100), 400); // Clamp between 100 and 400
+            });
+        }
+    };
+
+    // Reset View
+    const handleResetView = () => {
+        setGridItemSize(180);
+        setShowFileNames(false);
+    };
 
     // Scroll Observer
     useEffect(() => {
@@ -249,6 +289,16 @@ const LibraryPage: React.FC = () => {
             <Box sx={{ p: 3, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: theme.palette.background.default, zIndex: 10 }}>
                 <Typography variant="h4" fontWeight="bold">Library</Typography>
                 <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Tooltip title="View Settings">
+                        <IconButton
+                            onClick={(e) => setSettingsAnchorEl(e.currentTarget)}
+                            sx={{
+                                '&:hover': { bgcolor: theme.palette.action.hover }
+                            }}
+                        >
+                            <Gear weight="regular" />
+                        </IconButton>
+                    </Tooltip>
                     <Tooltip title={isSelectionMode ? "Cancel Selection" : "Select Items"}>
                         <IconButton
                             onClick={toggleSelectionMode}
@@ -268,14 +318,17 @@ const LibraryPage: React.FC = () => {
             </Box>
 
             {/* Content */}
-            <Box sx={{ 
-                flex: 1, 
-                overflowY: 'auto', 
-                p: 4, 
-                pt: 0,
-                '&::-webkit-scrollbar': { display: 'none' },
-                scrollbarWidth: 'none',
-            }}>
+            <Box 
+                sx={{ 
+                    flex: 1, 
+                    overflowY: 'auto', 
+                    p: 4, 
+                    pt: 0,
+                    '&::-webkit-scrollbar': { display: 'none' },
+                    scrollbarWidth: 'none',
+                }}
+                onWheel={handleWheel}
+            >
                 {loading ? (
                     <Box sx={{ mt: 2 }}>
                         {/* Date Header Skeleton */}
@@ -309,6 +362,8 @@ const LibraryPage: React.FC = () => {
                             else if (imageUrls[img.id]) setSelectedImage({ image: img, url: imageUrls[img.id] });
                         }}
                         onMenuOpen={handleMenuOpen}
+                        gridItemSize={gridItemSize}
+                        showNames={showFileNames}
                     />
                 )}
             </Box>
@@ -381,6 +436,64 @@ const LibraryPage: React.FC = () => {
                 <MenuItem onClick={handleDeleteGroup} sx={{ borderRadius: '6px', margin: '2px 0', gap: 1, color: 'error.main' }}>
                     <Trash size={18} /> Delete
                 </MenuItem>
+            </Menu>
+            {/* View Settings Menu */}
+            <Menu
+                anchorEl={settingsAnchorEl}
+                open={Boolean(settingsAnchorEl)}
+                onClose={() => setSettingsAnchorEl(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                PaperProps={{
+                    elevation: 0,
+                    sx: {
+                        backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(45, 45, 45, 0.95)',
+                        backdropFilter: 'blur(8px)',
+                        borderRadius: '12px',
+                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                        border: `1px solid ${theme.palette.divider}`,
+                        minWidth: '250px',
+                        p: 2,
+                        mt: 1
+                    }
+                }}
+            >
+                <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    Grid Size
+                    <Tooltip title="Reset to Default">
+                        <IconButton size="small" onClick={handleResetView}>
+                            <ArrowCounterClockwise size={14} />
+                        </IconButton>
+                    </Tooltip>
+                </Typography>
+                <Box sx={{ px: 1, mb: 2 }}>
+                    <Slider
+                        size="small"
+                        value={gridItemSize}
+                        min={100}
+                        max={400}
+                        onChange={(_, value) => setGridItemSize(value as number)}
+                        valueLabelDisplay="auto"
+                        valueLabelFormat={(value) => `${value}px`}
+                    />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                        <Typography variant="caption" color="text.secondary">Small</Typography>
+                        <Typography variant="caption" color="text.secondary">Large</Typography>
+                    </Box>
+                </Box>
+                
+                <Divider sx={{ my: 1 }} />
+                
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                    <Typography variant="subtitle2" fontWeight="600">
+                        Show File Names
+                    </Typography>
+                    <Switch 
+                        size="small"
+                        checked={showFileNames} 
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowFileNames(e.target.checked)} 
+                    />
+                </Box>
             </Menu>
         </Box>
     );
