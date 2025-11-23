@@ -6,6 +6,7 @@ import os from 'os'
 import { app, dialog } from 'electron'
 import { lookup } from 'mime-types'
 import { DatabaseService } from './database'
+import { JobManager } from './jobs'
 
 // Migration Routine
 async function migrateLegacyData() {
@@ -76,77 +77,15 @@ export async function uploadImage(relativePath: string, originalPath: string) {
 
 export async function uploadPaths(filePaths: string[], groupName?: string) {
     try {
-        let successCount = 0
-        let errors: string[] = []
-
-        const processFile = async (filePath: string, currentGroupId: number) => {
-            const ext = path.extname(filePath).toLowerCase()
-            if (ext === '.jpg' || ext === '.jpeg') {
-                try {
-                    DatabaseService.addImage(currentGroupId, filePath);
-                    successCount++;
-                } catch (e) {
-                    errors.push(`${path.basename(filePath)}: ${e}`);
-                }
-            }
+        // Check for immediate errors (empty, etc)
+        if (filePaths.length === 0) {
+            return { ok: false, error: 'No files selected' };
         }
 
-        const processItem = async (itemPath: string) => {
-            try {
-                const stat = await fs.stat(itemPath)
-                if (stat.isDirectory()) {
-                    // Create group for folder
-                    const folderName = path.basename(itemPath);
-                    const groupId = DatabaseService.createGroup(folderName);
+        // Add to Job Queue
+        JobManager.getInstance().addJob('import', { filePaths, groupName });
 
-                    // Process children
-                    const files = await fs.readdir(itemPath);
-                    for (const file of files) {
-                        const fullPath = path.join(itemPath, file);
-                        const fileStat = await fs.stat(fullPath);
-                        if (fileStat.isFile()) {
-                            await processFile(fullPath, groupId);
-                        } else if (fileStat.isDirectory()) {
-                            await processItem(fullPath);
-                        }
-                    }
-                } else {
-                    // It's a file. Needs a groupName.
-                    if (!groupName) {
-                        errors.push(`${path.basename(itemPath)}: Missing group name for file upload.`);
-                        return;
-                    }
-                }
-            } catch (err) {
-                errors.push(`Error processing ${itemPath}: ${err}`)
-            }
-        }
-
-        // Pre-process: Check if we have files and create a group for them
-        const filesOnly = [];
-        for (const p of filePaths) {
-            const stat = await fs.stat(p);
-            if (stat.isFile()) filesOnly.push(p);
-        }
-
-        let fileGroupId: number | null = null;
-        if (filesOnly.length > 0) {
-            if (!groupName) {
-                return { ok: false, error: 'Group name required for file uploads.' };
-            }
-            fileGroupId = DatabaseService.createGroup(groupName);
-        }
-
-        for (const p of filePaths) {
-            const stat = await fs.stat(p);
-            if (stat.isDirectory()) {
-                await processItem(p);
-            } else if (fileGroupId !== null) {
-                await processFile(p, fileGroupId);
-            }
-        }
-
-        return { ok: true, count: successCount, errors }
+        return { ok: true, count: 0, errors: [] }; // Count 0 indicates async start
     } catch (error: unknown) {
         return { ok: false, error: 'uploadPaths failed: ' + error }
     }

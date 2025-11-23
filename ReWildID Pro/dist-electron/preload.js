@@ -48,5 +48,13 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     deleteReidResult: (date, time) => electron_1.ipcRenderer.invoke('deleteReidResult', date, time),
     renameReidGroup: (date, time, old_group_id, new_group_id) => electron_1.ipcRenderer.invoke('renameReidGroup', date, time, old_group_id, new_group_id),
     terminateAI: () => electron_1.ipcRenderer.invoke('terminateAI'),
-    getPathForFile: (file) => electron_1.webUtils.getPathForFile(file)
+    getPathForFile: (file) => electron_1.webUtils.getPathForFile(file),
+    // Jobs
+    getJobs: () => electron_1.ipcRenderer.invoke('getJobs'),
+    cancelJob: (id) => electron_1.ipcRenderer.invoke('cancelJob', id),
+    onJobUpdate: (callback) => {
+        const handler = (_event, jobs) => callback(jobs);
+        electron_1.ipcRenderer.on('job-update', handler);
+        return () => electron_1.ipcRenderer.removeListener('job-update', handler);
+    }
 });

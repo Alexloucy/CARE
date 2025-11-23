@@ -99,6 +99,11 @@ export const DatabaseService = {
         return info.lastInsertRowid as number;
     },
 
+    updateImagePreview: (id: number, previewPath: string): void => {
+        const stmt = db.prepare('UPDATE images SET preview_path = ? WHERE id = ?');
+        stmt.run(previewPath, id);
+    },
+
     deleteImage: (id: number): void => {
         const stmt = db.prepare('DELETE FROM images WHERE id = ?');
         stmt.run(id);

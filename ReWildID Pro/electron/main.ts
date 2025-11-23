@@ -27,6 +27,7 @@ import {
     openFileDialog,
     saveImages
 } from './controller';
+import { JobManager } from './jobs';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -48,6 +49,9 @@ function createWindow(): void {
             allowRunningInsecureContent: false,
         },
     });
+
+    // Initialize Job Manager
+    JobManager.getInstance().setMainWindow(mainWindow);
 
     // Grant media permissions (covers webcam, microphone, and screen recording)
     mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -177,6 +181,10 @@ ipcMain.handle('renameReidGroup', (_, date, time, old_group_id, new_group_id) =>
     renameReidGroup(date, time, old_group_id, new_group_id)
 );
 ipcMain.handle('terminateAI', (_) => terminateAI());
+
+// Job Management
+ipcMain.handle('getJobs', () => JobManager.getInstance().getJobs());
+ipcMain.handle('cancelJob', (_, id) => JobManager.getInstance().cancelJob(id));
 
 
 app.on('ready', () => {

@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
 const controller_1 = require("./controller");
+const jobs_1 = require("./jobs");
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
     electron_1.app.quit();
@@ -24,6 +25,8 @@ function createWindow() {
             allowRunningInsecureContent: false,
         },
     });
+    // Initialize Job Manager
+    jobs_1.JobManager.getInstance().setMainWindow(mainWindow);
     // Grant media permissions (covers webcam, microphone, and screen recording)
     mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
         if (permission === 'media') {
@@ -139,6 +142,9 @@ electron_1.ipcMain.handle('downloadReidImages', (_, date, time) => (0, controlle
 electron_1.ipcMain.handle('deleteReidResult', (_, date, time) => (0, controller_1.deleteReidResult)(date, time));
 electron_1.ipcMain.handle('renameReidGroup', (_, date, time, old_group_id, new_group_id) => (0, controller_1.renameReidGroup)(date, time, old_group_id, new_group_id));
 electron_1.ipcMain.handle('terminateAI', (_) => (0, controller_1.terminateAI)());
+// Job Management
+electron_1.ipcMain.handle('getJobs', () => jobs_1.JobManager.getInstance().getJobs());
+electron_1.ipcMain.handle('cancelJob', (_, id) => jobs_1.JobManager.getInstance().cancelJob(id));
 electron_1.app.on('ready', () => {
     createWindow();
     electron_1.app.on('activate', function () {

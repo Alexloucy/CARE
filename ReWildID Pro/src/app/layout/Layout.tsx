@@ -1,9 +1,10 @@
 import { Box, useMediaQuery, useTheme } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import LeftSidebar from './navbar/LeftSidebar';
 import Navbar, { NAVBAR_HEIGHT } from './navbar/Navbar';
 import { RightSidebar } from './navbar/RightSidebar';
+import TaskPanel from '../../components/TaskPanel';
 
 export default function Layout() {
     const location = useLocation();
@@ -28,6 +29,22 @@ export default function Layout() {
         }
     }, [isDesktop, location.pathname]);
 
+    // Auto-open right sidebar on new job
+    const lastJobCount = useRef(0);
+    useEffect(() => {
+        const removeListener = window.api.onJobUpdate((jobs) => {
+            if (jobs.length > lastJobCount.current) {
+                 // New job added!
+                 const latestJob = jobs[0]; 
+                 if (latestJob.status === 'running' || latestJob.status === 'pending') {
+                     setRightSidebarOpen(true);
+                 }
+            }
+            lastJobCount.current = jobs.length;
+        });
+        return removeListener;
+    }, []);
+
     return (
         <Box sx={{ display: 'flex' }}>
             <LeftSidebar open={leftSidebarOpen} onClose={() => setLeftSidebarOpen(false)} />
@@ -38,7 +55,7 @@ export default function Layout() {
                 flexGrow: 1,
                 width: {
                     xs: '100%',
-                    md: `calc(100% - ${leftSidebarOpen ? 212 : 0}px - ${rightSidebarOpen ? 212 : 0}px)`
+                    md: `calc(100% - ${leftSidebarOpen ? 212 : 0}px - ${rightSidebarOpen ? 300 : 0}px)`
                 },
                 ml: { xs: 0, md: leftSidebarOpen ? 0 : 0 },
                 transition: theme => theme.transitions.create(['width', 'margin'], {
@@ -75,11 +92,9 @@ export default function Layout() {
             <RightSidebar
                 open={rightSidebarOpen}
                 onClose={() => setRightSidebarOpen(false)}
-                title="Notifications"
+                title="Tasks"
             >
-                <Box p={2}>
-                    Notifications content here.
-                </Box>
+                <TaskPanel />
             </RightSidebar>
         </Box>
     );

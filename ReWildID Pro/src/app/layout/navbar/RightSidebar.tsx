@@ -66,15 +66,13 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     {title || 'Notifications'}
                 </Typography>
 
-                {isMobile && (
-                    <IconButton
-                        onClick={onClose}
-                        size="small"
-                        aria-label="Close"
-                    >
-                        <X size={20} />
-                    </IconButton>
-                )}
+                <IconButton
+                    onClick={onClose}
+                    size="small"
+                    aria-label="Close"
+                >
+                    <X size={20} />
+                </IconButton>
             </Box>
             <Box sx={{
                 p: 2,

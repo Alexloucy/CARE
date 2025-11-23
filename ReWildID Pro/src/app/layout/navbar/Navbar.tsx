@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AppBar, Toolbar, Box, IconButton, Tooltip } from '@mui/material';
+import { AppBar, Toolbar, Box, IconButton, Tooltip, Badge } from '@mui/material';
 import { useTheme as useMuiTheme } from '@mui/material/styles';
 import {
     Sidebar,
@@ -19,6 +19,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useMediaQuery } from '@mui/material';
 import Breadcrumb from '../../../components/Breadcrumb';
 import { useColorMode } from '../../../features/theme/ThemeContext';
+import { useJobs } from '../../../hooks/useJobs';
 
 interface NavbarProps {
     toggleLeftSidebar: () => void;
@@ -53,6 +54,9 @@ export default function Navbar({
     const [isMaximized, setIsMaximized] = useState(false);
     const [canGoBack, setCanGoBack] = useState(false);
     const [canGoForward, setCanGoForward] = useState(false);
+
+    const { jobs } = useJobs();
+    const activeJobsCount = jobs.filter(j => ['pending', 'running'].includes(j.status)).length;
 
     useEffect(() => {
         // Function to update navigation state based on history
@@ -284,7 +288,24 @@ export default function Navbar({
                             onClick={toggleRightSidebar}
                             sx={{ fontSize: { xs: 18, sm: 20 } }}
                         >
-                            <Bell size={20} />
+                            <Badge 
+                                badgeContent={activeJobsCount} 
+                                color="error"
+                                max={99}
+                                invisible={activeJobsCount === 0}
+                                sx={{ 
+                                    '& .MuiBadge-badge': { 
+                                        bgcolor: isDarkMode ? 'white' : 'black', 
+                                        color: isDarkMode ? 'black' : 'white',
+                                        fontWeight: 'bold',
+                                        fontSize: '0.65rem',
+                                        height: 18,
+                                        minWidth: 18,
+                                    } 
+                                }}
+                            >
+                                <Bell size={20} />
+                            </Badge>
                         </IconButton>
                     </Tooltip>
 

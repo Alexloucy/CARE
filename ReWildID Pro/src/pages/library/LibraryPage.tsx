@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Box, Typography, useTheme, Skeleton, Fade, IconButton, Menu, MenuItem, Divider, Button, Tooltip } from '@mui/material';
 import { DBImage, FileDetails } from '../../types/electron';
 import ImageModal from '../../components/ImageModal';
@@ -21,7 +21,8 @@ interface DateSection {
 const LibraryPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [dateSections, setDateSections] = useState<DateSection[]>([]);
-    const [imageUrls, setImageUrls] = useState<Record<number, string>>({}); // Map ID -> URL
+    const [imageUrls, setImageUrls] = useState<Record<number, string>>({}); // Map ID -> URL (Thumbnails)
+    const [fullImageUrls, setFullImageUrls] = useState<Record<number, string>>({}); // Map ID -> URL (Full Res)
     const [isDragging, setIsDragging] = useState(false);
     const theme = useTheme();
 
@@ -110,11 +111,31 @@ const LibraryPage: React.FC = () => {
         return date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     };
 
+    const loadFullImage = async (image: DBImage) => {
+        if (fullImageUrls[image.id]) return;
+
+        try {
+            // Always load original path for full view
+            const response = await window.api.viewImage(image.original_path);
+            
+            if (response.ok && response.data) {
+                const blob = new Blob([response.data as unknown as BlobPart], { type: 'image/jpeg' });
+                const url = URL.createObjectURL(blob);
+                setFullImageUrls(prev => ({ ...prev, [image.id]: url }));
+            }
+        } catch (error) {
+            console.error(`Failed to load full image ${image.original_path}:`, error);
+        }
+    };
+
     const loadImage = async (image: DBImage) => {
         if (imageUrls[image.id]) return;
 
         try {
-            const response = await window.api.viewImage(image.original_path);
+            // Prioritize preview path if available
+            const pathToCheck = image.preview_path || image.original_path;
+            const response = await window.api.viewImage(pathToCheck);
+            
             if (response.ok && response.data) {
                 const blob = new Blob([response.data as unknown as BlobPart], { type: 'image/jpeg' });
                 const url = URL.createObjectURL(blob);
@@ -124,6 +145,44 @@ const LibraryPage: React.FC = () => {
             console.error(`Failed to load image ${image.original_path}:`, error);
         }
     };
+
+    // Load full image when selected
+    useEffect(() => {
+        if (selectedImage) {
+            loadFullImage(selectedImage.image);
+        }
+    }, [selectedImage?.image.id]);
+
+    // Update selectedImage URL when full image loads
+    useEffect(() => {
+        if (selectedImage) {
+            if (fullImageUrls[selectedImage.image.id]) {
+                setSelectedImage(prev => prev ? { ...prev, url: fullImageUrls[selectedImage.image.id] } : null);
+            }
+        }
+    }, [fullImageUrls, selectedImage?.image.id]);
+
+    // Listen for job completions to refresh library
+    const seenJobIds = useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        const removeListener = window.api.onJobUpdate((jobs) => {
+            let shouldRefresh = false;
+            jobs.forEach(job => {
+                if (job.type === 'import' && job.status === 'completed') {
+                    if (!seenJobIds.current.has(job.id)) {
+                        seenJobIds.current.add(job.id);
+                        shouldRefresh = true;
+                    }
+                }
+            });
+            
+            if (shouldRefresh) {
+                fetchLibrary();
+            }
+        });
+        return removeListener;
+    }, []);
 
     // Flatten images for navigation
     const allImages = useMemo(() => {
@@ -146,18 +205,9 @@ const LibraryPage: React.FC = () => {
         if (currentIndex > 0) {
             const prevImage = allImages[currentIndex - 1];
             if (!imageUrls[prevImage.id]) loadImage(prevImage);
-            setSelectedImage({ image: prevImage, url: imageUrls[prevImage.id] || '' });
+            setSelectedImage({ image: prevImage, url: fullImageUrls[prevImage.id] || imageUrls[prevImage.id] || '' });
         }
     };
-
-    // Update selectedImage URL when it loads
-    useEffect(() => {
-        if (selectedImage && !selectedImage.url) {
-            if (imageUrls[selectedImage.image.id]) {
-                setSelectedImage(prev => prev ? { ...prev, url: imageUrls[selectedImage.image.id] } : null);
-            }
-        }
-    }, [imageUrls, selectedImage]);
 
     // Drag & Drop Handlers
     const handleDragOver = (e: React.DragEvent) => {
@@ -198,11 +248,11 @@ const LibraryPage: React.FC = () => {
 
         if (allDirs) {
             // If all are directories, upload directly (backend handles group creation from folder name)
-            setLoading(true);
+            // Async upload
             try {
                 const result = await window.api.uploadPaths(paths);
                 if (result.ok) {
-                    await fetchLibrary();
+                   // Import started
                 } else {
                     console.error('Upload failed:', result.error);
                     alert('Upload failed: ' + result.error);
@@ -210,8 +260,6 @@ const LibraryPage: React.FC = () => {
             } catch (error) {
                 console.error('Upload error:', error);
                 alert('Upload error occurred.');
-            } finally {
-                setLoading(false);
             }
         } else {
             // If any are files, prompt for group name
@@ -222,19 +270,16 @@ const LibraryPage: React.FC = () => {
 
     const handleConfirmUpload = async (name: string) => {
         setGroupNameDialogOpen(false);
-        setLoading(true);
         try {
             const response = await window.api.uploadPaths(pendingUploadFiles, name);
             if (response.ok) {
-                console.log(`Successfully uploaded ${response.count} images.`);
-                await fetchLibrary();
+                // Import started
             } else {
                 console.error('Upload failed:', response.error);
             }
         } catch (error) {
             console.error('Error uploading:', error);
         } finally {
-            setLoading(false);
             setPendingUploadFiles([]);
         }
     };

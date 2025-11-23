@@ -72,6 +72,10 @@ exports.DatabaseService = {
         const info = stmt.run(groupId, originalPath, previewPath || null, Date.now());
         return info.lastInsertRowid;
     },
+    updateImagePreview: (id, previewPath) => {
+        const stmt = db.prepare('UPDATE images SET preview_path = ? WHERE id = ?');
+        stmt.run(previewPath, id);
+    },
     deleteImage: (id) => {
         const stmt = db.prepare('DELETE FROM images WHERE id = ?');
         stmt.run(id);

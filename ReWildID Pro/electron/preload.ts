@@ -52,5 +52,14 @@ contextBridge.exposeInMainWorld('api', {
     renameReidGroup: (date: string, time: string, old_group_id: string, new_group_id: string) =>
         ipcRenderer.invoke('renameReidGroup', date, time, old_group_id, new_group_id),
     terminateAI: () => ipcRenderer.invoke('terminateAI'),
-    getPathForFile: (file: File) => webUtils.getPathForFile(file)
+    getPathForFile: (file: File) => webUtils.getPathForFile(file),
+    
+    // Jobs
+    getJobs: () => ipcRenderer.invoke('getJobs'),
+    cancelJob: (id: string) => ipcRenderer.invoke('cancelJob', id),
+    onJobUpdate: (callback: (jobs: any[]) => void) => {
+        const handler = (_event: any, jobs: any[]) => callback(jobs);
+        ipcRenderer.on('job-update', handler);
+        return () => ipcRenderer.removeListener('job-update', handler);
+    }
 });

@@ -55,6 +55,9 @@ export interface ElectronApi {
     renameReidGroup: (date: string, time: string, old_group_id: string, new_group_id: string) => Promise<{ ok: boolean; error?: string }>;
     terminateAI: () => Promise<void>;
     getPathForFile: (file: File) => string;
+    getJobs: () => Promise<any[]>;
+    cancelJob: (id: string) => Promise<void>;
+    onJobUpdate: (callback: (jobs: any[]) => void) => () => void;
 }
 
 declare global {
