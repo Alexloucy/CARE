@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, LinearProgress, IconButton, List, Paper, useTheme, Chip } from '@mui/material';
-import { XCircle, DownloadSimple, Image, Scan, Users, DownloadIcon, ScanIcon, IdentificationCardIcon, ImageIcon } from '@phosphor-icons/react';
+import { XCircle, DownloadIcon, ScanIcon, IdentificationCardIcon, ImageIcon } from '@phosphor-icons/react';
 import { useJobs, Job } from '../hooks/useJobs';
 
 const TaskPanel: React.FC = () => {

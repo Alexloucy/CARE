@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export function useLibraryUpload(refreshLibrary: () => void) {
+export function useLibraryUpload() {
     const [groupNameDialogOpen, setGroupNameDialogOpen] = useState(false);
     const [pendingUploadFiles, setPendingUploadFiles] = useState<string[]>([]);
 

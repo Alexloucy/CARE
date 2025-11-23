@@ -15,20 +15,16 @@ from megadetector.detection.run_detector_batch import load_and_run_detector_batc
 from megadetector.utils import path_utils
 from detection_utils import convert_bbox_normalized_to_absolute, create_log_file, log_message, save_detection_results
 
-def md_detection(image_folder: str, output_file: str, logfile) -> None:
+def md_detection(image_folder: str, output_file: str, logfile, image_file_list: List[str] = None) -> None:
     """
     Run MegaDetector on a folder of images and save results to a JSON file.
     
     Args:
-        image_folder (str): Path to the folder containing images.
+        image_folder (str): Path to the folder containing images (or dummy path if list provided).
         output_file (str): Path to save the detection results JSON file.
+        logfile: Log file handle.
+        image_file_list (List[str], optional): List of absolute image paths to process.
     """
-    # Ensure the image folder exists
-    if not os.path.exists(image_folder):
-        print(f"Error: The specified image folder '{image_folder}' does not exist.")
-        log_message(logfile, f"The path '{image_folder}' does not exist.")
-        return
-    
     detector_filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models/md_v1000.0.0-redwood.pt')
 
     # Ensure the output directory exists
@@ -36,16 +32,27 @@ def md_detection(image_folder: str, output_file: str, logfile) -> None:
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
-    # Pick a folder to run MD on recursively, and an output file
-    image_folder = os.path.expanduser(image_folder)
+    # If a specific list is provided, use it
+    if image_file_list:
+        image_file_names = image_file_list
+    else:
+        # Ensure the image folder exists
+        if not os.path.exists(image_folder):
+            print(f"Error: The specified image folder '{image_folder}' does not exist.")
+            log_message(logfile, f"The path '{image_folder}' does not exist.")
+            return
+            
+        # Pick a folder to run MD on recursively, and an output file
+        image_folder = os.path.expanduser(image_folder)
+        
+        # Recursively find images
+        image_file_names = path_utils.find_images(image_folder, recursive=True)
+
     output_file = os.path.expanduser(output_file)
 
-    # Recursively find images
-    image_file_names = path_utils.find_images(image_folder, recursive=True)
-
     if not image_file_names:
-        print(f"No images found in the specified folder '{image_folder}'.")
-        log_message(logfile, f"No images found in the specified folder '{image_folder}'.")
+        print(f"No images found.")
+        log_message(logfile, f"No images found.")
         return
 
 
@@ -509,7 +516,7 @@ def run(original_images_dir, output_images_dir, json_output_dir, log_dir=''):
     Main run function that matches the interface expected by main.py
     
     Args:
-        original_images_dir: Input directory containing images
+        original_images_dir: Input directory containing images OR path to JSON manifest file
         output_images_dir: Output directory for marked images
         json_output_dir: Output directory for JSON detection results
         log_dir: Directory for log files
@@ -519,7 +526,32 @@ def run(original_images_dir, output_images_dir, json_output_dir, log_dir=''):
     log_file = create_log_file(log_dir)
     log_message(log_file, "Starting DINO detection pipeline")
 
-    detection_filepath = os.path.join(original_images_dir, "detection_results.json")
+    image_file_list = None
+    
+    # Check if input is a JSON manifest
+    if original_images_dir.lower().endswith('.json') and os.path.isfile(original_images_dir):
+        print(f"Reading image manifest from: {original_images_dir}")
+        log_message(log_file, f"Reading image manifest from: {original_images_dir}")
+        try:
+            with open(original_images_dir, 'r') as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    image_file_list = data
+                elif isinstance(data, dict) and 'files' in data:
+                    image_file_list = data['files']
+                else:
+                    raise ValueError("Manifest JSON must be a list or object with 'files' key")
+            
+            print(f"Found {len(image_file_list)} images in manifest")
+            log_message(log_file, f"Found {len(image_file_list)} images in manifest")
+            
+            # Use json_output_dir for the intermediate detection results when using manifest
+            detection_filepath = os.path.join(json_output_dir, "detection_results.json")
+        except Exception as e:
+            log_message(log_file, f"Error reading manifest: {str(e)}")
+            raise e
+    else:
+        detection_filepath = os.path.join(original_images_dir, "detection_results.json")
 
     # Check available devices
     if torch.cuda.is_available():
@@ -535,7 +567,7 @@ def run(original_images_dir, output_images_dir, json_output_dir, log_dir=''):
     print("Running MegaDetector...")
     log_message(log_file, "Running MegaDetector...")
     try:
-        md_detection(original_images_dir, detection_filepath, log_file)
+        md_detection(original_images_dir, detection_filepath, log_file, image_file_list)
     except Exception as e:
         log_message(log_file, f"Error running MegaDetector: {str(e)}")
         raise e

@@ -63,7 +63,7 @@ const LibraryPage: React.FC = () => {
         handleUploadClick, 
         processUploadPaths, 
         handleConfirmUpload 
-    } = useLibraryUpload(refreshLibrary);
+    } = useLibraryUpload();
 
     // 5. Group Actions
     const {

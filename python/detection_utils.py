@@ -51,8 +51,9 @@ def save_detection_results(predictions, image_output_path, original_images_dir, 
             json_results["boxes"] = []
 
             if image_output_path:
-                relative_path = os.path.relpath(image_path, original_images_dir)
-                output_path = os.path.join(image_output_path, relative_path)
+                # Simply save using the filename, flattening the structure
+                filename = os.path.basename(image_path)
+                output_path = os.path.join(image_output_path, filename)
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
             if len(predictions_list) == 0:
@@ -106,8 +107,8 @@ def save_detection_results(predictions, image_output_path, original_images_dir, 
                 log_message(log_file, save_message)
 
             if json_results:
-                relative_path = os.path.relpath(image_path, original_images_dir)
-                json_filename = os.path.splitext(relative_path)[0] + ".json"
+                filename = os.path.basename(image_path)
+                json_filename = os.path.splitext(filename)[0] + ".json"
                 fin_json_output_path = os.path.join(json_output_path, json_filename)
                 os.makedirs(os.path.dirname(fin_json_output_path), exist_ok=True)
 
@@ -133,8 +134,8 @@ def save_detection_results(predictions, image_output_path, original_images_dir, 
                 log_message(log_file, f"Cropped info for '{json_results['image']}' has been saved to '{fin_json_output_path}'.")
 
             else:
-                relative_path = os.path.relpath(image_path, original_images_dir)
-                json_filename = os.path.splitext(relative_path)[0] + ".json"
+                filename = os.path.basename(image_path)
+                json_filename = os.path.splitext(filename)[0] + ".json"
                 fin_json_output_path = os.path.join(json_output_path, json_filename)
                 os.makedirs(os.path.dirname(fin_json_output_path), exist_ok=True)
                 json_results = {

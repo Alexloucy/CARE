@@ -44,6 +44,27 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
         setCollapsedGroups(newCollapsed);
     };
 
+    const handleDetect = async (images: DBImage[]) => {
+        console.log('Running detection on', images.length, 'images');
+        const paths = images.map(img => img.original_path);
+        try {
+            const response = await window.api.detect(paths, (text: string) => {
+                console.log('Detection Stream:', text);
+            });
+
+            if (response.ok) {
+                console.log('Detection completed successfully');
+                // TODO: Show success notification or navigate
+            } else {
+                console.error('Detection failed:', response.error);
+                alert('Detection failed: ' + response.error);
+            }
+        } catch (error) {
+            console.error('Error triggering detection:', error);
+            alert('Error triggering detection: ' + error);
+        }
+    };
+
     const formatDate = (dateStr: string) => {
         if (dateStr.length !== 8) return dateStr;
         const year = dateStr.substring(0, 4);
@@ -129,7 +150,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                             <DotsThreeVertical size={20} />
                                         </IconButton>
                                     </Box>
-                                    <AiModeButton />
+                                    <AiModeButton onClick={() => handleDetect(group.images)} />
                                 </Box>
 
                                 <Collapse in={!isCollapsed} timeout={300}>

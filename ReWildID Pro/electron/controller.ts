@@ -507,48 +507,47 @@ function spawnPythonSubprocess(args: string[]) {
 
 export async function detect(selectedPaths: string[], stream: (txt: string) => void) {
     const userIdFolder = '1'
-    const tempPath = path.join(userProfileDir, 'temp/image_detection_pending', userIdFolder)
+    // Use a manifest file instead of a directory of copied images
+    const manifestPath = path.join(userProfileDir, 'temp', 'detection_manifest.json')
+    
     try {
         terminateSubprocess()
-        await fs.remove(tempPath)
+        
+        // Clean up previous manifest if exists
+        await fs.remove(manifestPath).catch(() => {})
 
         if (!selectedPaths || !Array.isArray(selectedPaths) || selectedPaths.length === 0) {
             return { ok: false, error: 'No images selected.' }
         }
 
-        // Copy selected images to a temp folder for detection.
+        // Convert relative paths to absolute paths and validate
+        const baseDir = path.join(userProfileDir, 'data/image_uploaded', userIdFolder)
+        const absolutePaths: string[] = []
+        
         for (const imagePath of selectedPaths) {
-            const baseDir = path.join(userProfileDir, 'data/image_uploaded', userIdFolder)
             const srcPath = path.resolve(baseDir, imagePath) // Resolve the full path
-
-            // Ensure the resolved path is still within the baseDir
-            if (!srcPath.startsWith(baseDir)) {
-                await fs.remove(tempPath)
-                return { ok: false, error: 'Invalid folder path ' + srcPath }
-            }
-
-            const destPath = path.join(
-                userProfileDir,
-                'temp/image_detection_pending',
-                userIdFolder,
-                imagePath
-            )
 
             // Check if the source image exists
             if (await fs.pathExists(srcPath)) {
-                // Ensure the destination directory exists
-                await fs.ensureDir(path.dirname(destPath))
-
-                // Copy the image
-                await fs.copy(srcPath, destPath)
+                absolutePaths.push(srcPath)
             } else {
-                console.warn(`runDetection: File not found: ${imagePath}`)
+                console.warn(`detect: File not found: ${imagePath}`)
             }
         }
 
+        if (absolutePaths.length === 0) {
+            return { ok: false, error: 'No valid images found.' }
+        }
+
+        // Create manifest JSON file
+        await fs.ensureDir(path.dirname(manifestPath))
+        await fs.writeJson(manifestPath, { files: absolutePaths }, { spaces: 2 })
+        
+        console.log(`Created manifest with ${absolutePaths.length} images at: ${manifestPath}`)
+
         let args = [
             'detection',
-            path.join(userProfileDir, 'temp/image_detection_pending', userIdFolder),
+            manifestPath, // Pass manifest path instead of directory
             path.join(userProfileDir, 'data/image_marked', userIdFolder),
             path.join(userProfileDir, 'data/image_cropped_json', userIdFolder),
             path.join(userProfileDir, 'logs')
@@ -568,7 +567,10 @@ export async function detect(selectedPaths: string[], stream: (txt: string) => v
         return await new Promise((resolve, reject) => {
             ps.on('close', (code) => {
                 console.log(`child process exited with code ${code}`)
-                fs.remove(tempPath)
+                
+                // Clean up manifest after processing
+                fs.remove(manifestPath).catch(err => console.warn('Failed to remove manifest:', err))
+                
                 if (code != 0) {
                     reject({ ok: false, error: 'ERROR: Detection AI model error, please contact support.' })
                 }
@@ -577,7 +579,8 @@ export async function detect(selectedPaths: string[], stream: (txt: string) => v
             })
         })
     } catch (error) {
-        await fs.remove(tempPath)
+        // Clean up manifest on error
+        await fs.remove(manifestPath).catch(() => {})
         return { ok: false, error: 'detect failed: ' + error }
     }
 }

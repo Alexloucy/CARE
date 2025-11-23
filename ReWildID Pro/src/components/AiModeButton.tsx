@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Box, Typography, useTheme, ButtonBase, SxProps, Theme, TypographyProps } from '@mui/material';
-import { Sparkle, SparkleIcon } from '@phosphor-icons/react';
+import { SparkleIcon } from '@phosphor-icons/react';
 
 interface AiModeButtonProps {
     text?: string;

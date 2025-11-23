@@ -473,37 +473,38 @@ function spawnPythonSubprocess(args) {
 }
 async function detect(selectedPaths, stream) {
     const userIdFolder = '1';
-    const tempPath = path_1.default.join(userProfileDir, 'temp/image_detection_pending', userIdFolder);
+    // Use a manifest file instead of a directory of copied images
+    const manifestPath = path_1.default.join(userProfileDir, 'temp', 'detection_manifest.json');
     try {
         terminateSubprocess();
-        await fs_extra_1.default.remove(tempPath);
+        // Clean up previous manifest if exists
+        await fs_extra_1.default.remove(manifestPath).catch(() => { });
         if (!selectedPaths || !Array.isArray(selectedPaths) || selectedPaths.length === 0) {
             return { ok: false, error: 'No images selected.' };
         }
-        // Copy selected images to a temp folder for detection.
+        // Convert relative paths to absolute paths and validate
+        const baseDir = path_1.default.join(userProfileDir, 'data/image_uploaded', userIdFolder);
+        const absolutePaths = [];
         for (const imagePath of selectedPaths) {
-            const baseDir = path_1.default.join(userProfileDir, 'data/image_uploaded', userIdFolder);
             const srcPath = path_1.default.resolve(baseDir, imagePath); // Resolve the full path
-            // Ensure the resolved path is still within the baseDir
-            if (!srcPath.startsWith(baseDir)) {
-                await fs_extra_1.default.remove(tempPath);
-                return { ok: false, error: 'Invalid folder path ' + srcPath };
-            }
-            const destPath = path_1.default.join(userProfileDir, 'temp/image_detection_pending', userIdFolder, imagePath);
             // Check if the source image exists
             if (await fs_extra_1.default.pathExists(srcPath)) {
-                // Ensure the destination directory exists
-                await fs_extra_1.default.ensureDir(path_1.default.dirname(destPath));
-                // Copy the image
-                await fs_extra_1.default.copy(srcPath, destPath);
+                absolutePaths.push(srcPath);
             }
             else {
-                console.warn(`runDetection: File not found: ${imagePath}`);
+                console.warn(`detect: File not found: ${imagePath}`);
             }
         }
+        if (absolutePaths.length === 0) {
+            return { ok: false, error: 'No valid images found.' };
+        }
+        // Create manifest JSON file
+        await fs_extra_1.default.ensureDir(path_1.default.dirname(manifestPath));
+        await fs_extra_1.default.writeJson(manifestPath, { files: absolutePaths }, { spaces: 2 });
+        console.log(`Created manifest with ${absolutePaths.length} images at: ${manifestPath}`);
         let args = [
             'detection',
-            path_1.default.join(userProfileDir, 'temp/image_detection_pending', userIdFolder),
+            manifestPath, // Pass manifest path instead of directory
             path_1.default.join(userProfileDir, 'data/image_marked', userIdFolder),
             path_1.default.join(userProfileDir, 'data/image_cropped_json', userIdFolder),
             path_1.default.join(userProfileDir, 'logs')
@@ -521,7 +522,8 @@ async function detect(selectedPaths, stream) {
         return await new Promise((resolve, reject) => {
             ps.on('close', (code) => {
                 console.log(`child process exited with code ${code}`);
-                fs_extra_1.default.remove(tempPath);
+                // Clean up manifest after processing
+                fs_extra_1.default.remove(manifestPath).catch(err => console.warn('Failed to remove manifest:', err));
                 if (code != 0) {
                     reject({ ok: false, error: 'ERROR: Detection AI model error, please contact support.' });
                 }
@@ -531,7 +533,8 @@ async function detect(selectedPaths, stream) {
         });
     }
     catch (error) {
-        await fs_extra_1.default.remove(tempPath);
+        // Clean up manifest on error
+        await fs_extra_1.default.remove(manifestPath).catch(() => { });
         return { ok: false, error: 'detect failed: ' + error };
     }
 }
