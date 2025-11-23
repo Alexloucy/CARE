@@ -8,7 +8,9 @@ import {
     Slider,
     Tooltip,
     Typography, useTheme,
-    Switch, Divider
+    Switch, Divider,
+    TextField,
+    InputAdornment
 } from '@mui/material';
 import {
     CheckSquare,
@@ -18,7 +20,8 @@ import {
     Trash,
     X,
     ArrowCounterClockwise,
-    Funnel
+    Funnel,
+    MagnifyingGlass
 } from '@phosphor-icons/react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { DBImage } from '../../types/electron';
@@ -94,6 +97,17 @@ const LibraryPage: React.FC = () => {
     // Filter State
     const [filterDialogOpen, setFilterDialogOpen] = useState(false);
     const [activeFilter, setActiveFilter] = useState<LibraryFilter | null>(null);
+    const [searchInputValue, setSearchInputValue] = useState('');
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+    const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+
+    // Debounce Search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchQuery(searchInputValue);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchInputValue]);
 
     // Zoom Handler
     const handleWheel = (e: React.WheelEvent) => {
@@ -115,21 +129,42 @@ const LibraryPage: React.FC = () => {
 
     // Filter Logic
     const filteredDateSections = useMemo(() => {
-        if (!activeFilter) return dateSections;
-        
-        return dateSections
-            .filter(section => section.date === activeFilter.date)
-            .map(section => {
-                if (!activeFilter.groupIds) return section; // All groups
-                
-                const filteredGroups = section.groups.filter(g => activeFilter.groupIds!.has(g.id));
-                return {
-                    ...section,
-                    groups: filteredGroups
-                };
-            })
-            .filter(section => section.groups.length > 0);
-    }, [dateSections, activeFilter]);
+        let sections = dateSections;
+
+        // 1. Apply Modal Filter (Date & Groups)
+        if (activeFilter) {
+            sections = sections
+                .filter(section => section.date === activeFilter.date)
+                .map(section => {
+                    if (!activeFilter.groupIds) return section; // All groups
+                    
+                    const filteredGroups = section.groups.filter(g => activeFilter.groupIds!.has(g.id));
+                    return {
+                        ...section,
+                        groups: filteredGroups
+                    };
+                })
+                .filter(section => section.groups.length > 0);
+        }
+
+        // 2. Apply Search Filter
+        if (debouncedSearchQuery.trim()) {
+            const query = debouncedSearchQuery.toLowerCase();
+            sections = sections.map(section => ({
+                ...section,
+                groups: section.groups.map(group => {
+                    // Filter images within group
+                    const matchingImages = group.images.filter(img => {
+                        const name = img.original_path.split(/[\\/]/).pop() || '';
+                        return name.toLowerCase().includes(query);
+                    });
+                    return { ...group, images: matchingImages };
+                }).filter(group => group.images.length > 0) // Remove empty groups
+            })).filter(section => section.groups.length > 0); // Remove empty sections
+        }
+
+        return sections;
+    }, [dateSections, activeFilter, debouncedSearchQuery]);
 
     // Scroll Observer
     useEffect(() => {
@@ -330,7 +365,59 @@ const LibraryPage: React.FC = () => {
             {/* Header */}
             <Box sx={{ p: 3, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: theme.palette.background.default, zIndex: 10 }}>
                 <Typography variant="h4" fontWeight="bold">Library</Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                    <Box sx={{ 
+                        width: isSearchExpanded ? '220px' : '40px', 
+                        transition: 'width 0.3s ease-in-out', 
+                        overflow: 'hidden',
+                        display: 'flex',
+                        justifyContent: 'flex-end'
+                    }}>
+                        {isSearchExpanded ? (
+                            <TextField
+                                autoFocus
+                                placeholder="Search images..."
+                                size="small"
+                                value={searchInputValue}
+                                onChange={(e) => setSearchInputValue(e.target.value)}
+                                onBlur={() => {
+                                    if (!searchInputValue) {
+                                        setIsSearchExpanded(false);
+                                    } else {
+                                        setIsSearchExpanded(false); // Collapse even if has text, per request
+                                    }
+                                }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <MagnifyingGlass size={18} color={theme.palette.text.secondary} />
+                                        </InputAdornment>
+                                    ),
+                                    sx: {
+                                        borderRadius: 2,
+                                        bgcolor: theme.palette.background.paper,
+                                        width: '100%',
+                                        '& fieldset': { border: 'none' },
+                                        boxShadow: theme.palette.mode === 'dark' ? '0 0 0 1px rgba(255,255,255,0.1)' : '0 0 0 1px rgba(0,0,0,0.05)'
+                                    }
+                                }}
+                            />
+                        ) : (
+                            <Tooltip title={searchInputValue ? `Search: ${searchInputValue}` : "Search"}>
+                                <IconButton 
+                                    onClick={() => setIsSearchExpanded(true)}
+                                    sx={{ 
+                                        bgcolor: searchInputValue ? (theme.palette.mode === 'light' ? 'rgba(25, 118, 210, 0.08)' : 'rgba(144, 202, 249, 0.16)') : 'transparent',
+                                        color: searchInputValue ? 'primary.main' : 'default',
+                                        '&:hover': { bgcolor: searchInputValue ? (theme.palette.mode === 'light' ? 'rgba(25, 118, 210, 0.12)' : 'rgba(144, 202, 249, 0.24)') : theme.palette.action.hover }
+                                    }}
+                                >
+                                    <MagnifyingGlass weight={searchInputValue ? "bold" : "regular"} />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                    </Box>
+                    <Divider orientation="vertical" flexItem sx={{ mx: 0.5, height: '24px', alignSelf: 'center' }} />
                     <Tooltip title="Filter Library">
                         <IconButton 
                             onClick={() => setFilterDialogOpen(true)}
