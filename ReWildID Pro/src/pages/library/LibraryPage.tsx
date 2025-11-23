@@ -17,7 +17,8 @@ import {
     Plus,
     Trash,
     X,
-    ArrowCounterClockwise
+    ArrowCounterClockwise,
+    Funnel
 } from '@phosphor-icons/react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { DBImage } from '../../types/electron';
@@ -36,6 +37,7 @@ import { DateGroupList } from '../../components/library/DateGroupList';
 import { DragDropOverlay } from '../../components/library/DragDropOverlay';
 import { SelectionToolbar } from '../../components/library/SelectionToolbar';
 import { Timeline } from '../../components/library/Timeline';
+import { LibraryFilter, LibraryFilterDialog } from '../../components/library/LibraryFilterDialog';
 
 const LibraryPage: React.FC = () => {
     const theme = useTheme();
@@ -88,6 +90,10 @@ const LibraryPage: React.FC = () => {
     const [gridItemSize, setGridItemSize] = useState(180);
     const [showFileNames, setShowFileNames] = useState(false);
     const [settingsAnchorEl, setSettingsAnchorEl] = useState<null | HTMLElement>(null);
+    
+    // Filter State
+    const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+    const [activeFilter, setActiveFilter] = useState<LibraryFilter | null>(null);
 
     // Zoom Handler
     const handleWheel = (e: React.WheelEvent) => {
@@ -107,9 +113,27 @@ const LibraryPage: React.FC = () => {
         setShowFileNames(false);
     };
 
+    // Filter Logic
+    const filteredDateSections = useMemo(() => {
+        if (!activeFilter) return dateSections;
+        
+        return dateSections
+            .filter(section => section.date === activeFilter.date)
+            .map(section => {
+                if (!activeFilter.groupIds) return section; // All groups
+                
+                const filteredGroups = section.groups.filter(g => activeFilter.groupIds!.has(g.id));
+                return {
+                    ...section,
+                    groups: filteredGroups
+                };
+            })
+            .filter(section => section.groups.length > 0);
+    }, [dateSections, activeFilter]);
+
     // Scroll Observer
     useEffect(() => {
-        if (loading || dateSections.length === 0) return;
+        if (loading || filteredDateSections.length === 0) return;
 
         const observer = new IntersectionObserver((entries) => {
             // Filter intersecting entries and sort by top position to find the topmost one
@@ -127,7 +151,7 @@ const LibraryPage: React.FC = () => {
         });
 
         // Observe groups only (skipping dates as they are too short)
-        dateSections.forEach(section => {
+        filteredDateSections.forEach(section => {
             // const dateEl = document.getElementById(`date-${section.date}`);
             // if (dateEl) observer.observe(dateEl);
             
@@ -138,12 +162,24 @@ const LibraryPage: React.FC = () => {
         });
 
         return () => observer.disconnect();
-    }, [loading, dateSections]);
+    }, [loading, filteredDateSections]);
 
     // Derived State
     const allImages = useMemo(() => {
-        return dateSections.flatMap(section => section.groups.flatMap(group => group.images));
-    }, [dateSections]);
+        return filteredDateSections.flatMap(section => section.groups.flatMap(group => group.images));
+    }, [filteredDateSections]);
+
+    // Effect: Prune selection when filter hides items
+    useEffect(() => {
+        if (selectedImageIds.size === 0) return;
+
+        const visibleIds = new Set(allImages.map(img => img.id));
+        const nextSelection = new Set([...selectedImageIds].filter(id => visibleIds.has(id)));
+
+        if (nextSelection.size !== selectedImageIds.size) {
+            setSelection(nextSelection);
+        }
+    }, [allImages, selectedImageIds, setSelection]);
 
     // Effect: Load full image when modal opens
     useEffect(() => {
@@ -282,9 +318,9 @@ const LibraryPage: React.FC = () => {
             }} />
             <DragDropOverlay isDragging={isDragging} />
             
-            {!loading && dateSections.length > 0 && (
+            {!loading && filteredDateSections.length > 0 && (
                 <Timeline 
-                    dateSections={dateSections}
+                    dateSections={filteredDateSections}
                     onDateClick={handleDateClick}
                     onGroupClick={handleGroupClick}
                     activeId={activeId}
@@ -295,6 +331,18 @@ const LibraryPage: React.FC = () => {
             <Box sx={{ p: 3, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: theme.palette.background.default, zIndex: 10 }}>
                 <Typography variant="h4" fontWeight="bold">Library</Typography>
                 <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Tooltip title="Filter Library">
+                        <IconButton 
+                            onClick={() => setFilterDialogOpen(true)}
+                            color={activeFilter ? 'primary' : 'default'}
+                            sx={{ 
+                                bgcolor: activeFilter ? (theme.palette.mode === 'light' ? 'rgba(25, 118, 210, 0.08)' : 'rgba(144, 202, 249, 0.16)') : 'transparent',
+                                '&:hover': { bgcolor: activeFilter ? (theme.palette.mode === 'light' ? 'rgba(25, 118, 210, 0.12)' : 'rgba(144, 202, 249, 0.24)') : theme.palette.action.hover }
+                            }}
+                        >
+                            <Funnel weight={activeFilter ? "fill" : "regular"} />
+                        </IconButton>
+                    </Tooltip>
                     <Tooltip title="View Settings">
                         <IconButton
                             onClick={(e) => setSettingsAnchorEl(e.currentTarget)}
@@ -357,7 +405,7 @@ const LibraryPage: React.FC = () => {
                     </Box>
                 ) : (
                     <DateGroupList 
-                        dateSections={dateSections}
+                        dateSections={filteredDateSections}
                         imageUrls={imageUrls}
                         loadImage={loadImage}
                         isSelectionMode={isSelectionMode}
@@ -384,6 +432,15 @@ const LibraryPage: React.FC = () => {
                 selectedCount={selectedImageIds.size}
                 onSave={handleBatchSave}
                 onDelete={handleBatchDelete}
+            />
+
+            {/* Filter Dialog */}
+            <LibraryFilterDialog
+                open={filterDialogOpen}
+                onClose={() => setFilterDialogOpen(false)}
+                dateSections={dateSections} // Pass full list for selection
+                currentFilter={activeFilter}
+                onApply={setActiveFilter}
             />
 
             {/* Image Modal */}
