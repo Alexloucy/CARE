@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Box, Typography, IconButton, useTheme, Collapse } from '@mui/material';
 import { DotsThreeVertical, UploadSimple, CaretRight, CaretDown } from '@phosphor-icons/react';
 import ImageCard from '../ImageCard';
+import AiModeButton from '../AiModeButton';
 import { DateSection } from '../../types/library';
 import { DBImage } from '../../types/electron';
 
@@ -94,6 +95,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                     mb: 2,
                                     position: 'relative', // Establish positioning context
                                     '&:hover .collapse-arrow': { opacity: 1, transform: 'translateX(0)' },
+                                    '&:hover .group-menu-button': { opacity: 1 },
                                     '& .collapse-arrow': { 
                                         opacity: 0, 
                                         transition: 'all 0.2s ease'
@@ -118,14 +120,16 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                         <Typography variant="caption" color="text.secondary" sx={{ bgcolor: theme.palette.action.selected, px: 1, py: 0.5, borderRadius: 1 }}>
                                             {group.images.length}
                                         </Typography>
+                                        <IconButton
+                                            className="group-menu-button"
+                                            size="small"
+                                            onClick={(e) => onMenuOpen(e, group.id)}
+                                            sx={{ opacity: 0, transition: 'opacity 0.2s ease' }}
+                                        >
+                                            <DotsThreeVertical size={20} />
+                                        </IconButton>
                                     </Box>
-                                    <IconButton
-                                        size="small"
-                                        onClick={(e) => onMenuOpen(e, group.id)}
-                                        sx={{ opacity: 0.6, '&:hover': { opacity: 1 } }}
-                                    >
-                                        <DotsThreeVertical size={20} />
-                                    </IconButton>
+                                    <AiModeButton />
                                 </Box>
 
                                 <Collapse in={!isCollapsed} timeout={300}>

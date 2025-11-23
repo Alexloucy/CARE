@@ -1,8 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, Typography, useTheme, ButtonBase } from '@mui/material';
+import { Box, Typography, useTheme, ButtonBase, SxProps, Theme, TypographyProps } from '@mui/material';
 import { Sparkle } from '@phosphor-icons/react';
 
-const AiModeButton: React.FC = () => {
+interface AiModeButtonProps {
+    text?: string;
+    onClick?: (event: React.MouseEvent) => void;
+    sx?: SxProps<Theme>;
+    icon?: React.ReactNode;
+    typographyProps?: TypographyProps;
+}
+
+const AiModeButton: React.FC<AiModeButtonProps> = ({ 
+    text = "Detect", 
+    onClick, 
+    sx,
+    icon = <Sparkle size={20} weight="fill" />,
+    typographyProps
+}) => {
     const [renderPosition, setRenderPosition] = useState({ x: 0, y: 0 });
     const targetPosition = useRef({ x: 0, y: 0 });
     const [isHovered, setIsHovered] = useState(false);
@@ -93,27 +107,31 @@ const AiModeButton: React.FC = () => {
                     opacity: isHovered ? 1 : 0,
                     transition: 'opacity 0.4s ease', // Slightly slower fade for elegance
                     zIndex: 1,
-                    maskImage: `radial-gradient(65px circle at ${renderPosition.x}px ${renderPosition.y}px, black, transparent)`,
-                    WebkitMaskImage: `radial-gradient(65px circle at ${renderPosition.x}px ${renderPosition.y}px, black, transparent)`,
+                    maskImage: `radial-gradient(85px circle at ${renderPosition.x}px ${renderPosition.y}px, black, transparent)`,
+                    WebkitMaskImage: `radial-gradient(85px circle at ${renderPosition.x}px ${renderPosition.y}px, black, transparent)`,
                 }} 
             />
 
             {/* Inner Content with Ripple */}
-            <ButtonBase sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                px: 2.5,
-                py: 1,
-                borderRadius: '9999px',
-                bgcolor: theme.palette.background.paper, 
-                color: theme.palette.text.primary,
-                position: 'relative',
-                zIndex: 2, // Above borders
-            }}>
-                 <Sparkle size={20} weight="fill" />
-                 <Typography fontWeight={600} fontSize="0.9rem">
-                     AI Mode
+            <ButtonBase 
+                onClick={onClick}
+                sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 2.5,
+                    py: 1,
+                    borderRadius: '9999px',
+                    bgcolor: theme.palette.background.paper, 
+                    color: theme.palette.text.primary,
+                    position: 'relative',
+                    zIndex: 2, // Above borders
+                    ...sx as any
+                }}
+            >
+                 {icon}
+                 <Typography fontSize="0.9rem" {...typographyProps}>
+                     {text}
                  </Typography>
             </ButtonBase>
         </Box>
