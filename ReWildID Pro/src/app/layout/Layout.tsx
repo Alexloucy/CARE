@@ -85,7 +85,7 @@ export default function Layout() {
                         paddingBottom: 0,
                     }}
                 >
-                    <Outlet />
+                    <Outlet context={{ leftSidebarOpen, rightSidebarOpen }} />
                 </Box>
             </Box>
 

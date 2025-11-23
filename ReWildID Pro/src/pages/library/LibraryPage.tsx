@@ -21,6 +21,7 @@ import {
     Funnel
 } from '@phosphor-icons/react';
 import React, { useEffect, useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { DBImage } from '../../types/electron';
 
 // Hooks
@@ -35,13 +36,14 @@ import { GroupNameDialog } from '../../components/GroupNameDialog';
 import ImageModal from '../../components/ImageModal';
 import { DateGroupList } from '../../components/library/DateGroupList';
 import { DragDropOverlay } from '../../components/library/DragDropOverlay';
-import { SelectionToolbar } from '../../components/library/SelectionToolbar';
 import { Timeline } from '../../components/library/Timeline';
 import { LibraryFilter, LibraryFilterDialog } from '../../components/library/LibraryFilterDialog';
 import { LibrarySearchBar } from '../../components/library/LibrarySearchBar';
+import { LibrarySelectionBar } from '../../components/library/LibrarySelectionBar';
 
 const LibraryPage: React.FC = () => {
     const theme = useTheme();
+    const { leftSidebarOpen, rightSidebarOpen } = useOutletContext<{ leftSidebarOpen: boolean; rightSidebarOpen: boolean }>();
 
     // 1. Filter & Search State (Must be defined before data loading)
     const [filterDialogOpen, setFilterDialogOpen] = useState(false);
@@ -248,21 +250,6 @@ const LibraryPage: React.FC = () => {
     };
 
     // Batch Actions
-    const handleBatchDelete = async () => {
-        if (selectedImageIds.size === 0) return;
-        if (window.confirm(`Are you sure you want to delete ${selectedImageIds.size} images?`)) {
-            try {
-                for (const id of selectedImageIds) {
-                    await window.api.deleteImage(id);
-                }
-                await refreshLibrary();
-                clearSelection();
-            } catch (error) {
-                console.error('Batch delete error:', error);
-            }
-        }
-    };
-
     const handleBatchSave = async () => {
         if (selectedImageIds.size === 0) return;
         const paths: string[] = [];
@@ -281,6 +268,39 @@ const LibraryPage: React.FC = () => {
             }
         } catch (error) {
             console.error('Batch save error:', error);
+        }
+    };
+
+    const handleBatchDelete = async () => {
+        if (selectedImageIds.size === 0) return;
+        if (window.confirm(`Are you sure you want to delete ${selectedImageIds.size} images?`)) {
+            try {
+                for (const id of selectedImageIds) {
+                    await window.api.deleteImage(id);
+                }
+                await refreshLibrary();
+                clearSelection();
+            } catch (error) {
+                console.error('Batch delete error:', error);
+            }
+        }
+    };
+
+    const handleBatchDetect = async () => {
+        if (selectedImageIds.size === 0) return;
+        const paths: string[] = [];
+        allImages.forEach(img => {
+            if (selectedImageIds.has(img.id)) paths.push(img.original_path);
+        });
+        if (paths.length === 0) return;
+
+        try {
+            await window.api.detect(paths, (txt) => console.log(txt));
+            setIsSelectionMode(false);
+            clearSelection();
+        } catch (error) {
+            console.error('Batch detect error:', error);
+            alert('Failed to start detection: ' + error);
         }
     };
 
@@ -427,14 +447,6 @@ const LibraryPage: React.FC = () => {
                 )}
             </Box>
 
-            {/* Selection Toolbar */}
-            <SelectionToolbar 
-                visible={isSelectionMode && selectedImageIds.size > 0}
-                selectedCount={selectedImageIds.size}
-                onSave={handleBatchSave}
-                onDelete={handleBatchDelete}
-            />
-
             {/* Filter Dialog */}
             <LibraryFilterDialog
                 open={filterDialogOpen}
@@ -563,6 +575,22 @@ const LibraryPage: React.FC = () => {
                     />
                 </Box>
             </Menu>
+
+            {/* Selection Bar (Bottom) */}
+            {isSelectionMode && (
+                <LibrarySelectionBar 
+                    selectedCount={selectedImageIds.size}
+                    onClose={() => {
+                        setIsSelectionMode(false);
+                        clearSelection();
+                    }}
+                    onDelete={handleBatchDelete}
+                    onDetect={handleBatchDetect}
+                    onSave={handleBatchSave}
+                    leftSidebarOpen={leftSidebarOpen}
+                    rightSidebarOpen={rightSidebarOpen}
+                />
+            )}
         </Box>
     );
 };
