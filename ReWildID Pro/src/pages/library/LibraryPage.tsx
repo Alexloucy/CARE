@@ -112,20 +112,24 @@ const LibraryPage: React.FC = () => {
         if (loading || dateSections.length === 0) return;
 
         const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    setActiveId(entry.target.id);
-                }
-            });
+            // Filter intersecting entries and sort by top position to find the topmost one
+            const visibleEntries = entries
+                .filter(entry => entry.isIntersecting)
+                .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+
+            if (visibleEntries.length > 0) {
+                // The first one is the topmost visible element
+                setActiveId(visibleEntries[0].target.id);
+            }
         }, {
-            rootMargin: '-10% 0px -80% 0px', // Trigger when element is near the top
+            rootMargin: '0px 0px -80% 0px', // Start from top, active zone is top 20%
             threshold: 0
         });
 
-        // Observe all dates and groups
+        // Observe groups only (skipping dates as they are too short)
         dateSections.forEach(section => {
-            const dateEl = document.getElementById(`date-${section.date}`);
-            if (dateEl) observer.observe(dateEl);
+            // const dateEl = document.getElementById(`date-${section.date}`);
+            // if (dateEl) observer.observe(dateEl);
             
             section.groups.forEach(group => {
                 const groupEl = document.getElementById(`group-${group.id}`);
