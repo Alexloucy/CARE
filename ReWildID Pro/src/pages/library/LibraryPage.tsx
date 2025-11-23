@@ -365,6 +365,7 @@ const LibraryPage: React.FC = () => {
                         onToggleSelection={toggleImageSelection}
                         onSetSelection={setSelection}
                         onEnableSelectionMode={() => setIsSelectionMode(true)}
+                        onExitSelectionMode={() => setIsSelectionMode(false)}
                         allImages={allImages}
                         onImageClick={(img) => {
                             if (isSelectionMode) toggleImageSelection(img.id);

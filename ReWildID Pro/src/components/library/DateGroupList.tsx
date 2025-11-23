@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, Typography, IconButton, useTheme, Collapse } from '@mui/material';
-import { DotsThreeVertical, UploadSimple, CaretRight, CaretDown } from '@phosphor-icons/react';
+import { Box, Typography, IconButton, useTheme, Collapse, Tooltip } from '@mui/material';
+import { DotsThreeVertical, UploadSimple, CaretRight, CaretDown, Checks, Check as CheckIcon } from '@phosphor-icons/react';
 import ImageCard from '../ImageCard';
 import AiModeButton from '../AiModeButton';
 import { DateSection } from '../../types/library';
@@ -15,6 +15,7 @@ interface DateGroupListProps {
     onToggleSelection: (id: number) => void;
     onSetSelection?: (ids: Set<number>) => void;
     onEnableSelectionMode?: () => void;
+    onExitSelectionMode?: () => void;
     allImages?: DBImage[];
     onImageClick: (image: DBImage) => void;
     onMenuOpen: (event: React.MouseEvent<HTMLElement>, groupId: number) => void;
@@ -31,6 +32,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
     onToggleSelection,
     onSetSelection,
     onEnableSelectionMode,
+    onExitSelectionMode,
     allImages = [],
     onImageClick,
     onMenuOpen,
@@ -213,6 +215,37 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
         }
     };
 
+    const handleSelectGroup = (groupImages: DBImage[]) => {
+        if (!onSetSelection) return;
+        
+        // Enable selection mode if not active
+        if (!isSelectionMode && onEnableSelectionMode) {
+            onEnableSelectionMode();
+        }
+
+        const groupIds = groupImages.map(img => img.id);
+        // Check against current props. Note: If onEnableSelectionMode just ran, selectedImageIds might be empty/stale
+        // in this render cycle, so we might default to selecting all.
+        const allSelected = groupIds.every(id => selectedImageIds.has(id));
+        
+        const newSelection = new Set(selectedImageIds);
+        
+        if (allSelected) {
+            // Deselect all
+            groupIds.forEach(id => newSelection.delete(id));
+        } else {
+            // Select all
+            groupIds.forEach(id => newSelection.add(id));
+        }
+        
+        onSetSelection(newSelection);
+
+        // Exit selection mode if nothing is left selected
+        if (newSelection.size === 0 && onExitSelectionMode) {
+            onExitSelectionMode();
+        }
+    };
+
     const toggleGroup = (groupId: number) => {
         const newCollapsed = new Set(collapsedGroups);
         if (newCollapsed.has(groupId)) {
@@ -286,6 +319,9 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
 
                     {section.groups.map(group => {
                         const isCollapsed = collapsedGroups.has(group.id);
+                        // Check if all in group are selected for button state (optional visual feedback)
+                        const isAllSelected = group.images.every(img => selectedImageIds.has(img.id));
+                        
                         return (
                             <Box key={group.id} id={`group-${group.id}`} sx={{ mb: 4, scrollMarginTop: '100px' }}>
                                 <Box sx={{ 
@@ -296,6 +332,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                     position: 'relative', // Establish positioning context
                                     '&:hover .collapse-arrow': { opacity: 1, transform: 'translateX(0)' },
                                     '&:hover .group-menu-button': { opacity: 1 },
+                                    '&:hover .group-select-button': { opacity: 1 },
                                     '& .collapse-arrow': { 
                                         opacity: 0, 
                                         transition: 'all 0.2s ease'
@@ -320,6 +357,26 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                         <Typography variant="caption" color="text.secondary" sx={{ bgcolor: theme.palette.action.selected, px: 1, py: 0.5, borderRadius: 1 }}>
                                             {group.images.length}
                                         </Typography>
+                                        
+                                        {/* Select All Button */}
+                                        <Tooltip title="Select all in group" enterDelay={0}>
+                                            <IconButton
+                                                className="group-select-button"
+                                                size="small"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleSelectGroup(group.images);
+                                                }}
+                                                sx={{ 
+                                                    opacity: isAllSelected ? 1 : 0, // Show if selected, else hover
+                                                    transition: 'opacity 0.2s ease',
+                                                    color: isAllSelected ? 'primary.main' : 'text.secondary'
+                                                }}
+                                            >
+                                                <CheckIcon size={20} weight={isAllSelected ? "bold" : "regular"} />
+                                            </IconButton>
+                                        </Tooltip>
+
                                         <IconButton
                                             className="group-menu-button"
                                             size="small"
