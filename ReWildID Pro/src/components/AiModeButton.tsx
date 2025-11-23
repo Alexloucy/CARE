@@ -15,9 +15,6 @@ const AiModeButton: React.FC = () => {
         
         const animate = () => {
             setRenderPosition(prev => {
-                const dx = targetPosition.current.x - prev.x;
-                const dy = targetPosition.current.y - prev.y;
-                
                 // If very close, just snap (optimization could be added here, but constant lerp is smoother)
                 // Speed factor 0.05 gives a more noticeable fluid delay (sluggish)
                 return {
