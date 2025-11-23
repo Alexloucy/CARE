@@ -9,6 +9,17 @@ const crypto_1 = require("crypto");
 const database_1 = require("./database");
 const path_1 = __importDefault(require("path"));
 const fs_extra_1 = __importDefault(require("fs-extra"));
+const os_1 = __importDefault(require("os"));
+const python_1 = require("./python");
+function getAppDataDir() {
+    if (process.platform === 'win32') {
+        let appDataPath = process.env.APPDATA || process.env.LOCALAPPDATA;
+        if (appDataPath) {
+            return path_1.default.join(appDataPath, 'ml4sg-care');
+        }
+    }
+    return path_1.default.join(os_1.default.homedir(), '.ml4sg-care');
+}
 class JobManager {
     static instance;
     queue = [];
@@ -110,6 +121,9 @@ class JobManager {
                     break;
                 case 'thumbnail':
                     await this.handleThumbnailJob(job);
+                    break;
+                case 'detect':
+                    await this.handleDetectJob(job);
                     break;
                 default:
                     throw new Error(`Unknown job type: ${job.type}`);
@@ -298,6 +312,88 @@ class JobManager {
     async handleThumbnailJob(job) {
         const { imageId, originalPath } = job.payload;
         await this.generateThumbnail(imageId, originalPath);
+    }
+    async handleDetectJob(job) {
+        const { selectedPaths } = job.payload;
+        const userIdFolder = '1';
+        const userProfileDir = getAppDataDir();
+        const manifestPath = path_1.default.join(userProfileDir, 'temp', `detection_manifest_${job.id}.json`);
+        try {
+            (0, python_1.terminateSubprocess)();
+            await fs_extra_1.default.remove(manifestPath).catch(() => { });
+            // Validate paths
+            const absolutePaths = [];
+            for (const imagePath of selectedPaths) {
+                if (await fs_extra_1.default.pathExists(imagePath)) {
+                    absolutePaths.push(imagePath);
+                }
+            }
+            if (absolutePaths.length === 0) {
+                throw new Error('No valid images found to process.');
+            }
+            // Write Manifest
+            await fs_extra_1.default.ensureDir(path_1.default.dirname(manifestPath));
+            await fs_extra_1.default.writeJson(manifestPath, { files: absolutePaths }, { spaces: 2 });
+            // Spawn Python
+            const args = [
+                'detection',
+                manifestPath,
+                path_1.default.join(userProfileDir, 'data/image_marked', userIdFolder),
+                path_1.default.join(userProfileDir, 'data/image_cropped_json', userIdFolder),
+                path_1.default.join(userProfileDir, 'logs')
+            ];
+            const ps = (0, python_1.spawnPythonSubprocess)(args);
+            (0, python_1.setSubProcess)(ps);
+            if (!ps || !ps.stdout) {
+                throw new Error('Failed to spawn Python process.');
+            }
+            job.message = 'Initializing AI models...';
+            this.emitUpdate();
+            // Wrap process in promise
+            await new Promise((resolve, reject) => {
+                ps.stdout?.on('data', (data) => {
+                    const txt = data.toString();
+                    console.log(`[Job ${job.id}] ${txt.trim()}`);
+                    // Parse progress
+                    // Example: [1] PROCESS: 8/61
+                    const processMatch = txt.match(/PROCESS:\s*(\d+)\/(\d+)/);
+                    if (processMatch) {
+                        const current = parseInt(processMatch[1]);
+                        const total = parseInt(processMatch[2]);
+                        if (total > 0) {
+                            job.progress = Math.floor((current / total) * 100);
+                            job.message = `Processing detections: ${current}/${total}`;
+                            // Throttle updates slightly? JobManager.emitUpdate handles some UI
+                            this.emitUpdate();
+                        }
+                    }
+                    else if (txt.includes('Loading models')) {
+                        job.message = 'Loading AI models...';
+                        this.emitUpdate();
+                    }
+                    else if (txt.includes('Running MegaDetector')) {
+                        job.message = 'Running Object Detection...';
+                        this.emitUpdate();
+                    }
+                });
+                ps.on('close', (code) => {
+                    (0, python_1.setSubProcess)(null);
+                    if (code === 0) {
+                        resolve();
+                    }
+                    else {
+                        reject(new Error(`Python process exited with code ${code}`));
+                    }
+                });
+                ps.on('error', (err) => {
+                    reject(err);
+                });
+            });
+        }
+        finally {
+            // Cleanup
+            await fs_extra_1.default.remove(manifestPath).catch(() => { });
+        }
     }
 }
 exports.JobManager = JobManager;

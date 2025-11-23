@@ -31,12 +31,12 @@ exports.saveImages = saveImages;
 const fs_extra_1 = __importDefault(require("fs-extra"));
 const path_1 = __importDefault(require("path"));
 const archiver_1 = __importDefault(require("archiver"));
-const node_child_process_1 = require("node:child_process");
 const os_1 = __importDefault(require("os"));
 const electron_1 = require("electron");
 const mime_types_1 = require("mime-types");
 const database_1 = require("./database");
 const jobs_1 = require("./jobs");
+const python_1 = require("./python");
 // Migration Routine
 async function migrateLegacyData() {
     try {
@@ -390,151 +390,16 @@ async function downloadSelectedGalleryImages(selectedPaths) {
         return { ok: false, error: 'downloadSelectedGalleryImages failed: ' + error };
     }
 }
-let subProcess = null;
-function terminateSubprocess() {
-    // Terminate any running AI process.
-    if (subProcess === null) {
-        return;
-    }
-    subProcess.kill();
-    subProcess = null;
-}
-function conda() {
-    try {
-        const ps = (0, node_child_process_1.spawnSync)('conda info');
-        return ps.status !== undefined && ps.status == 0;
-    }
-    catch (e) {
-        return false;
-    }
-}
-function spawnPythonSubprocess(args) {
-    let ps = null;
-    let python = '';
-    console.log(`process.resourcesPath=${process.resourcesPath}`);
-    if (process.env.PYTHON_SCRIPT_PATH) {
-        if (process.env.VIRTUAL_ENV) {
-            // Standard Python virtual env.
-            if (os_1.default.platform() == 'win32') {
-                python = path_1.default.join(process.env.VIRTUAL_ENV, 'Scripts', 'python');
-            }
-            else {
-                python = path_1.default.join(process.env.VIRTUAL_ENV, 'bin', 'python');
-            }
-            args = [process.env.PYTHON_SCRIPT_PATH, ...args];
-            console.log(`Spawning Python subprocess using venv.`);
-        }
-        else if (conda()) {
-            const scriptPath = process.env.PYTHON_SCRIPT_PATH;
-            const condaEnv = process.env.DEVICE == 'GPU' ? 'CARE-GPU' : 'CARE';
-            python = os_1.default.platform() == 'win32' ? 'python' : 'python3';
-            args = ['run', '--no-capture-output', '-n', condaEnv, python, scriptPath].concat(args);
-            console.log(`Spawning Conda Python subprocess.`);
-        }
-    }
-    else {
-        if (electron_1.app.isPackaged) {
-            // Want: C:\Users\chris\AppData\Local\Programs\care-electron\resources\app.asar.unpacked\resources\care-detect-reid
-            // GOT: C:\Users\chris\AppData\Local\Programs\resources\care-detect-reid
-            console.log('Running Pyinstaller Python');
-            const ext = os_1.default.platform() == 'win32' ? '.exe' : '';
-            python = path_1.default.join(process.resourcesPath, 'app.asar.unpacked', 'resources', 'care-detect-reid', `care-detect-reid${ext}`);
-        }
-        else {
-            console.log('Running Dev Mode Python');
-            // Adjusted path for ReWildID Pro structure
-            const pythonScriptPath = path_1.default.resolve(__dirname, '../../python/main.py');
-            const venvPath = path_1.default.resolve(__dirname, '../../python/.venv');
-            args = [pythonScriptPath, ...args];
-            if (fs_extra_1.default.existsSync(venvPath)) {
-                if (os_1.default.platform() == 'win32') {
-                    python = path_1.default.join(venvPath, 'Scripts', 'python.exe');
-                }
-                else {
-                    python = path_1.default.join(venvPath, 'bin', 'python');
-                }
-                console.log(`Using local venv at: ${python}`);
-            }
-            else {
-                python = 'python'; // Fallback to global python
-                console.log(`Using global python`);
-            }
-        }
-    }
-    console.log(`Spawn: ${python} ${args.join(' ')}`);
-    try {
-        ps = (0, node_child_process_1.spawn)(python, args);
-    }
-    catch (e) {
-        console.log(e);
-        throw e;
-    }
-    return ps;
-}
 async function detect(selectedPaths, stream) {
-    const userIdFolder = '1';
-    // Use a manifest file instead of a directory of copied images
-    const manifestPath = path_1.default.join(userProfileDir, 'temp', 'detection_manifest.json');
     try {
-        terminateSubprocess();
-        // Clean up previous manifest if exists
-        await fs_extra_1.default.remove(manifestPath).catch(() => { });
         if (!selectedPaths || !Array.isArray(selectedPaths) || selectedPaths.length === 0) {
             return { ok: false, error: 'No images selected.' };
         }
-        // Convert relative paths to absolute paths and validate
-        const baseDir = path_1.default.join(userProfileDir, 'data/image_uploaded', userIdFolder);
-        const absolutePaths = [];
-        for (const imagePath of selectedPaths) {
-            const srcPath = path_1.default.resolve(baseDir, imagePath); // Resolve the full path
-            // Check if the source image exists
-            if (await fs_extra_1.default.pathExists(srcPath)) {
-                absolutePaths.push(srcPath);
-            }
-            else {
-                console.warn(`detect: File not found: ${imagePath}`);
-            }
-        }
-        if (absolutePaths.length === 0) {
-            return { ok: false, error: 'No valid images found.' };
-        }
-        // Create manifest JSON file
-        await fs_extra_1.default.ensureDir(path_1.default.dirname(manifestPath));
-        await fs_extra_1.default.writeJson(manifestPath, { files: absolutePaths }, { spaces: 2 });
-        console.log(`Created manifest with ${absolutePaths.length} images at: ${manifestPath}`);
-        let args = [
-            'detection',
-            manifestPath, // Pass manifest path instead of directory
-            path_1.default.join(userProfileDir, 'data/image_marked', userIdFolder),
-            path_1.default.join(userProfileDir, 'data/image_cropped_json', userIdFolder),
-            path_1.default.join(userProfileDir, 'logs')
-        ];
-        let ps = spawnPythonSubprocess(args);
-        // Note: We track the process on a global, but only reference it in a local var, as another
-        // ipc/event handler could clear the global var.
-        subProcess = ps;
-        if (ps && ps.stdout) {
-            ps.stdout.on('data', (data) => {
-                console.log(`stdout: ${data}`);
-                stream(data);
-            });
-        }
-        return await new Promise((resolve, reject) => {
-            ps.on('close', (code) => {
-                console.log(`child process exited with code ${code}`);
-                // Clean up manifest after processing
-                fs_extra_1.default.remove(manifestPath).catch(err => console.warn('Failed to remove manifest:', err));
-                if (code != 0) {
-                    reject({ ok: false, error: 'ERROR: Detection AI model error, please contact support.' });
-                }
-                subProcess = null;
-                resolve({ ok: true });
-            });
-        });
+        // Add to Job Queue
+        jobs_1.JobManager.getInstance().addJob('detect', { selectedPaths });
+        return { ok: true };
     }
     catch (error) {
-        // Clean up manifest on error
-        await fs_extra_1.default.remove(manifestPath).catch(() => { });
         return { ok: false, error: 'detect failed: ' + error };
     }
 }
@@ -755,7 +620,7 @@ async function runReid(selectedPaths, stream) {
     const tempImagePath = path_1.default.join(userProfileDir, 'temp/image_reid_pending', userIdFolder);
     const tempJsonPath = path_1.default.join(userProfileDir, 'temp/image_cropped_reid_pending', userIdFolder);
     try {
-        terminateSubprocess();
+        (0, python_1.terminateSubprocess)();
         await fs_extra_1.default.remove(tempImagePath);
         await fs_extra_1.default.remove(tempJsonPath);
         if (!selectedPaths || !Array.isArray(selectedPaths) || selectedPaths.length === 0) {
@@ -791,13 +656,13 @@ async function runReid(selectedPaths, stream) {
             path_1.default.join(userProfileDir, 'data/image_reid_output', userIdFolder),
             path_1.default.join(userProfileDir, 'logs')
         ];
-        let ps = spawnPythonSubprocess(args);
+        let ps = (0, python_1.spawnPythonSubprocess)(args);
         if (!ps) {
             return { ok: false, error: 'Failed to start process' };
         }
         // Note: We track the process on a global, but only reference it in a local var, as another
         // event handler could clear the global var.
-        subProcess = ps;
+        (0, python_1.setSubProcess)(ps);
         if (ps.stdout) {
             ps.stdout.on('data', (data) => {
                 console.log(`stdout: ${data}`);
@@ -817,7 +682,7 @@ async function runReid(selectedPaths, stream) {
                 if (code != 0) {
                     reject({ ok: false, error: 'ERROR: Detection AI model error, please contact support.' });
                 }
-                subProcess = null;
+                (0, python_1.setSubProcess)(null);
                 resolve({ ok: true });
             });
         });
@@ -1085,7 +950,7 @@ async function renameReidGroup(date, time, old_group_id, new_group_id) {
     }
 }
 function terminateAI() {
-    terminateSubprocess();
+    (0, python_1.terminateSubprocess)();
 }
 async function checkIsDirectory(filePath) {
     try {
