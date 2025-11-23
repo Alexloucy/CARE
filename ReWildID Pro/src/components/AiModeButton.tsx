@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Box, Typography, useTheme, ButtonBase, SxProps, Theme, TypographyProps } from '@mui/material';
-import { Sparkle } from '@phosphor-icons/react';
+import { Sparkle, SparkleIcon } from '@phosphor-icons/react';
 
 interface AiModeButtonProps {
     text?: string;
@@ -14,7 +14,7 @@ const AiModeButton: React.FC<AiModeButtonProps> = ({
     text = "Detect", 
     onClick, 
     sx,
-    icon = <Sparkle size={20} weight="fill" />,
+    icon = <SparkleIcon size={20} weight="fill" />,
     typographyProps
 }) => {
     const [renderPosition, setRenderPosition] = useState({ x: 0, y: 0 });

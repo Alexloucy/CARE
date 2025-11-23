@@ -103,7 +103,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                 }}>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}> {/* Restored gap: 2 */}
                                         {/* Arrow positioned absolutely to the left */}
-                                        <Box sx={{ position: 'absolute', left: -32, display: 'flex', alignItems: 'center', height: '100%' }}>
+                                        <Box sx={{ position: 'absolute', left: -29, display: 'flex', alignItems: 'center', height: '100%' }}>
                                             <IconButton
                                                 className="collapse-arrow"
                                                 size="small"
