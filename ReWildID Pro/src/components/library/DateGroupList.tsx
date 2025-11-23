@@ -386,7 +386,15 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                             <DotsThreeVertical size={20} />
                                         </IconButton>
                                     </Box>
-                                    <AiModeButton onClick={() => handleDetect(group.images)} />
+                                    <AiModeButton 
+                                        text={group.images.filter(img => selectedImageIds.has(img.id)).length > 0 
+                                            ? `Detect (${group.images.filter(img => selectedImageIds.has(img.id)).length})` 
+                                            : "Detect"}
+                                        onClick={() => {
+                                            const selectedInGroup = group.images.filter(img => selectedImageIds.has(img.id));
+                                            handleDetect(selectedInGroup.length > 0 ? selectedInGroup : group.images);
+                                        }} 
+                                    />
                                 </Box>
 
                                 <Collapse in={!isCollapsed} timeout={300}>
