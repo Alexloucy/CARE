@@ -20,11 +20,53 @@ const AiModeButton: React.FC<AiModeButtonProps> = ({
     const [renderPosition, setRenderPosition] = useState({ x: 0, y: 0 });
     const targetPosition = useRef({ x: 0, y: 0 });
     const [isHovered, setIsHovered] = useState(false);
+    const [introActive, setIntroActive] = useState(true);
     const buttonRef = useRef<HTMLDivElement>(null);
     const theme = useTheme();
 
+    // Intro Animation
+    useEffect(() => {
+        // Small delay to ensure layout is done
+        const timer = setTimeout(() => {
+            if (!buttonRef.current) return;
+            const width = buttonRef.current.offsetWidth;
+            const height = buttonRef.current.offsetHeight;
+            
+            let startTime: number | null = null;
+            const duration = 1500; // ms
+
+            const step = (timestamp: number) => {
+                if (!startTime) startTime = timestamp;
+                const progress = Math.min((timestamp - startTime) / duration, 1);
+                
+                // Animate from left to right
+                setRenderPosition({
+                    x: width * progress,
+                    y: height / 2
+                });
+
+                if (progress < 1) {
+                    if (introActive) requestAnimationFrame(step);
+                } else {
+                    setIntroActive(false);
+                }
+            };
+
+            requestAnimationFrame(step);
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, []);
+
+    // Stop intro on hover
+    useEffect(() => {
+        if (isHovered) setIntroActive(false);
+    }, [isHovered]);
+
     // Smooth mouse following effect
     useEffect(() => {
+        if (introActive) return; // Skip if intro is playing
+
         let animationFrameId: number;
         
         const animate = () => {
@@ -104,7 +146,7 @@ const AiModeButton: React.FC<AiModeButtonProps> = ({
                     inset: 0,
                     borderRadius: '9999px',
                     background: gradient,
-                    opacity: isHovered ? 1 : 0,
+                    opacity: isHovered || introActive ? 1 : 0,
                     transition: 'opacity 0.4s ease', // Slightly slower fade for elegance
                     zIndex: 1,
                     maskImage: `radial-gradient(85px circle at ${renderPosition.x}px ${renderPosition.y}px, black, transparent)`,
