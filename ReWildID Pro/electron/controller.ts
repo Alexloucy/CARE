@@ -851,12 +851,21 @@ export async function deleteDetectionBatch(id: number) {
 
 // --- Detections ---
 
-export async function getDetectionsForBatch(batchId: number) {
+export async function getDetectionsForBatch(batchId: number, species?: string[], minConfidence?: number) {
     try {
-        const detections = DatabaseService.getDetectionsForBatch(batchId);
+        const detections = DatabaseService.getDetectionsForBatch(batchId, species, minConfidence);
         return { ok: true, detections };
     } catch (error) {
         return { ok: false, error: 'getDetectionsForBatch failed: ' + error };
+    }
+}
+
+export async function getAvailableSpecies() {
+    try {
+        const species = DatabaseService.getAvailableSpecies();
+        return { ok: true, species };
+    } catch (error) {
+        return { ok: false, error: 'getAvailableSpecies failed: ' + error };
     }
 }
 

@@ -30,6 +30,7 @@ import {
     updateDetectionBatchName,
     deleteDetectionBatch,
     getDetectionsForBatch,
+    getAvailableSpecies,
     updateDetectionLabel,
     deleteDetection
 } from './controller';
@@ -192,7 +193,8 @@ ipcMain.handle('terminateAI', (_) => terminateAI());
 ipcMain.handle('getDetectionBatches', () => getDetectionBatches());
 ipcMain.handle('updateDetectionBatchName', (_, id, name) => updateDetectionBatchName(id, name));
 ipcMain.handle('deleteDetectionBatch', (_, id) => deleteDetectionBatch(id));
-ipcMain.handle('getDetectionsForBatch', (_, batchId) => getDetectionsForBatch(batchId));
+ipcMain.handle('getDetectionsForBatch', (_, batchId, species, minConfidence) => getDetectionsForBatch(batchId, species, minConfidence));
+ipcMain.handle('getAvailableSpecies', () => getAvailableSpecies());
 ipcMain.handle('updateDetectionLabel', (_, id, label) => updateDetectionLabel(id, label));
 ipcMain.handle('deleteDetection', (_, id) => deleteDetection(id));
 

@@ -25,6 +25,7 @@ exports.getDetectionBatches = getDetectionBatches;
 exports.updateDetectionBatchName = updateDetectionBatchName;
 exports.deleteDetectionBatch = deleteDetectionBatch;
 exports.getDetectionsForBatch = getDetectionsForBatch;
+exports.getAvailableSpecies = getAvailableSpecies;
 exports.updateDetectionLabel = updateDetectionLabel;
 exports.deleteDetection = deleteDetection;
 exports.browseReidImage = browseReidImage;
@@ -744,13 +745,22 @@ async function deleteDetectionBatch(id) {
     }
 }
 // --- Detections ---
-async function getDetectionsForBatch(batchId) {
+async function getDetectionsForBatch(batchId, species, minConfidence) {
     try {
-        const detections = database_1.DatabaseService.getDetectionsForBatch(batchId);
+        const detections = database_1.DatabaseService.getDetectionsForBatch(batchId, species, minConfidence);
         return { ok: true, detections };
     }
     catch (error) {
         return { ok: false, error: 'getDetectionsForBatch failed: ' + error };
+    }
+}
+async function getAvailableSpecies() {
+    try {
+        const species = database_1.DatabaseService.getAvailableSpecies();
+        return { ok: true, species };
+    }
+    catch (error) {
+        return { ok: false, error: 'getAvailableSpecies failed: ' + error };
     }
 }
 async function updateDetectionLabel(id, label) {

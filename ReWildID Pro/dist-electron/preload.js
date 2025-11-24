@@ -53,7 +53,8 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     getDetectionBatches: () => electron_1.ipcRenderer.invoke('getDetectionBatches'),
     updateDetectionBatchName: (id, name) => electron_1.ipcRenderer.invoke('updateDetectionBatchName', id, name),
     deleteDetectionBatch: (id) => electron_1.ipcRenderer.invoke('deleteDetectionBatch', id),
-    getDetectionsForBatch: (batchId) => electron_1.ipcRenderer.invoke('getDetectionsForBatch', batchId),
+    getDetectionsForBatch: (batchId, species, minConfidence) => electron_1.ipcRenderer.invoke('getDetectionsForBatch', batchId, species, minConfidence),
+    getAvailableSpecies: () => electron_1.ipcRenderer.invoke('getAvailableSpecies'),
     updateDetectionLabel: (id, label) => electron_1.ipcRenderer.invoke('updateDetectionLabel', id, label),
     deleteDetection: (id) => electron_1.ipcRenderer.invoke('deleteDetection', id),
     // Jobs

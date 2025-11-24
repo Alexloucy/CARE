@@ -83,6 +83,9 @@ interface MediaExplorerProps {
     // Sidebar State
     leftSidebarOpen: boolean;
     rightSidebarOpen: boolean;
+
+    // Filter Options (for detection page)
+    availableSpecies?: string[];
 }
 
 export const MediaExplorer: React.FC<MediaExplorerProps> = ({
@@ -118,7 +121,8 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     onGroupMenuOpen,
     groupMenu,
     leftSidebarOpen,
-    rightSidebarOpen
+    rightSidebarOpen,
+    availableSpecies
 }) => {
     const theme = useTheme();
 
@@ -358,6 +362,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                 dateSections={fullDateSections}
                 currentFilter={activeFilter}
                 onApply={onFilterChange}
+                availableSpecies={availableSpecies}
             />
 
             <ImageModal

@@ -146,7 +146,8 @@ electron_1.ipcMain.handle('terminateAI', (_) => (0, controller_1.terminateAI)())
 electron_1.ipcMain.handle('getDetectionBatches', () => (0, controller_1.getDetectionBatches)());
 electron_1.ipcMain.handle('updateDetectionBatchName', (_, id, name) => (0, controller_1.updateDetectionBatchName)(id, name));
 electron_1.ipcMain.handle('deleteDetectionBatch', (_, id) => (0, controller_1.deleteDetectionBatch)(id));
-electron_1.ipcMain.handle('getDetectionsForBatch', (_, batchId) => (0, controller_1.getDetectionsForBatch)(batchId));
+electron_1.ipcMain.handle('getDetectionsForBatch', (_, batchId, species, minConfidence) => (0, controller_1.getDetectionsForBatch)(batchId, species, minConfidence));
+electron_1.ipcMain.handle('getAvailableSpecies', () => (0, controller_1.getAvailableSpecies)());
 electron_1.ipcMain.handle('updateDetectionLabel', (_, id, label) => (0, controller_1.updateDetectionLabel)(id, label));
 electron_1.ipcMain.handle('deleteDetection', (_, id) => (0, controller_1.deleteDetection)(id));
 // Job Management

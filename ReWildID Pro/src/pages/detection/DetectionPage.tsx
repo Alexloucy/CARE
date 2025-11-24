@@ -25,33 +25,46 @@ const DetectionPage: React.FC = () => {
     const [filteredDateSections, setFilteredDateSections] = useState<DateSection[]>([]);
     const [fullDateSections, setFullDateSections] = useState<DateSection[]>([]); // Needed for timeline?
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [availableSpecies, setAvailableSpecies] = useState<string[]>([]);
 
     const refreshLibrary = async () => {
         setRefreshTrigger(prev => prev + 1);
     };
-    
+
     // Data Loading Effect
     useEffect(() => {
         const loadData = async () => {
             setLoading(true);
             try {
+                // Fetch available species
+                const speciesRes = await window.api.getAvailableSpecies();
+                console.log(speciesRes)
+                if (speciesRes.ok && speciesRes.species) {
+                    setAvailableSpecies(speciesRes.species);
+                }
+
                 const batchesRes = await window.api.getDetectionBatches();
                 if (batchesRes.ok && batchesRes.batches) {
                     // Sort batches by date descending
                     const sortedBatches = batchesRes.batches.sort((a, b) => b.created_at - a.created_at);
-                    
+
                     const sectionsMap = new Map<string, GroupData[]>(); // DateKey -> Groups
 
                     for (const batch of sortedBatches) {
-                        const detRes = await window.api.getDetectionsForBatch(batch.id);
+                        // Apply filters
+                        const detRes = await window.api.getDetectionsForBatch(
+                            batch.id,
+                            activeFilter?.species,
+                            activeFilter?.minConfidence
+                        );
                         if (detRes.ok && detRes.detections) {
                             // Group detections by Image ID
                             const imagesMap = new Map<number, DBImage>();
-                            
+
                             for (const d of detRes.detections) {
                                 // d is (Detection & Image) from backend query
                                 const imageId = (d as any).id || d.image_id; // In my query I aliased images.id as 'id'
-                                
+
                                 if (!imagesMap.has(imageId)) {
                                     imagesMap.set(imageId, {
                                         id: imageId,
@@ -64,7 +77,7 @@ const DetectionPage: React.FC = () => {
                                         detections: []
                                     });
                                 }
-                                
+
                                 // Add detection info
                                 imagesMap.get(imageId)?.detections?.push({
                                     id: (d as any).detection_id,
@@ -78,19 +91,20 @@ const DetectionPage: React.FC = () => {
                                     image_id: d.image_id
                                 });
                             }
-                            
+
                             const images = Array.from(imagesMap.values());
-                            
+
                             if (images.length > 0) {
                                 // Group by Date
                                 const dateObj = new Date(batch.created_at);
                                 const y = dateObj.getFullYear();
                                 const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-                                const day = String(dateObj.getDate()).padStart(2, '0');
-                                const dateKey = `${y}${m}${day}`;
-                                
-                                if (!sectionsMap.has(dateKey)) sectionsMap.set(dateKey, []);
-                                
+                                const d = String(dateObj.getDate()).padStart(2, '0');
+                                const dateKey = `${y}-${m}-${d}`;
+
+                                if (!sectionsMap.has(dateKey)) {
+                                    sectionsMap.set(dateKey, []);
+                                }
                                 sectionsMap.get(dateKey)?.push({
                                     id: batch.id,
                                     name: batch.name,
@@ -100,21 +114,17 @@ const DetectionPage: React.FC = () => {
                             }
                         }
                     }
-                    
-                    // Convert to Sections
-                    const newSections: DateSection[] = [];
-                    // Sort dates descending
-                    const sortedDates = Array.from(sectionsMap.keys()).sort((a, b) => b.localeCompare(a));
-                    
-                    for (const dateKey of sortedDates) {
-                        newSections.push({
-                            date: dateKey,
-                            groups: sectionsMap.get(dateKey) || []
-                        });
-                    }
-                    
-                    setFilteredDateSections(newSections);
-                    setFullDateSections(newSections); // For now, sync them
+
+                    // Convert map to array and sort
+                    const sections: DateSection[] = Array.from(sectionsMap.entries())
+                        .map(([date, groups]) => ({
+                            date,
+                            groups: groups.sort((a, b) => b.name.localeCompare(a.name))
+                        }))
+                        .sort((a, b) => b.date.localeCompare(a.date));
+
+                    setFullDateSections(sections);
+                    setFilteredDateSections(sections);
                 }
             } catch (e) {
                 console.error("Failed to load detections:", e);
@@ -123,17 +133,54 @@ const DetectionPage: React.FC = () => {
             }
         };
         loadData();
-    }, [refreshTrigger]);
+    }, [refreshTrigger, activeFilter]); // Re-fetch when filter changes
+
+    // Search Filtering Effect
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            setFilteredDateSections(fullDateSections);
+            return;
+        }
+
+        const query = searchQuery.toLowerCase();
+        const filtered = fullDateSections.map(section => {
+            const filteredGroups = section.groups.map(group => {
+                // Filter images by label or path
+                const filteredImages = group.images.filter(img => {
+                    const label = img.detections?.[0]?.label?.toLowerCase() || '';
+                    const path = img.original_path.toLowerCase();
+                    return label.includes(query) || path.includes(query);
+                });
+
+                // Also match group name
+                if (group.name.toLowerCase().includes(query)) {
+                    return group; // Keep all images if group name matches
+                }
+
+                return {
+                    ...group,
+                    images: filteredImages
+                };
+            }).filter(group => group.images.length > 0);
+
+            return {
+                ...section,
+                groups: filteredGroups
+            };
+        }).filter(section => section.groups.length > 0);
+
+        setFilteredDateSections(filtered);
+    }, [searchQuery, fullDateSections]);
 
     // 3. Image Loading
     const { imageUrls, fullImageUrls, loadImage, loadFullImage } = useImageLoader();
 
     // 4. Selection
-    const { 
-        isSelectionMode, 
-        selectedIds: selectedImageIds, 
-        toggleSelectionMode, 
-        toggleItem: toggleImageSelection, 
+    const {
+        isSelectionMode,
+        selectedIds: selectedImageIds,
+        toggleSelectionMode,
+        toggleItem: toggleImageSelection,
         clearSelection,
         setIsSelectionMode,
         setSelection
@@ -185,13 +232,13 @@ const DetectionPage: React.FC = () => {
             if (selectedImageIds.has(img.id)) paths.push(img.original_path);
         });
         if (paths.length === 0) return;
-        
+
         try {
-             const result = await window.api.saveImages(paths);
-             if (result.ok) {
-                 alert(`Successfully saved ${result.successCount} images.`);
-                 clearSelection();
-             }
+            const result = await window.api.saveImages(paths);
+            if (result.ok) {
+                alert(`Successfully saved ${result.successCount} images.`);
+                clearSelection();
+            }
         } catch (e) {
             console.error(e);
         }
@@ -232,6 +279,7 @@ const DetectionPage: React.FC = () => {
             onDeleteImage={handleDeleteImage}
             leftSidebarOpen={leftSidebarOpen}
             rightSidebarOpen={rightSidebarOpen}
+            availableSpecies={availableSpecies}
         />
     );
 };

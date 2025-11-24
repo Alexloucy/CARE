@@ -53,15 +53,16 @@ contextBridge.exposeInMainWorld('api', {
         ipcRenderer.invoke('renameReidGroup', date, time, old_group_id, new_group_id),
     terminateAI: () => ipcRenderer.invoke('terminateAI'),
     getPathForFile: (file: File) => webUtils.getPathForFile(file),
-    
+
     // Detection Batches
     getDetectionBatches: () => ipcRenderer.invoke('getDetectionBatches'),
     updateDetectionBatchName: (id: number, name: string) => ipcRenderer.invoke('updateDetectionBatchName', id, name),
     deleteDetectionBatch: (id: number) => ipcRenderer.invoke('deleteDetectionBatch', id),
-    getDetectionsForBatch: (batchId: number) => ipcRenderer.invoke('getDetectionsForBatch', batchId),
+    getDetectionsForBatch: (batchId: number, species?: string[], minConfidence?: number) => ipcRenderer.invoke('getDetectionsForBatch', batchId, species, minConfidence),
+    getAvailableSpecies: () => ipcRenderer.invoke('getAvailableSpecies'),
     updateDetectionLabel: (id: number, label: string) => ipcRenderer.invoke('updateDetectionLabel', id, label),
     deleteDetection: (id: number) => ipcRenderer.invoke('deleteDetection', id),
-    
+
     // Jobs
     getJobs: () => ipcRenderer.invoke('getJobs'),
     cancelJob: (id: string) => ipcRenderer.invoke('cancelJob', id),

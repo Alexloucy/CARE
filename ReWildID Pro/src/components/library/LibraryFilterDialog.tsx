@@ -1,17 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-    Dialog, 
-    Button, 
-    Box, 
-    Typography, 
-    List, 
-    ListItemButton, 
-    ListItemText, 
-    Checkbox, 
+import {
+    Dialog,
+    Button,
+    Box,
+    Typography,
+    List,
+    ListItemButton,
+    ListItemText,
+    Checkbox,
     useTheme,
     IconButton,
     alpha,
-    Link
+    Link,
+    Autocomplete,
+    TextField,
+    Chip,
+    Slider
 } from '@mui/material';
 import { X, CheckCircle, Circle } from '@phosphor-icons/react';
 import { DateSection } from '../../types/library';
@@ -19,6 +23,8 @@ import { DateSection } from '../../types/library';
 export interface LibraryFilter {
     date: string | null;
     groupIds: Set<number> | null; // null means all
+    species?: string[];
+    minConfidence?: number;
 }
 
 interface LibraryFilterDialogProps {
@@ -27,6 +33,7 @@ interface LibraryFilterDialogProps {
     dateSections: DateSection[];
     currentFilter: LibraryFilter | null;
     onApply: (filter: LibraryFilter | null) => void;
+    availableSpecies?: string[];
 }
 
 export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
@@ -34,13 +41,16 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
     onClose,
     dateSections,
     currentFilter,
-    onApply
+    onApply,
+    availableSpecies
 }) => {
     const theme = useTheme();
-    
+
     // Local state for the dialog
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number> | null>(null);
+    const [selectedSpecies, setSelectedSpecies] = useState<string[]>([]);
+    const [minConfidence, setMinConfidence] = useState<number>(0);
 
     // Initialize state when opening
     useEffect(() => {
@@ -48,9 +58,13 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
             if (currentFilter && currentFilter.date) {
                 setSelectedDate(currentFilter.date);
                 setSelectedGroupIds(currentFilter.groupIds ? new Set(currentFilter.groupIds) : null);
+                setSelectedSpecies(currentFilter.species || []);
+                setMinConfidence(currentFilter.minConfidence || 0);
             } else {
                 setSelectedDate(null);
                 setSelectedGroupIds(new Set());
+                setSelectedSpecies([]);
+                setMinConfidence(0);
             }
         }
     }, [open, currentFilter, dateSections]);
@@ -89,7 +103,7 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
             } else {
                 newSet.add(id);
             }
-            
+
             if (currentGroups.length > 0 && currentGroups.every(g => newSet.has(g.id))) {
                 setSelectedGroupIds(null);
             } else {
@@ -107,14 +121,12 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
     };
 
     const handleApply = () => {
-        if (selectedDate) {
-            onApply({
-                date: selectedDate,
-                groupIds: selectedGroupIds
-            });
-        } else {
-            onApply(null);
-        }
+        onApply({
+            date: selectedDate,
+            groupIds: selectedGroupIds,
+            species: selectedSpecies.length > 0 ? selectedSpecies : undefined,
+            minConfidence: minConfidence > 0 ? minConfidence : undefined
+        });
         onClose();
     };
 
@@ -135,14 +147,14 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
     const isAllGroupsSelected = selectedGroupIds === null;
 
     return (
-        <Dialog 
-            open={open} 
+        <Dialog
+            open={open}
             onClose={onClose}
             maxWidth="md"
             fullWidth
             PaperProps={{
-                sx: { 
-                    borderRadius: 4, 
+                sx: {
+                    borderRadius: 4,
                     height: '650px',
                     bgcolor: theme.palette.background.paper,
                     backgroundImage: 'none',
@@ -157,11 +169,11 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
         >
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 {/* Header */}
-                <Box sx={{ 
-                    p: 3, 
+                <Box sx={{
+                    p: 3,
                     pb: 2,
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
+                    display: 'flex',
+                    justifyContent: 'space-between',
                     alignItems: 'center'
                 }}>
                     <Box>
@@ -170,12 +182,12 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
                     </Box>
                     <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary', bgcolor: theme.palette.action.hover }}><X /></IconButton>
                 </Box>
-                
+
                 {/* Content Body */}
                 <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden', mt: 1, gap: 2, px: 3 }}>
                     {/* Dates Sidebar */}
-                    <Box sx={{ 
-                        width: '32%', 
+                    <Box sx={{
+                        width: '32%',
                         display: 'flex',
                         flexDirection: 'column',
                         bgcolor: alpha(theme.palette.background.default, 0.5),
@@ -190,11 +202,11 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
                             {dateSections.map(section => {
                                 const isSelected = section.date === selectedDate;
                                 return (
-                                    <ListItemButton 
+                                    <ListItemButton
                                         key={section.date}
                                         selected={isSelected}
                                         onClick={() => handleDateClick(section.date)}
-                                        sx={{ 
+                                        sx={{
                                             borderRadius: 3,
                                             mb: 0.5,
                                             py: 1.5,
@@ -231,9 +243,9 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
                     {/* Groups List */}
                     <Box sx={{ width: '68%', display: 'flex', flexDirection: 'column', pb: 2 }}>
                         {/* Groups Header */}
-                        <Box sx={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
+                        <Box sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
                             alignItems: 'center',
                             minHeight: '40px',
                             mb: 1,
@@ -242,11 +254,11 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
                             <Typography variant="caption" fontWeight="700" color="text.secondary" sx={{ letterSpacing: 1 }}>
                                 GROUPS
                             </Typography>
-                            
+
                             {selectedDate && (
-                                <Link 
-                                    component="button" 
-                                    variant="caption" 
+                                <Link
+                                    component="button"
+                                    variant="caption"
                                     fontWeight="600"
                                     onClick={handleSelectAllToggle}
                                     underline="hover"
@@ -256,7 +268,7 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
                                 </Link>
                             )}
                         </Box>
-                        
+
                         <Box sx={{ flex: 1, overflowY: 'auto', borderRadius: 4 }}>
                             {!selectedDate ? (
                                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', opacity: 0.4 }}>
@@ -272,11 +284,11 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
                                     {currentGroups.map(group => {
                                         const isSelected = isGroupSelected(group.id);
                                         return (
-                                            <ListItemButton 
-                                                key={group.id} 
+                                            <ListItemButton
+                                                key={group.id}
                                                 onClick={() => handleGroupToggle(group.id)}
                                                 disableRipple
-                                                sx={{ 
+                                                sx={{
                                                     borderRadius: 3,
                                                     mb: 0.5,
                                                     py: 1.5,
@@ -288,7 +300,7 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
                                                     }
                                                 }}
                                             >
-                                                <Checkbox 
+                                                <Checkbox
                                                     icon={<Circle size={20} weight="regular" color={theme.palette.text.secondary} />}
                                                     checkedIcon={<CheckCircle size={20} weight="fill" color={theme.palette.primary.main} />}
                                                     edge="start"
@@ -298,7 +310,7 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
                                                     size="small"
                                                     sx={{ mr: 1.5, p: 0 }}
                                                 />
-                                                <ListItemText 
+                                                <ListItemText
                                                     primary={group.name}
                                                     secondary={`${group.images.length} images`}
                                                     primaryTypographyProps={{ fontWeight: 400, fontSize: '0.95rem', color: isSelected ? 'primary.main' : 'text.primary' }}
@@ -310,37 +322,79 @@ export const LibraryFilterDialog: React.FC<LibraryFilterDialogProps> = ({
                                 </List>
                             )}
                         </Box>
+
+                        {/* Species - Only for detection page */}
+                        {availableSpecies && (
+                            <Box sx={{ mt: 3, px: 1 }}>
+                                <Typography variant="caption" fontWeight="700" color="text.secondary" sx={{ mb: 1.5, display: 'block', letterSpacing: 1 }}>
+                                    SPECIES
+                                </Typography>
+                                <Autocomplete
+                                    multiple
+                                    size="small"
+                                    options={availableSpecies}
+                                    value={selectedSpecies}
+                                    onChange={(_, newValue) => setSelectedSpecies(newValue)}
+                                    renderInput={(params) => (
+                                        <TextField {...params} placeholder="Select species..." size="small" />
+                                    )}
+                                    renderTags={(value, getTagProps) =>
+                                        value.map((option, index) => {
+                                            const { key, ...tagProps } = getTagProps({ index });
+                                            return <Chip key={key} label={option} size="small" {...tagProps} />;
+                                        })
+                                    }
+                                />
+                            </Box>
+                        )}
+
+                        {/* Confidence - Only for detection page */}
+                        {availableSpecies && (
+                            <Box sx={{ mt: 3, px: 1 }}>
+                                <Typography variant="caption" fontWeight="700" color="text.secondary" sx={{ mb: 1, display: 'block', letterSpacing: 1 }}>
+                                    MIN CONFIDENCE: {Math.round(minConfidence * 100)}%
+                                </Typography>
+                                <Slider
+                                    value={minConfidence}
+                                    min={0}
+                                    max={1}
+                                    step={0.05}
+                                    onChange={(_: Event, val: number | number[]) => setMinConfidence(val as number)}
+                                    valueLabelDisplay="auto"
+                                    valueLabelFormat={(val: number) => `${Math.round(val * 100)}%`}
+                                />
+                            </Box>
+                        )}
                     </Box>
                 </Box>
 
                 {/* Footer */}
-                <Box sx={{ 
-                    p: 3, 
+                <Box sx={{
+                    p: 3,
                     pt: 2,
-                    display: 'flex', 
+                    display: 'flex',
                     justifyContent: 'space-between',
                 }}>
-                    <Button 
-                        onClick={handleClear} 
-                        color="error" 
+                    <Button
+                        onClick={handleClear}
+                        color="error"
                         sx={{ textTransform: 'none', borderRadius: 2, px: 2, fontWeight: 600 }}
                     >
                         Reset
                     </Button>
                     <Box sx={{ display: 'flex', gap: 1.5 }}>
-                        <Button 
-                            onClick={onClose} 
-                            color="inherit" 
+                        <Button
+                            onClick={onClose}
+                            color="inherit"
                             sx={{ textTransform: 'none', borderRadius: 2, px: 2, fontWeight: 600, color: 'text.secondary' }}
                         >
                             Cancel
                         </Button>
-                        <Button 
-                            onClick={handleApply} 
-                            variant="contained" 
-                            color="primary" 
+                        <Button
+                            onClick={handleApply}
+                            variant="contained"
+                            color="primary"
                             disableElevation
-                            disabled={!selectedDate}
                             sx={{ textTransform: 'none', borderRadius: 2, px: 4, fontWeight: 600 }}
                         >
                             Apply Filter

@@ -173,20 +173,8 @@ exports.DatabaseService = {
         const info = stmt.run(batchId, imageId, label, confidence, detectionConfidence, bbox[0], bbox[1], bbox[2], bbox[3], source, now);
         return info.lastInsertRowid;
     },
-    getDetectionsForBatch: (batchId) => {
-        const stmt = db.prepare(`
-            SELECT detections.*, images.*
-            FROM detections
-            JOIN images ON detections.image_id = images.id
-            WHERE batch_id = ?
-            ORDER BY images.original_path, detections.created_at
-        `);
-        // We need to handle column name collisions if any. 
-        // detections.id vs images.id.
-        // SQLite returns both. JS driver might overwrite.
-        // We should select explicit columns to avoid ID collision.
-        // detections.id as detection_id, images.id as image_id (which matches DBImage id)
-        const safeStmt = db.prepare(`
+    getDetectionsForBatch: (batchId, species, minConfidence) => {
+        let query = `
             SELECT 
                 detections.id as detection_id,
                 detections.batch_id,
@@ -197,7 +185,7 @@ exports.DatabaseService = {
                 detections.x1, detections.y1, detections.x2, detections.y2,
                 detections.source,
                 detections.created_at as detection_created_at,
-                images.id as id, -- DBImage expects 'id' to be the image ID
+                images.id as id,
                 images.group_id,
                 images.original_path,
                 images.preview_path,
@@ -205,9 +193,25 @@ exports.DatabaseService = {
             FROM detections
             JOIN images ON detections.image_id = images.id
             WHERE batch_id = ?
-            ORDER BY images.original_path, detections.created_at
-        `);
-        return safeStmt.all(batchId);
+        `;
+        const params = [batchId];
+        if (species && species.length > 0) {
+            const placeholders = species.map(() => '?').join(',');
+            query += ` AND detections.label IN (${placeholders})`;
+            params.push(...species);
+        }
+        if (minConfidence !== undefined) {
+            query += ` AND detections.confidence >= ?`;
+            params.push(minConfidence);
+        }
+        query += ` ORDER BY images.original_path, detections.created_at`;
+        const stmt = db.prepare(query);
+        return stmt.all(...params);
+    },
+    getAvailableSpecies: () => {
+        const stmt = db.prepare("SELECT DISTINCT label FROM detections WHERE label IS NOT NULL AND label != '' ORDER BY label");
+        const rows = stmt.all();
+        return rows.map(r => r.label);
     },
     updateDetectionLabel: (id, label) => {
         const stmt = db.prepare('UPDATE detections SET label = ? WHERE id = ?');

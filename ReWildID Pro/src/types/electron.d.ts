@@ -57,7 +57,8 @@ export interface ElectronApi {
     getDetectionBatches: () => Promise<{ ok: boolean; batches?: DetectionBatch[]; error?: string }>;
     updateDetectionBatchName: (id: number, name: string) => Promise<{ ok: boolean; error?: string }>;
     deleteDetectionBatch: (id: number) => Promise<{ ok: boolean; error?: string }>;
-    getDetectionsForBatch: (batchId: number) => Promise<{ ok: boolean; detections?: Detection[]; error?: string }>;
+    getDetectionsForBatch: (batchId: number, species?: string[], minConfidence?: number) => Promise<{ ok: boolean; detections?: Detection[]; error?: string }>;
+    getAvailableSpecies: () => Promise<{ ok: boolean; species?: string[]; error?: string }>;
     updateDetectionLabel: (id: number, label: string) => Promise<{ ok: boolean; error?: string }>;
     deleteDetection: (id: number) => Promise<{ ok: boolean; error?: string }>;
 
