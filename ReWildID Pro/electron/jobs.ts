@@ -435,6 +435,53 @@ export class JobManager {
                 });
             });
 
+            // Post-process: Import results to Database
+            // job.message = 'Saving results to database...'; // Kept internal, user sees progress bar
+            this.emitUpdate();
+
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const batchName = `Detection/Species Classification Finished`;
+            
+            const batchId = DatabaseService.createDetectionBatch(batchName);
+
+            for (const originalPath of absolutePaths) {
+                const filename = path.basename(originalPath);
+                const jsonFilename = path.parse(filename).name + '.json';
+                const jsonPath = path.join(jsonOutputDir, jsonFilename);
+
+                if (await fs.pathExists(jsonPath)) {
+                    try {
+                        const result = await fs.readJson(jsonPath);
+                        const image = DatabaseService.getImageByPath(originalPath);
+
+                        if (image && result.boxes && Array.isArray(result.boxes)) {
+                            for (const box of result.boxes) {
+                                // Skip if label is null (no detection) unless we want to track "empty"
+                                // Based on schema, label is nullable, so we can store it.
+                                // But "no detection" usually means empty box list in some formats, or a specific "empty" entry.
+                                // detection_utils outputs: { label: null, confidence: 0, bbox: [] } for no detection.
+                                
+                                if (box.bbox && box.bbox.length === 4) {
+                                    DatabaseService.addDetection(
+                                        batchId,
+                                        image.id,
+                                        box.label,
+                                        box.pred_conf || 0,
+                                        box.detection_conf || 0,
+                                        box.bbox, // [x1, y1, x2, y2]
+                                        box.source || 'unknown'
+                                    );
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error(`Failed to parse result for ${originalPath}`, e);
+                    }
+                }
+            }
+
         } finally {
             // Cleanup
             await fs.remove(manifestPath).catch(() => {});

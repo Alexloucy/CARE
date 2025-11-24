@@ -1,4 +1,4 @@
-import { Box, Collapse, IconButton, Tooltip, Typography, useTheme } from '@mui/material';
+import { Box, Collapse, IconButton, Tooltip, Typography, useTheme, Chip } from '@mui/material';
 import { CaretDown, CaretRight, Check as CheckIcon, DotsThreeVertical, UploadSimple } from '@phosphor-icons/react';
 import React, { useEffect, useRef, useState } from 'react';
 import { DBImage } from '../../types/electron';
@@ -410,6 +410,17 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                                 isDirectory: false
                                             };
 
+                                            let badge = null;
+                                            if (img.detections && img.detections.length > 0) {
+                                                const labels = Array.from(new Set(img.detections.map(d => d.label).filter(l => l && l !== 'blank')));
+                                                if (labels.length === 0) {
+                                                     badge = <Chip label="Empty" size="small" sx={{ bgcolor: 'rgba(0,0,0,0.6)', color: 'white', height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
+                                                } else {
+                                                     const text = labels.length > 1 ? `${labels[0]} +${labels.length - 1}` : labels[0];
+                                                     badge = <Chip label={text} size="small" color="primary" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
+                                                }
+                                            }
+
                                             return (
                                                 <Box key={img.id}>
                                                     <ImageCard
@@ -426,6 +437,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                                         onLongPress={() => handleLongPress(img.id)}
                                                         onPointerDown={(e) => handlePointerDown(e, img.id)}
                                                         onPointerEnter={() => handlePointerEnter(img.id)}
+                                                        badge={badge}
                                                     />
                                                 </Box>
                                             );

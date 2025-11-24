@@ -16,6 +16,7 @@ interface ImageCardProps {
     onLongPress?: () => void;
     onPointerEnter?: () => void;
     onPointerDown?: (e: React.PointerEvent) => void;
+    badge?: React.ReactNode;
 }
 
 const ImageCard: React.FC<ImageCardProps> = ({
@@ -30,7 +31,8 @@ const ImageCard: React.FC<ImageCardProps> = ({
     showNames = false,
     onLongPress,
     onPointerEnter,
-    onPointerDown
+    onPointerDown,
+    badge
 }) => {
     const theme = useTheme();
     const [showImage, setShowImage] = useState(false);
@@ -192,11 +194,6 @@ const ImageCard: React.FC<ImageCardProps> = ({
                             <Box sx={{
                                 position: 'absolute',
                                 top: 8,
-                                right: 8, // Move to right like iOS/Google Photos often do, or stick to left? User didn't specify. Left is previous code. I'll stick to left to be safe, or right? 
-                                // Let's stick to left as per previous code unless user asked.
-                                // Actually, "right" is more standard for selection circles on photos. I'll try right?
-                                // No, let's keep left for now to minimize confusion, or maybe right is better?
-                                // The previous code had it at left: 8. I'll keep it at left: 8.
                                 left: 8,
                                 zIndex: 2,
                                 cursor: 'pointer'
@@ -207,6 +204,19 @@ const ImageCard: React.FC<ImageCardProps> = ({
                             }}
                             >
                                 {getSelectionIcon()}
+                            </Box>
+                        )}
+
+                        {/* Badge (Species Label) */}
+                        {badge && (
+                            <Box sx={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                zIndex: 2,
+                                pointerEvents: 'none'
+                            }}>
+                                {badge}
                             </Box>
                         )}
 

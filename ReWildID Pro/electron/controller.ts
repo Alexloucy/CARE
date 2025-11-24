@@ -818,6 +818,66 @@ const extractKeysFromJson = async (filePath: string) => {
     }
 }
 
+// ... existing code ...
+
+// --- Detection Batches ---
+
+export async function getDetectionBatches() {
+    try {
+        const batches = DatabaseService.getDetectionBatches();
+        return { ok: true, batches };
+    } catch (error) {
+        return { ok: false, error: 'getDetectionBatches failed: ' + error };
+    }
+}
+
+export async function updateDetectionBatchName(id: number, name: string) {
+    try {
+        DatabaseService.updateDetectionBatchName(id, name);
+        return { ok: true };
+    } catch (error) {
+        return { ok: false, error: 'updateDetectionBatchName failed: ' + error };
+    }
+}
+
+export async function deleteDetectionBatch(id: number) {
+    try {
+        DatabaseService.deleteDetectionBatch(id);
+        return { ok: true };
+    } catch (error) {
+        return { ok: false, error: 'deleteDetectionBatch failed: ' + error };
+    }
+}
+
+// --- Detections ---
+
+export async function getDetectionsForBatch(batchId: number) {
+    try {
+        const detections = DatabaseService.getDetectionsForBatch(batchId);
+        return { ok: true, detections };
+    } catch (error) {
+        return { ok: false, error: 'getDetectionsForBatch failed: ' + error };
+    }
+}
+
+export async function updateDetectionLabel(id: number, label: string) {
+    try {
+        DatabaseService.updateDetectionLabel(id, label);
+        return { ok: true };
+    } catch (error) {
+        return { ok: false, error: 'updateDetectionLabel failed: ' + error };
+    }
+}
+
+export async function deleteDetection(id: number) {
+    try {
+        DatabaseService.deleteDetection(id);
+        return { ok: true };
+    } catch (error) {
+        return { ok: false, error: 'deleteDetection failed: ' + error };
+    }
+}
+
 // Function to read the JSON file and extract values for a specific key
 const extractValuesForKey = async (filePath: string, key: string) => {
     try {

@@ -49,6 +49,13 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     renameReidGroup: (date, time, old_group_id, new_group_id) => electron_1.ipcRenderer.invoke('renameReidGroup', date, time, old_group_id, new_group_id),
     terminateAI: () => electron_1.ipcRenderer.invoke('terminateAI'),
     getPathForFile: (file) => electron_1.webUtils.getPathForFile(file),
+    // Detection Batches
+    getDetectionBatches: () => electron_1.ipcRenderer.invoke('getDetectionBatches'),
+    updateDetectionBatchName: (id, name) => electron_1.ipcRenderer.invoke('updateDetectionBatchName', id, name),
+    deleteDetectionBatch: (id) => electron_1.ipcRenderer.invoke('deleteDetectionBatch', id),
+    getDetectionsForBatch: (batchId) => electron_1.ipcRenderer.invoke('getDetectionsForBatch', batchId),
+    updateDetectionLabel: (id, label) => electron_1.ipcRenderer.invoke('updateDetectionLabel', id, label),
+    deleteDetection: (id) => electron_1.ipcRenderer.invoke('deleteDetection', id),
     // Jobs
     getJobs: () => electron_1.ipcRenderer.invoke('getJobs'),
     cancelJob: (id) => electron_1.ipcRenderer.invoke('cancelJob', id),

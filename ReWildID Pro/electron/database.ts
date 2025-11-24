@@ -40,8 +40,38 @@ const initSchema = () => {
         );
     `;
 
+    const createDetectionBatchesTable = `
+        CREATE TABLE IF NOT EXISTS detection_batches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+    `;
+
+    const createDetectionsTable = `
+        CREATE TABLE IF NOT EXISTS detections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            batch_id INTEGER NOT NULL,
+            image_id INTEGER NOT NULL,
+            label TEXT,
+            confidence REAL,
+            detection_confidence REAL,
+            x1 REAL,
+            y1 REAL,
+            x2 REAL,
+            y2 REAL,
+            source TEXT,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY(batch_id) REFERENCES detection_batches(id) ON DELETE CASCADE,
+            FOREIGN KEY(image_id) REFERENCES images(id) ON DELETE CASCADE
+        );
+    `;
+
     db.exec(createGroupsTable);
     db.exec(createImagesTable);
+    db.exec(createDetectionBatchesTable);
+    db.exec(createDetectionsTable);
 };
 
 initSchema();
@@ -59,6 +89,28 @@ export interface Image {
     original_path: string;
     preview_path?: string;
     date_added: number;
+}
+
+export interface DetectionBatch {
+    id: number;
+    name: string;
+    created_at: number;
+    updated_at: number;
+}
+
+export interface Detection {
+    id: number;
+    batch_id: number;
+    image_id: number;
+    label: string;
+    confidence: number;
+    detection_confidence: number;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    source: string;
+    created_at: number;
 }
 
 export const DatabaseService = {
@@ -109,6 +161,11 @@ export const DatabaseService = {
         stmt.run(id);
     },
 
+    getImageByPath: (originalPath: string): Image | undefined => {
+        const stmt = db.prepare('SELECT * FROM images WHERE original_path = ?');
+        return stmt.get(originalPath) as Image | undefined;
+    },
+
     getImages: (filter?: { date?: string, groupIds?: number[], searchQuery?: string }): (Image & { group_name: string, group_created_at: number })[] => {
         let query = `
             SELECT images.*, groups.name as group_name, groups.created_at as group_created_at
@@ -143,6 +200,110 @@ export const DatabaseService = {
 
         const stmt = db.prepare(query);
         return stmt.all(...params) as (Image & { group_name: string, group_created_at: number })[];
+    },
+
+    // --- Detection Batches ---
+
+    createDetectionBatch: (name: string): number => {
+        const stmt = db.prepare('INSERT INTO detection_batches (name, created_at, updated_at) VALUES (?, ?, ?)');
+        const now = Date.now();
+        const info = stmt.run(name, now, now);
+        return info.lastInsertRowid as number;
+    },
+
+    getDetectionBatches: (): DetectionBatch[] => {
+        const stmt = db.prepare('SELECT * FROM detection_batches ORDER BY created_at DESC');
+        return stmt.all() as DetectionBatch[];
+    },
+
+    updateDetectionBatchName: (id: number, name: string): void => {
+        const stmt = db.prepare('UPDATE detection_batches SET name = ?, updated_at = ? WHERE id = ?');
+        stmt.run(name, Date.now(), id);
+    },
+
+    deleteDetectionBatch: (id: number): void => {
+        const stmt = db.prepare('DELETE FROM detection_batches WHERE id = ?');
+        stmt.run(id);
+    },
+
+    // --- Detections ---
+
+    addDetection: (
+        batchId: number,
+        imageId: number,
+        label: string | null,
+        confidence: number,
+        detectionConfidence: number,
+        bbox: [number, number, number, number],
+        source: string
+    ): number => {
+        const stmt = db.prepare(`
+            INSERT INTO detections (
+                batch_id, image_id, label, confidence, detection_confidence, 
+                x1, y1, x2, y2, source, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const now = Date.now();
+        const info = stmt.run(
+            batchId,
+            imageId,
+            label,
+            confidence,
+            detectionConfidence,
+            bbox[0], bbox[1], bbox[2], bbox[3],
+            source,
+            now
+        );
+        return info.lastInsertRowid as number;
+    },
+
+    getDetectionsForBatch: (batchId: number): (Detection & Image)[] => {
+        const stmt = db.prepare(`
+            SELECT detections.*, images.*
+            FROM detections
+            JOIN images ON detections.image_id = images.id
+            WHERE batch_id = ?
+            ORDER BY images.original_path, detections.created_at
+        `);
+        // We need to handle column name collisions if any. 
+        // detections.id vs images.id.
+        // SQLite returns both. JS driver might overwrite.
+        // We should select explicit columns to avoid ID collision.
+        // detections.id as detection_id, images.id as image_id (which matches DBImage id)
+        
+        const safeStmt = db.prepare(`
+            SELECT 
+                detections.id as detection_id,
+                detections.batch_id,
+                detections.image_id,
+                detections.label,
+                detections.confidence,
+                detections.detection_confidence,
+                detections.x1, detections.y1, detections.x2, detections.y2,
+                detections.source,
+                detections.created_at as detection_created_at,
+                images.id as id, -- DBImage expects 'id' to be the image ID
+                images.group_id,
+                images.original_path,
+                images.preview_path,
+                images.date_added
+            FROM detections
+            JOIN images ON detections.image_id = images.id
+            WHERE batch_id = ?
+            ORDER BY images.original_path, detections.created_at
+        `);
+        
+        return safeStmt.all(batchId) as (Detection & Image)[];
+    },
+
+    updateDetectionLabel: (id: number, label: string): void => {
+        const stmt = db.prepare('UPDATE detections SET label = ? WHERE id = ?');
+        stmt.run(label, id);
+    },
+
+    deleteDetection: (id: number): void => {
+        const stmt = db.prepare('DELETE FROM detections WHERE id = ?');
+        stmt.run(id);
     },
 
     // --- Cleanup ---

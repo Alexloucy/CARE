@@ -21,6 +21,12 @@ exports.getDetectImagePaths = getDetectImagePaths;
 exports.downloadDetectImages = downloadDetectImages;
 exports.downloadSelectedDetectImages = downloadSelectedDetectImages;
 exports.runReid = runReid;
+exports.getDetectionBatches = getDetectionBatches;
+exports.updateDetectionBatchName = updateDetectionBatchName;
+exports.deleteDetectionBatch = deleteDetectionBatch;
+exports.getDetectionsForBatch = getDetectionsForBatch;
+exports.updateDetectionLabel = updateDetectionLabel;
+exports.deleteDetection = deleteDetection;
 exports.browseReidImage = browseReidImage;
 exports.deleteReidResult = deleteReidResult;
 exports.renameReidGroup = renameReidGroup;
@@ -708,6 +714,63 @@ const extractKeysFromJson = async (filePath) => {
         return [];
     }
 };
+// ... existing code ...
+// --- Detection Batches ---
+async function getDetectionBatches() {
+    try {
+        const batches = database_1.DatabaseService.getDetectionBatches();
+        return { ok: true, batches };
+    }
+    catch (error) {
+        return { ok: false, error: 'getDetectionBatches failed: ' + error };
+    }
+}
+async function updateDetectionBatchName(id, name) {
+    try {
+        database_1.DatabaseService.updateDetectionBatchName(id, name);
+        return { ok: true };
+    }
+    catch (error) {
+        return { ok: false, error: 'updateDetectionBatchName failed: ' + error };
+    }
+}
+async function deleteDetectionBatch(id) {
+    try {
+        database_1.DatabaseService.deleteDetectionBatch(id);
+        return { ok: true };
+    }
+    catch (error) {
+        return { ok: false, error: 'deleteDetectionBatch failed: ' + error };
+    }
+}
+// --- Detections ---
+async function getDetectionsForBatch(batchId) {
+    try {
+        const detections = database_1.DatabaseService.getDetectionsForBatch(batchId);
+        return { ok: true, detections };
+    }
+    catch (error) {
+        return { ok: false, error: 'getDetectionsForBatch failed: ' + error };
+    }
+}
+async function updateDetectionLabel(id, label) {
+    try {
+        database_1.DatabaseService.updateDetectionLabel(id, label);
+        return { ok: true };
+    }
+    catch (error) {
+        return { ok: false, error: 'updateDetectionLabel failed: ' + error };
+    }
+}
+async function deleteDetection(id) {
+    try {
+        database_1.DatabaseService.deleteDetection(id);
+        return { ok: true };
+    }
+    catch (error) {
+        return { ok: false, error: 'deleteDetection failed: ' + error };
+    }
+}
 // Function to read the JSON file and extract values for a specific key
 const extractValuesForKey = async (filePath, key) => {
     try {

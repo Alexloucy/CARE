@@ -54,6 +54,14 @@ contextBridge.exposeInMainWorld('api', {
     terminateAI: () => ipcRenderer.invoke('terminateAI'),
     getPathForFile: (file: File) => webUtils.getPathForFile(file),
     
+    // Detection Batches
+    getDetectionBatches: () => ipcRenderer.invoke('getDetectionBatches'),
+    updateDetectionBatchName: (id: number, name: string) => ipcRenderer.invoke('updateDetectionBatchName', id, name),
+    deleteDetectionBatch: (id: number) => ipcRenderer.invoke('deleteDetectionBatch', id),
+    getDetectionsForBatch: (batchId: number) => ipcRenderer.invoke('getDetectionsForBatch', batchId),
+    updateDetectionLabel: (id: number, label: string) => ipcRenderer.invoke('updateDetectionLabel', id, label),
+    deleteDetection: (id: number) => ipcRenderer.invoke('deleteDetection', id),
+    
     // Jobs
     getJobs: () => ipcRenderer.invoke('getJobs'),
     cancelJob: (id: string) => ipcRenderer.invoke('cancelJob', id),

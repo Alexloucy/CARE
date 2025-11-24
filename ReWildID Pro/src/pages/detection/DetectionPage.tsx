@@ -1,15 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { DBImage } from '../../types/electron';
 
 // Hooks
 import { useImageLoader } from '../../hooks/useImageLoader';
-import { useLibraryData } from '../../hooks/useLibraryData';
+// import { useLibraryData } from '../../hooks/useLibraryData'; // Replaced with custom loading
 import { useSelection } from '../../hooks/useSelection';
 
 // Components
 import { LibraryFilter } from '../../components/library/LibraryFilterDialog';
 import { MediaExplorer } from '../../components/library/MediaExplorer';
+import { DateSection, GroupData } from '../../types/library';
 
 const DetectionPage: React.FC = () => {
     const { leftSidebarOpen, rightSidebarOpen } = useOutletContext<{ leftSidebarOpen: boolean; rightSidebarOpen: boolean }>();
@@ -19,21 +20,111 @@ const DetectionPage: React.FC = () => {
     const [activeFilter, setActiveFilter] = useState<LibraryFilter | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Construct DB Filter
-    const dbFilter = useMemo(() => ({
-        date: activeFilter?.date || null,
-        groupIds: activeFilter?.groupIds || null,
-        searchQuery: searchQuery || undefined
-    }), [activeFilter, searchQuery]);
-
     // 2. Data & Loading
-    const { dateSections: fullDateSections, refreshLibrary: refreshFullLibrary } = useLibraryData();
-    const { dateSections: filteredDateSections, loading, refreshLibrary: refreshFilteredLibrary } = useLibraryData(dbFilter);
+    const [loading, setLoading] = useState(false);
+    const [filteredDateSections, setFilteredDateSections] = useState<DateSection[]>([]);
+    const [fullDateSections, setFullDateSections] = useState<DateSection[]>([]); // Needed for timeline?
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const refreshLibrary = async () => {
-        await Promise.all([refreshFullLibrary(), refreshFilteredLibrary()]);
+        setRefreshTrigger(prev => prev + 1);
     };
     
+    // Data Loading Effect
+    useEffect(() => {
+        const loadData = async () => {
+            setLoading(true);
+            try {
+                const batchesRes = await window.api.getDetectionBatches();
+                if (batchesRes.ok && batchesRes.batches) {
+                    // Sort batches by date descending
+                    const sortedBatches = batchesRes.batches.sort((a, b) => b.created_at - a.created_at);
+                    
+                    const sectionsMap = new Map<string, GroupData[]>(); // DateKey -> Groups
+
+                    for (const batch of sortedBatches) {
+                        const detRes = await window.api.getDetectionsForBatch(batch.id);
+                        if (detRes.ok && detRes.detections) {
+                            // Group detections by Image ID
+                            const imagesMap = new Map<number, DBImage>();
+                            
+                            for (const d of detRes.detections) {
+                                // d is (Detection & Image) from backend query
+                                const imageId = (d as any).id || d.image_id; // In my query I aliased images.id as 'id'
+                                
+                                if (!imagesMap.has(imageId)) {
+                                    imagesMap.set(imageId, {
+                                        id: imageId,
+                                        group_id: 0, // Placeholder
+                                        original_path: (d as any).original_path || '',
+                                        preview_path: (d as any).preview_path,
+                                        date_added: (d as any).date_added,
+                                        group_name: batch.name,
+                                        group_created_at: batch.created_at,
+                                        detections: []
+                                    });
+                                }
+                                
+                                // Add detection info
+                                imagesMap.get(imageId)?.detections?.push({
+                                    id: (d as any).detection_id,
+                                    label: d.label,
+                                    confidence: d.confidence,
+                                    detection_confidence: d.detection_confidence,
+                                    x1: d.x1, y1: d.y1, x2: d.x2, y2: d.y2,
+                                    source: d.source,
+                                    created_at: (d as any).detection_created_at,
+                                    batch_id: d.batch_id,
+                                    image_id: d.image_id
+                                });
+                            }
+                            
+                            const images = Array.from(imagesMap.values());
+                            
+                            if (images.length > 0) {
+                                // Group by Date
+                                const dateObj = new Date(batch.created_at);
+                                const y = dateObj.getFullYear();
+                                const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+                                const day = String(dateObj.getDate()).padStart(2, '0');
+                                const dateKey = `${y}${m}${day}`;
+                                
+                                if (!sectionsMap.has(dateKey)) sectionsMap.set(dateKey, []);
+                                
+                                sectionsMap.get(dateKey)?.push({
+                                    id: batch.id,
+                                    name: batch.name,
+                                    created_at: batch.created_at,
+                                    images: images
+                                });
+                            }
+                        }
+                    }
+                    
+                    // Convert to Sections
+                    const newSections: DateSection[] = [];
+                    // Sort dates descending
+                    const sortedDates = Array.from(sectionsMap.keys()).sort((a, b) => b.localeCompare(a));
+                    
+                    for (const dateKey of sortedDates) {
+                        newSections.push({
+                            date: dateKey,
+                            groups: sectionsMap.get(dateKey) || []
+                        });
+                    }
+                    
+                    setFilteredDateSections(newSections);
+                    setFullDateSections(newSections); // For now, sync them
+                }
+            } catch (e) {
+                console.error("Failed to load detections:", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadData();
+    }, [refreshTrigger]);
+
     // 3. Image Loading
     const { imageUrls, fullImageUrls, loadImage, loadFullImage } = useImageLoader();
 

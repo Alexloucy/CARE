@@ -142,6 +142,13 @@ electron_1.ipcMain.handle('downloadReidImages', (_, date, time) => (0, controlle
 electron_1.ipcMain.handle('deleteReidResult', (_, date, time) => (0, controller_1.deleteReidResult)(date, time));
 electron_1.ipcMain.handle('renameReidGroup', (_, date, time, old_group_id, new_group_id) => (0, controller_1.renameReidGroup)(date, time, old_group_id, new_group_id));
 electron_1.ipcMain.handle('terminateAI', (_) => (0, controller_1.terminateAI)());
+// Detection Batches
+electron_1.ipcMain.handle('getDetectionBatches', () => (0, controller_1.getDetectionBatches)());
+electron_1.ipcMain.handle('updateDetectionBatchName', (_, id, name) => (0, controller_1.updateDetectionBatchName)(id, name));
+electron_1.ipcMain.handle('deleteDetectionBatch', (_, id) => (0, controller_1.deleteDetectionBatch)(id));
+electron_1.ipcMain.handle('getDetectionsForBatch', (_, batchId) => (0, controller_1.getDetectionsForBatch)(batchId));
+electron_1.ipcMain.handle('updateDetectionLabel', (_, id, label) => (0, controller_1.updateDetectionLabel)(id, label));
+electron_1.ipcMain.handle('deleteDetection', (_, id) => (0, controller_1.deleteDetection)(id));
 // Job Management
 electron_1.ipcMain.handle('getJobs', () => jobs_1.JobManager.getInstance().getJobs());
 electron_1.ipcMain.handle('cancelJob', (_, id) => jobs_1.JobManager.getInstance().cancelJob(id));

@@ -25,7 +25,13 @@ import {
     getImages,
     checkIsDirectory,
     openFileDialog,
-    saveImages
+    saveImages,
+    getDetectionBatches,
+    updateDetectionBatchName,
+    deleteDetectionBatch,
+    getDetectionsForBatch,
+    updateDetectionLabel,
+    deleteDetection
 } from './controller';
 import { JobManager } from './jobs';
 
@@ -181,6 +187,14 @@ ipcMain.handle('renameReidGroup', (_, date, time, old_group_id, new_group_id) =>
     renameReidGroup(date, time, old_group_id, new_group_id)
 );
 ipcMain.handle('terminateAI', (_) => terminateAI());
+
+// Detection Batches
+ipcMain.handle('getDetectionBatches', () => getDetectionBatches());
+ipcMain.handle('updateDetectionBatchName', (_, id, name) => updateDetectionBatchName(id, name));
+ipcMain.handle('deleteDetectionBatch', (_, id) => deleteDetectionBatch(id));
+ipcMain.handle('getDetectionsForBatch', (_, batchId) => getDetectionsForBatch(batchId));
+ipcMain.handle('updateDetectionLabel', (_, id, label) => updateDetectionLabel(id, label));
+ipcMain.handle('deleteDetection', (_, id) => deleteDetection(id));
 
 // Job Management
 ipcMain.handle('getJobs', () => JobManager.getInstance().getJobs());

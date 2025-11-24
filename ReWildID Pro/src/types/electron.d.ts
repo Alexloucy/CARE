@@ -26,9 +26,41 @@ export interface DBImage {
     date_added: number;
     group_name: string;
     group_created_at: number;
+    detections?: Detection[];
+}
+
+export interface DetectionBatch {
+    id: number;
+    name: string;
+    created_at: number;
+    updated_at: number;
+}
+
+export interface Detection {
+    id: number;
+    batch_id: number;
+    image_id: number;
+    label: string;
+    confidence: number;
+    detection_confidence: number;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    source: string;
+    created_at: number;
+    image_path?: string;
 }
 
 export interface ElectronApi {
+    // ... existing methods ...
+    getDetectionBatches: () => Promise<{ ok: boolean; batches?: DetectionBatch[]; error?: string }>;
+    updateDetectionBatchName: (id: number, name: string) => Promise<{ ok: boolean; error?: string }>;
+    deleteDetectionBatch: (id: number) => Promise<{ ok: boolean; error?: string }>;
+    getDetectionsForBatch: (batchId: number) => Promise<{ ok: boolean; detections?: Detection[]; error?: string }>;
+    updateDetectionLabel: (id: number, label: string) => Promise<{ ok: boolean; error?: string }>;
+    deleteDetection: (id: number) => Promise<{ ok: boolean; error?: string }>;
+
     browseImage: (date: string, folderPath: string) => Promise<BrowseImageResponse>;
     viewImage: (originalPath: string) => Promise<ViewImageResponse>;
     getImagePaths: (currentFolder: string) => Promise<{ ok: boolean; selectAllPaths?: string[]; error?: string }>;
