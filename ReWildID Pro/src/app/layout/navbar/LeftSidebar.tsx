@@ -12,8 +12,8 @@ import {
 } from '@mui/material';
 import {
     House,
-    ArrowSquareIn,
     Images,
+    Scan,
     MagnifyingGlass,
     Gear,
 } from '@phosphor-icons/react';
@@ -46,8 +46,8 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
 
     const navItems = [
         { key: 'dashboard', label: 'Dashboard', path: '/', icon: <House weight="regular" size={20} /> },
-        { key: 'import', label: 'Import', path: '/import', icon: <ArrowSquareIn weight="regular" size={20} /> },
         { key: 'library', label: 'Library', path: '/library', icon: <Images weight="regular" size={20} /> },
+        { key: 'detection', label: 'Detection', path: '/detection', icon: <Scan weight="regular" size={20} /> },
         { key: 'analysis', label: 'Analysis', path: '/analysis', icon: <MagnifyingGlass weight="regular" size={20} /> },
         { key: 'settings', label: 'Settings', path: '/settings', icon: <Gear weight="regular" size={20} /> },
     ];
