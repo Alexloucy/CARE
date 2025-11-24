@@ -100,7 +100,7 @@ const DetectionPage: React.FC = () => {
                                 const y = dateObj.getFullYear();
                                 const m = String(dateObj.getMonth() + 1).padStart(2, '0');
                                 const d = String(dateObj.getDate()).padStart(2, '0');
-                                const dateKey = `${y}-${m}-${d}`;
+                                const dateKey = `${y}${m}${d}`;
 
                                 if (!sectionsMap.has(dateKey)) {
                                     sectionsMap.set(dateKey, []);
