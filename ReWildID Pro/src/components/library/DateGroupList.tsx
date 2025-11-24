@@ -41,13 +41,13 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
 }) => {
     const theme = useTheme();
     const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(new Set());
-    
+
     // Drag Selection State
     const isPointerDownRef = useRef(false);
     const dragStartIdRef = useRef<number | null>(null);
     const initialSelectionRef = useRef<Set<number>>(new Set());
     const isSelectingRef = useRef(true); // true = add to selection, false = remove
-    
+
     // Auto Scroll State
     const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const scrollContainerRef = useRef<HTMLElement | null>(null);
@@ -58,7 +58,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
         const style = window.getComputedStyle(node);
         const overflowY = style.overflowY;
         const isScrollable = overflowY !== 'visible' && overflowY !== 'hidden';
-        
+
         if (isScrollable && node.scrollHeight > node.clientHeight) {
             return node;
         }
@@ -67,11 +67,11 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
 
     const checkAutoScroll = () => {
         if (!isPointerDownRef.current) return;
-        
+
         const y = lastPointerYRef.current;
         const threshold = 100; // px from edge
         const maxSpeed = 20; // px per frame
-        
+
         let speed = 0;
         if (y < threshold) {
             // Scroll Up - faster as we get closer to 0
@@ -127,7 +127,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
 
         window.addEventListener('pointerup', handleGlobalPointerUp);
         window.addEventListener('pointermove', handleGlobalPointerMove);
-        
+
         return () => {
             window.removeEventListener('pointerup', handleGlobalPointerUp);
             window.removeEventListener('pointermove', handleGlobalPointerMove);
@@ -137,10 +137,10 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
 
     const startDragSession = (imgId: number) => {
         dragStartIdRef.current = imgId;
-        
+
         // Snapshot current selection
         initialSelectionRef.current = new Set(selectedImageIds);
-        
+
         // Determine behavior based on the clicked item's state IN THE SNAPSHOT
         // Standard: If clicking unselected -> Select. If clicking selected -> Deselect.
         const wasSelected = initialSelectionRef.current.has(imgId);
@@ -153,7 +153,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
         } else {
             newSelection.delete(imgId);
         }
-        
+
         if (onSetSelection) {
             onSetSelection(newSelection);
         } else {
@@ -164,15 +164,15 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
     const handleLongPress = (imgId: number) => {
         if (!isSelectionMode && onEnableSelectionMode) {
             onEnableSelectionMode();
-            
+
             // Manually start drag session immediately
             isPointerDownRef.current = true;
-            
+
             // Since we are just enabling selection mode, the item is currently unselected (visually).
             // We want to select it and start drag-select mode (adding).
             // Note: selectedImageIds might be stale if onEnableSelectionMode triggers update,
             // but usually it's empty or cleared when entering mode.
-            
+
             // We need to assume 'selectedImageIds' matches what user sees (unselected).
             // But if we reuse startDragSession, it uses current props.
             startDragSession(imgId);
@@ -217,7 +217,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
 
     const handleSelectGroup = (groupImages: DBImage[]) => {
         if (!onSetSelection) return;
-        
+
         // Enable selection mode if not active
         if (!isSelectionMode && onEnableSelectionMode) {
             onEnableSelectionMode();
@@ -227,9 +227,9 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
         // Check against current props. Note: If onEnableSelectionMode just ran, selectedImageIds might be empty/stale
         // in this render cycle, so we might default to selecting all.
         const allSelected = groupIds.every(id => selectedImageIds.has(id));
-        
+
         const newSelection = new Set(selectedImageIds);
-        
+
         if (allSelected) {
             // Deselect all
             groupIds.forEach(id => newSelection.delete(id));
@@ -237,7 +237,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
             // Select all
             groupIds.forEach(id => newSelection.add(id));
         }
-        
+
         onSetSelection(newSelection);
 
         // Exit selection mode if nothing is left selected
@@ -321,20 +321,20 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                         const isCollapsed = collapsedGroups.has(group.id);
                         // Check if all in group are selected for button state (optional visual feedback)
                         const isAllSelected = group.images.every(img => selectedImageIds.has(img.id));
-                        
+
                         return (
                             <Box key={group.id} id={`group-${group.id}`} sx={{ mb: 4, scrollMarginTop: '100px' }}>
-                                <Box sx={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'space-between', 
+                                <Box sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
                                     mb: 2,
                                     position: 'relative', // Establish positioning context
                                     '&:hover .collapse-arrow': { opacity: 1, transform: 'translateX(0)' },
                                     '&:hover .group-menu-button': { opacity: 1 },
                                     '&:hover .group-select-button': { opacity: 1 },
-                                    '& .collapse-arrow': { 
-                                        opacity: 0, 
+                                    '& .collapse-arrow': {
+                                        opacity: 0,
                                         transition: 'all 0.2s ease'
                                     }
                                 }}>
@@ -357,7 +357,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                         <Typography variant="caption" color="text.secondary" sx={{ bgcolor: theme.palette.action.selected, px: 1, py: 0.5, borderRadius: 1 }}>
                                             {group.images.length}
                                         </Typography>
-                                        
+
                                         {/* Select All Button */}
                                         <Tooltip title="Select all in group" enterDelay={0}>
                                             <IconButton
@@ -367,7 +367,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                                     e.stopPropagation();
                                                     handleSelectGroup(group.images);
                                                 }}
-                                                sx={{ 
+                                                sx={{
                                                     opacity: isAllSelected ? 1 : 0, // Show if selected, else hover
                                                     transition: 'opacity 0.2s ease',
                                                     color: isAllSelected ? 'primary.main' : 'text.secondary'
@@ -386,14 +386,14 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                             <DotsThreeVertical size={20} />
                                         </IconButton>
                                     </Box>
-                                    <AiModeButton 
-                                        text={group.images.filter(img => selectedImageIds.has(img.id)).length > 0 
-                                            ? `Detect (${group.images.filter(img => selectedImageIds.has(img.id)).length})` 
+                                    <AiModeButton
+                                        text={group.images.filter(img => selectedImageIds.has(img.id)).length > 0
+                                            ? `Detect (${group.images.filter(img => selectedImageIds.has(img.id)).length})`
                                             : "Detect"}
                                         onClick={() => {
                                             const selectedInGroup = group.images.filter(img => selectedImageIds.has(img.id));
                                             handleDetect(selectedInGroup.length > 0 ? selectedInGroup : group.images);
-                                        }} 
+                                        }}
                                     />
                                 </Box>
 
@@ -414,10 +414,10 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                             if (img.detections && img.detections.length > 0) {
                                                 const labels = Array.from(new Set(img.detections.map(d => d.label).filter(l => l && l !== 'blank')));
                                                 if (labels.length === 0) {
-                                                     badge = <Chip label="Empty" size="small" sx={{ bgcolor: 'rgba(0,0,0,0.6)', color: 'white', height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
+                                                    badge = <Chip label="Empty" size="small" sx={{ bgcolor: 'rgba(0,0,0,0.6)', color: 'white', height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
                                                 } else {
-                                                     const text = labels.length > 1 ? `${labels[0]} +${labels.length - 1}` : labels[0];
-                                                     badge = <Chip label={text} size="small" color="primary" sx={{ height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
+                                                    const text = labels.length > 1 ? `${labels[0]} +${labels.length - 1}` : labels[0];
+                                                    badge = <Chip label={text} size="small" sx={{ bgcolor: '#ffffff', color: '#000000', height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
                                                 }
                                             }
 
