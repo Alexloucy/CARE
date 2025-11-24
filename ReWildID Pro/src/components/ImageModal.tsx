@@ -59,7 +59,7 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, containerW
                     boxShadow: 'inset 2px 2px 0px -2px rgba(255, 255, 255, 0.7), inset 0 0 3px 1px rgba(255, 255, 255, 0.7)',
                 },
                 
-                // Glass distortion layer (from .glassContainer::after)
+                // Glass distortion layer (from .glassContainer::after) - ONLY AT EDGES
                 '&::after': {
                     content: '""',
                     position: 'absolute',
@@ -70,6 +70,9 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, containerW
                     filter: 'url(#container-glass)',
                     overflow: 'hidden',
                     isolation: 'isolate',
+                    // Mask to create edge-only effect - transparent center, opaque edges
+                    WebkitMask: 'radial-gradient(ellipse 80% 80% at center, transparent 60%, black 75%)',
+                    mask: 'radial-gradient(ellipse 80% 80% at center, transparent 60%, black 75%)',
                 }
             }}
         >
