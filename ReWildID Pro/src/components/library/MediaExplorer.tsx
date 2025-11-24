@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
 import {
     Box,
     Card,
+    Divider,
     GlobalStyles,
     IconButton,
     Menu,
@@ -10,16 +10,16 @@ import {
     Switch,
     Tooltip,
     Typography,
-    useTheme,
-    Divider
+    useTheme
 } from '@mui/material';
 import {
+    ArrowCounterClockwise,
     CheckSquare,
-    Gear,
     Funnel,
-    X,
-    ArrowCounterClockwise
+    Gear,
+    X
 } from '@phosphor-icons/react';
+import React, { useEffect, useState } from 'react';
 import { DBImage } from '../../types/electron';
 import { DateSection } from '../../types/library';
 
@@ -27,15 +27,15 @@ import { DateSection } from '../../types/library';
 import ImageModal from '../ImageModal';
 import { DateGroupList } from './DateGroupList';
 import { DragDropOverlay } from './DragDropOverlay';
-import { Timeline } from './Timeline';
 import { LibraryFilter, LibraryFilterDialog } from './LibraryFilterDialog';
 import { LibrarySearchBar } from './LibrarySearchBar';
 import { LibrarySelectionBar } from './LibrarySelectionBar';
+import { Timeline } from './Timeline';
 
 interface MediaExplorerProps {
     title: string;
     loading: boolean;
-    
+
     // Data
     dateSections: DateSection[];
     fullDateSections: DateSection[];
@@ -44,7 +44,7 @@ interface MediaExplorerProps {
     allImages: DBImage[];
     loadImage: (img: DBImage) => void;
     loadFullImage: (img: DBImage) => void;
-    
+
     // Filter & Search
     activeFilter: LibraryFilter | null;
     onFilterChange: (filter: LibraryFilter | null) => void;
@@ -67,7 +67,7 @@ interface MediaExplorerProps {
     onBatchDetect: () => void;
     onBatchSave: () => void;
     onDeleteImage: (img: DBImage) => Promise<void>; // Single image delete from modal
-    
+
     // Custom Header Actions (e.g. Upload)
     headerActions?: React.ReactNode;
 
@@ -97,7 +97,6 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     loadFullImage,
     activeFilter,
     onFilterChange,
-    searchQuery,
     onSearchChange,
     filterDialogOpen,
     setFilterDialogOpen,
@@ -122,7 +121,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     rightSidebarOpen
 }) => {
     const theme = useTheme();
-    
+
     // Local View State
     const [activeId, setActiveId] = useState<string>('');
     const [gridItemSize, setGridItemSize] = useState(180);
@@ -134,10 +133,10 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     const handleWheel = (e: React.WheelEvent) => {
         if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
-            const delta = e.deltaY * -2.5; 
+            const delta = e.deltaY * -2.5;
             setGridItemSize(prev => {
                 const newVal = prev + delta;
-                return Math.min(Math.max(newVal, 100), 400); 
+                return Math.min(Math.max(newVal, 100), 400);
             });
         }
     };
@@ -148,16 +147,16 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     };
 
     // Drag Handlers
-    const handleDragOver = (e: React.DragEvent) => { 
+    const handleDragOver = (e: React.DragEvent) => {
         if (onDrop && setIsDragging) {
-            e.preventDefault(); 
-            setIsDragging(true); 
+            e.preventDefault();
+            setIsDragging(true);
         }
     };
-    const handleDragLeave = (e: React.DragEvent) => { 
+    const handleDragLeave = (e: React.DragEvent) => {
         if (onDrop && setIsDragging) {
-            e.preventDefault(); 
-            if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false); 
+            e.preventDefault();
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false);
         }
     };
 
@@ -231,12 +230,12 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
 
     return (
         <Box
-            sx={{ 
-                height: '100%', 
-                position: 'relative', 
-                outline: 'none', 
-                overflow: 'hidden', 
-                display: 'flex', 
+            sx={{
+                height: '100%',
+                position: 'relative',
+                outline: 'none',
+                overflow: 'hidden',
+                display: 'flex',
                 flexDirection: 'column',
             }}
             onDragOver={handleDragOver}
@@ -248,9 +247,9 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                 '*': { scrollbarWidth: 'none', '-ms-overflow-style': 'none' }
             }} />
             <DragDropOverlay isDragging={isDragging} />
-            
+
             {!loading && dateSections.length > 0 && (
-                <Timeline 
+                <Timeline
                     dateSections={dateSections}
                     onDateClick={handleDateClick}
                     onGroupClick={handleGroupClick}
@@ -263,12 +262,12 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                 <Typography variant="h4" fontWeight="bold">{title}</Typography>
                 <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
                     <LibrarySearchBar onSearch={onSearchChange} />
-                    
+
                     <Tooltip title="Filter">
-                        <IconButton 
+                        <IconButton
                             onClick={() => setFilterDialogOpen(true)}
                             color={activeFilter ? 'inherit' : 'default'}
-                            sx={{ 
+                            sx={{
                                 bgcolor: activeFilter ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
                                 '&:hover': { bgcolor: activeFilter ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.20)') : theme.palette.action.hover }
                             }}
@@ -304,11 +303,11 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
             </Box>
 
             {/* Content */}
-            <Box 
-                sx={{ 
-                    flex: 1, 
-                    overflowY: 'auto', 
-                    p: 4, 
+            <Box
+                sx={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    p: 4,
                     pt: 0,
                     '&::-webkit-scrollbar': { display: 'none' },
                     scrollbarWidth: 'none',
@@ -331,7 +330,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         </Box>
                     </Box>
                 ) : (
-                    <DateGroupList 
+                    <DateGroupList
                         dateSections={dateSections}
                         imageUrls={imageUrls}
                         loadImage={loadImage}
@@ -375,7 +374,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                 hasNext={selectedImage ? allImages.findIndex(img => img.id === selectedImage.image.id) < allImages.length - 1 : false}
                 hasPrev={selectedImage ? allImages.findIndex(img => img.id === selectedImage.image.id) > 0 : false}
                 onDelete={async () => {
-                    if(selectedImage) {
+                    if (selectedImage) {
                         await onDeleteImage(selectedImage.image);
                         setSelectedImage(null);
                     }
@@ -427,23 +426,23 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         <Typography variant="caption" color="text.secondary">Large</Typography>
                     </Box>
                 </Box>
-                
+
                 <Divider sx={{ my: 1 }} />
-                
+
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
                     <Typography variant="subtitle2" fontWeight="600">
                         Show File Names
                     </Typography>
-                    <Switch 
+                    <Switch
                         size="small"
-                        checked={showFileNames} 
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowFileNames(e.target.checked)} 
+                        checked={showFileNames}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowFileNames(e.target.checked)}
                     />
                 </Box>
             </Menu>
 
             {isSelectionMode && (
-                <LibrarySelectionBar 
+                <LibrarySelectionBar
                     selectedCount={selectedImageIds.size}
                     onClose={() => {
                         setIsSelectionMode(false);

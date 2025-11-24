@@ -342,9 +342,14 @@ export class JobManager {
 
     private async handleDetectJob(job: Job) {
         const { selectedPaths } = job.payload;
-        const userIdFolder = '1';
-        const userProfileDir = getAppDataDir();
-        const manifestPath = path.join(userProfileDir, 'temp', `detection_manifest_${job.id}.json`);
+        // Use project root for data to keep it local
+        const baseDataDir = process.cwd();
+        // Create unique, deterministic output paths based on job ID
+        const detectionJobDir = path.join(baseDataDir, 'data', 'detections', job.id);
+        const imageOutputDir = path.join(detectionJobDir, 'images');
+        const jsonOutputDir = path.join(detectionJobDir, 'json');
+        
+        const manifestPath = path.join(baseDataDir, 'data', 'temp', `detection_manifest_${job.id}.json`);
 
         try {
             terminateSubprocess();
@@ -366,13 +371,17 @@ export class JobManager {
             await fs.ensureDir(path.dirname(manifestPath));
             await fs.writeJson(manifestPath, { files: absolutePaths }, { spaces: 2 });
 
+            // Ensure output directories exist
+            await fs.ensureDir(imageOutputDir);
+            await fs.ensureDir(jsonOutputDir);
+
             // Spawn Python
             const args = [
                 'detection',
                 manifestPath,
-                path.join(userProfileDir, 'data/image_marked', userIdFolder),
-                path.join(userProfileDir, 'data/image_cropped_json', userIdFolder),
-                path.join(userProfileDir, 'logs')
+                imageOutputDir,
+                jsonOutputDir,
+                path.join(baseDataDir, 'logs')
             ];
 
             const ps = spawnPythonSubprocess(args);

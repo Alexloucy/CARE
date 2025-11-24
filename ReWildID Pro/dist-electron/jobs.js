@@ -315,9 +315,13 @@ class JobManager {
     }
     async handleDetectJob(job) {
         const { selectedPaths } = job.payload;
-        const userIdFolder = '1';
-        const userProfileDir = getAppDataDir();
-        const manifestPath = path_1.default.join(userProfileDir, 'temp', `detection_manifest_${job.id}.json`);
+        // Use project root for data to keep it local
+        const baseDataDir = process.cwd();
+        // Create unique, deterministic output paths based on job ID
+        const detectionJobDir = path_1.default.join(baseDataDir, 'data', 'detections', job.id);
+        const imageOutputDir = path_1.default.join(detectionJobDir, 'images');
+        const jsonOutputDir = path_1.default.join(detectionJobDir, 'json');
+        const manifestPath = path_1.default.join(baseDataDir, 'data', 'temp', `detection_manifest_${job.id}.json`);
         try {
             (0, python_1.terminateSubprocess)();
             await fs_extra_1.default.remove(manifestPath).catch(() => { });
@@ -334,13 +338,16 @@ class JobManager {
             // Write Manifest
             await fs_extra_1.default.ensureDir(path_1.default.dirname(manifestPath));
             await fs_extra_1.default.writeJson(manifestPath, { files: absolutePaths }, { spaces: 2 });
+            // Ensure output directories exist
+            await fs_extra_1.default.ensureDir(imageOutputDir);
+            await fs_extra_1.default.ensureDir(jsonOutputDir);
             // Spawn Python
             const args = [
                 'detection',
                 manifestPath,
-                path_1.default.join(userProfileDir, 'data/image_marked', userIdFolder),
-                path_1.default.join(userProfileDir, 'data/image_cropped_json', userIdFolder),
-                path_1.default.join(userProfileDir, 'logs')
+                imageOutputDir,
+                jsonOutputDir,
+                path_1.default.join(baseDataDir, 'logs')
             ];
             const ps = (0, python_1.spawnPythonSubprocess)(args);
             (0, python_1.setSubProcess)(ps);
