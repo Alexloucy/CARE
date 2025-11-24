@@ -379,6 +379,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         setSelectedImage(null);
                     }
                 }}
+                detections={selectedImage?.image.detections}
             />
 
             {groupMenu}
