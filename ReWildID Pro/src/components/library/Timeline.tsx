@@ -14,6 +14,21 @@ export const Timeline: React.FC<TimelineProps> = ({ dateSections, onDateClick, o
     const scrollRef = useRef<HTMLDivElement>(null);
     const activeRef = useRef<HTMLDivElement>(null);
     const [showLabels, setShowLabels] = useState(false);
+    const [containerHeight, setContainerHeight] = useState(0);
+
+    // Measure container height
+    useEffect(() => {
+        if (!scrollRef.current) return;
+        
+        const observer = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                setContainerHeight(entry.contentRect.height);
+            }
+        });
+        
+        observer.observe(scrollRef.current);
+        return () => observer.disconnect();
+    }, []);
 
     const formatDate = (dateStr: string) => {
         if (dateStr.length !== 8) return dateStr;
@@ -69,8 +84,17 @@ export const Timeline: React.FC<TimelineProps> = ({ dateSections, onDateClick, o
 
     if (timelineItems.length === 0) return null;
 
-    const ITEM_SPACING = 35; // Minimum spacing in px
-    const TOTAL_HEIGHT = Math.max(timelineItems.length * ITEM_SPACING, 100); // Ensure min height
+    // Dynamic Spacing Calculation
+    const MIN_SPACING = 28; 
+    const PADDING_Y = 64; // 32px top + 32px bottom
+    const availableHeight = Math.max(0, containerHeight - PADDING_Y);
+    const count = Math.max(1, timelineItems.length);
+    
+    // Spread evenly if possible, otherwise use MIN_SPACING
+    const idealSpacing = availableHeight / count;
+    const itemSpacing = Math.max(idealSpacing, MIN_SPACING);
+    
+    const TOTAL_HEIGHT = count * itemSpacing;
 
     return (
         <Box sx={{ 
@@ -136,7 +160,7 @@ export const Timeline: React.FC<TimelineProps> = ({ dateSections, onDateClick, o
 
                         {timelineItems.map((item, index) => {
                             const isActive = activeId === item.id;
-                            const top = index * ITEM_SPACING + (ITEM_SPACING / 2); 
+                            const top = index * itemSpacing + (itemSpacing / 2); 
                             
                             return (
                                 <React.Fragment key={item.id}>
