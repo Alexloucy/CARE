@@ -11,92 +11,13 @@ interface DetectionBoxProps {
     containerWidth: number;
 }
 
-const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, zoom, containerWidth }) => {
-    const [renderPosition, setRenderPosition] = useState({ x: 0, y: 0 });
-    const targetPosition = useRef({ x: 0, y: 0 });
+const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, containerWidth }) => {
     const [isHovered, setIsHovered] = useState(false);
-    const [introActive, setIntroActive] = useState(true);
     const boxRef = useRef<HTMLDivElement>(null);
     const theme = useTheme();
     const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
 
-    const isRightAligned = bbox.x + bbox.width + 240 > containerWidth; // Popup width approx 240px
-
-    // Intro Animation
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (!boxRef.current) return;
-            const width = bbox.width;
-            const height = bbox.height;
-            
-            let startTime: number | null = null;
-            const duration = 1500;
-
-            const step = (timestamp: number) => {
-                if (!startTime) startTime = timestamp;
-                const progress = Math.min((timestamp - startTime) / duration, 1);
-                
-                // Animate diagonal slide
-                setRenderPosition({
-                    x: width * progress,
-                    y: height * progress
-                });
-
-                if (progress < 1) {
-                    if (introActive) requestAnimationFrame(step);
-                } else {
-                    setIntroActive(false);
-                }
-            };
-
-            requestAnimationFrame(step);
-        }, 500);
-
-        return () => clearTimeout(timer);
-    }, [bbox.width, bbox.height]); // Re-run if size changes drastically
-
-    // Stop intro on hover
-    useEffect(() => {
-        if (isHovered) setIntroActive(false);
-    }, [isHovered]);
-
-    // Smooth mouse following effect
-    useEffect(() => {
-        if (introActive) return;
-
-        let animationFrameId: number;
-        
-        const animate = () => {
-            setRenderPosition(prev => {
-                return {
-                    x: prev.x + (targetPosition.current.x - prev.x) * 0.05,
-                    y: prev.y + (targetPosition.current.y - prev.y) * 0.05
-                };
-            });
-            animationFrameId = requestAnimationFrame(animate);
-        };
-        
-        if (isHovered) {
-            animate();
-        }
-        
-        return () => cancelAnimationFrame(animationFrameId);
-    }, [isHovered, introActive]);
-
-    const handleMouseMove = (e: React.MouseEvent) => {
-        if (boxRef.current) {
-            const rect = boxRef.current.getBoundingClientRect();
-            // Calculate relative to the box (scaled by zoom)
-            targetPosition.current = {
-                x: (e.clientX - rect.left) / zoom, // Adjust for zoom scale on parent
-                y: (e.clientY - rect.top) / zoom,
-            };
-            
-            if (!isHovered) {
-                setRenderPosition(targetPosition.current);
-            }
-        }
-    };
+    const isRightAligned = bbox.x + bbox.width + 240 > containerWidth;
 
     const handleMouseEnter = () => {
         if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
@@ -106,22 +27,12 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, zoom, cont
     const handleMouseLeave = () => {
         hoverTimeout.current = setTimeout(() => {
             setIsHovered(false);
-        }, 300); // 300ms grace period
+        }, 300);
     };
-
-    const gradient = `conic-gradient(from 0deg at ${renderPosition.x}px ${renderPosition.y}px, 
-        #2962FF, 
-        #AA00FF, 
-        #FF0055, 
-        #FFD600, 
-        #00C853, 
-        #2962FF
-    )`;
 
     return (
         <Box
             ref={boxRef}
-            onMouseMove={handleMouseMove}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             sx={{
@@ -130,72 +41,71 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, zoom, cont
                 top: bbox.y,
                 width: bbox.width,
                 height: bbox.height,
-                pointerEvents: 'auto', // Enable interaction
-            }}
-        >
-            {/* 0. Inner Light-up Fill (Hover Effect) */}
-            <Box sx={{
-                position: 'absolute',
-                inset: 0,
-                bgcolor: isHovered || introActive ? 'rgba(255, 255, 255, 0.07)' : 'transparent',
-                transition: 'background-color 0.3s ease',
-                borderRadius: 1.5,
-                pointerEvents: 'none'
-            }} />
-
-            {/* 1. The Border Frame (Masked to be hollow) */}
-            <Box sx={{
-                position: 'absolute',
-                inset: 0,
-                p: '3px',
-                borderRadius: 1.5,
-                mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                maskComposite: 'exclude',
-                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                WebkitMaskComposite: 'xor',
-            }}>
-                {/* A. Base Border (Glassy White/Grey - Brighter) */}
-                <Box sx={{ 
-                    position: 'absolute', 
-                    inset: 0, 
-                    bgcolor: 'rgba(255, 255, 255, 0.5)',
-                }} />
+                borderRadius: '30px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'auto',
+                zIndex: 100,
                 
-                {/* B. Gradient Spotlight Border */}
-                <Box sx={{
+                // Inner border/shadow layer (from .glassContainer::before)
+                '&::before': {
+                    content: '""',
                     position: 'absolute',
                     inset: 0,
-                    background: gradient,
-                    opacity: isHovered || introActive ? 1 : 0,
-                    transition: 'opacity 0.3s ease',
-                    maskImage: `radial-gradient(${Math.min(bbox.width, bbox.height) * 1.5}px circle at ${renderPosition.x}px ${renderPosition.y}px, black, transparent)`,
-                    WebkitMaskImage: `radial-gradient(${Math.min(bbox.width, bbox.height) * 1.5}px circle at ${renderPosition.x}px ${renderPosition.y}px, black, transparent)`,
-                }} />
-            </Box>
-
-            {/* 2. Label Badge (Fixed above, Glassy) */}
-            <Box
-                sx={{
+                    zIndex: 0,
+                    overflow: 'hidden',
+                    borderRadius: '30px',
+                    boxShadow: 'inset 2px 2px 0px -2px rgba(255, 255, 255, 0.7), inset 0 0 3px 1px rgba(255, 255, 255, 0.7)',
+                },
+                
+                // Glass distortion layer (from .glassContainer::after)
+                '&::after': {
+                    content: '""',
                     position: 'absolute',
-                    top: -28,
-                    left: 0,
-                    px: 1.5,
-                    py: 0.5,
-                    bgcolor: 'rgba(255, 255, 255, 0.25)', // Semi-transparent white
-                    color: 'white',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    borderRadius: '12px', // Rounded
-                    whiteSpace: 'nowrap',
-                    backdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    zIndex: -1,
+                    inset: 0,
+                    borderRadius: '30px',
+                    backdropFilter: 'blur(0px)',
+                    filter: 'url(#container-glass)',
+                    overflow: 'hidden',
+                    isolation: 'isolate',
+                }
+            }}
+        >
+            {/* Content (Label Badge) - Elevated z-index to sit above glass */}
+            <Box 
+                sx={{ 
+                    position: 'relative', 
+                    width: '100%', 
+                    height: '100%', 
+                    zIndex: 3 
                 }}
             >
-                {detection.label}
+                {/* Label Badge */}
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: -28,
+                        left: 0,
+                        px: 1.5,
+                        py: 0.5,
+                        bgcolor: 'rgba(255, 255, 255, 0.25)',
+                        color: 'white',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        borderRadius: '12px',
+                        whiteSpace: 'nowrap',
+                        backdropFilter: 'blur(8px)',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    }}
+                >
+                    {detection.label}
+                </Box>
             </Box>
 
-            {/* 3. Info Popup (Anchored with smart positioning) */}
+            {/* Info Popup */}
             <Fade in={isHovered}>
                 <Box sx={{
                     position: 'absolute',
@@ -444,6 +354,15 @@ const ImageModal: React.FC<ImageModalProps> = ({
                         outline: 'none'
                     }}
                 >
+                    {/* SVG Filters for Liquid Glass Effect */}
+                    <svg style={{ display: 'none' }}>
+                        <filter id="container-glass" x="0%" y="0%" width="100%" height="100%">
+                            <feTurbulence type="fractalNoise" baseFrequency="0.008 0.008" numOctaves="2" seed="92" result="noise" />
+                            <feGaussianBlur in="noise" stdDeviation="0.02" result="blur" />
+                            <feDisplacementMap in="SourceGraphic" in2="blur" scale="77" xChannelSelector="R" yChannelSelector="G" />
+                        </filter>
+                    </svg>
+
                     {/* Image Container */}
                     <Box
                         ref={containerRef}
