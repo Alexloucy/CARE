@@ -89,8 +89,8 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, containerW
                 <Box
                     sx={{
                         position: 'absolute',
-                        top: -28,
-                        left: 0,
+                        top: -35,
+                        left: 7,
                         px: 1.5,
                         py: 0.5,
                         bgcolor: 'rgba(255, 255, 255, 0.25)',
