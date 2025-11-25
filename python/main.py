@@ -43,6 +43,7 @@ import reid_dino_adapter
 import reid_cpu
 import reid_gpu
 import detection_dino
+import reid_v2
 
 
 def setup_logging(log_dir):
@@ -97,6 +98,12 @@ def main():
                     run = detection_dino.run
                 else:
                     run = detection_dino.run
+            case "reid_v2":
+                args = [
+                    "input_json_path",
+                ]
+                optional_args = ["batch_size"]
+                run = reid_v2.run
             case _:
                 print(f"Invalid option {task}")
                 sys.exit(1)
@@ -117,15 +124,17 @@ def main():
                 kwargs[optional_args[i]] = value
         
         # Setup logging before running
-        setup_logging(kwargs['log_dir'])
+        log_dir = kwargs.get('log_dir', os.path.join(os.path.expanduser('~'), '.ml4sg-care', 'logs'))
+        setup_logging(log_dir)
         logging.info(f"Starting {task} with arguments: {kwargs}")
         
-        # Verify input/output paths exist for path arguments only
-        for key in args:
-            path = kwargs[key]
-            if not os.path.exists(path):
-                os.makedirs(path, exist_ok=True)
-                logging.info(f"Created directory: {path}")
+        # Verify input/output paths exist for path arguments only (skip for reid_v2 which uses JSON)
+        if task != "reid_v2":
+            for key in args:
+                path = kwargs[key]
+                if not os.path.exists(path):
+                    os.makedirs(path, exist_ok=True)
+                    logging.info(f"Created directory: {path}")
         
         run(**kwargs)
         

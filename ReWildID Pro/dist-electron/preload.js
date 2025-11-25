@@ -64,5 +64,19 @@ electron_1.contextBridge.exposeInMainWorld('api', {
         const handler = (_event, jobs) => callback(jobs);
         electron_1.ipcRenderer.on('job-update', handler);
         return () => electron_1.ipcRenderer.removeListener('job-update', handler);
-    }
+    },
+    // New Smart ReID (DB-based)
+    smartReID: (imageIds, species, onStream) => {
+        electron_1.ipcRenderer.removeAllListeners('stream');
+        electron_1.ipcRenderer.on('stream', (_, txt) => onStream(txt));
+        return electron_1.ipcRenderer.invoke('smartReID', imageIds, species);
+    },
+    getReidRuns: () => electron_1.ipcRenderer.invoke('getReidRuns'),
+    getReidRun: (id) => electron_1.ipcRenderer.invoke('getReidRun', id),
+    deleteReidRun: (id) => electron_1.ipcRenderer.invoke('deleteReidRun', id),
+    updateReidRunName: (id, name) => electron_1.ipcRenderer.invoke('updateReidRunName', id, name),
+    getReidResults: (filter) => electron_1.ipcRenderer.invoke('getReidResults', filter),
+    updateReidIndividualName: (id, displayName) => electron_1.ipcRenderer.invoke('updateReidIndividualName', id, displayName),
+    updateReidIndividualColor: (id, color) => electron_1.ipcRenderer.invoke('updateReidIndividualColor', id, color),
+    mergeReidIndividuals: (targetId, sourceIds) => electron_1.ipcRenderer.invoke('mergeReidIndividuals', targetId, sourceIds)
 });

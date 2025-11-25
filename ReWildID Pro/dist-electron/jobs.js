@@ -402,7 +402,7 @@ class JobManager {
             const now = new Date();
             const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
             const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const batchName = `Detection/Species Classification Finished`;
+            const batchName = `Detection ${dateStr} ${timeStr}`;
             const batchId = database_1.DatabaseService.createDetectionBatch(batchName);
             for (const originalPath of absolutePaths) {
                 const filename = path_1.default.basename(originalPath);

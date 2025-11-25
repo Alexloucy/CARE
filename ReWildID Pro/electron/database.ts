@@ -68,10 +68,44 @@ const initSchema = () => {
         );
     `;
 
+    const createReidRunsTable = `
+        CREATE TABLE IF NOT EXISTS reid_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            species TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );
+    `;
+
+    const createReidIndividualsTable = `
+        CREATE TABLE IF NOT EXISTS reid_individuals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            color TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY(run_id) REFERENCES reid_runs(id) ON DELETE CASCADE
+        );
+    `;
+
+    const createReidMembersTable = `
+        CREATE TABLE IF NOT EXISTS reid_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            individual_id INTEGER NOT NULL,
+            detection_id INTEGER NOT NULL,
+            FOREIGN KEY(individual_id) REFERENCES reid_individuals(id) ON DELETE CASCADE,
+            FOREIGN KEY(detection_id) REFERENCES detections(id) ON DELETE CASCADE
+        );
+    `;
+
     db.exec(createGroupsTable);
     db.exec(createImagesTable);
     db.exec(createDetectionBatchesTable);
     db.exec(createDetectionsTable);
+    db.exec(createReidRunsTable);
+    db.exec(createReidIndividualsTable);
+    db.exec(createReidMembersTable);
 };
 
 initSchema();
@@ -111,6 +145,110 @@ export interface Detection {
     y2: number;
     source: string;
     created_at: number;
+}
+
+export interface ReidRun {
+    id: number;
+    name: string;
+    species: string;
+    created_at: number;
+}
+
+export interface ReidIndividual {
+    id: number;
+    run_id: number;
+    name: string;           // Original from Python ("ID-0")
+    display_name: string;   // Friendly name ("Luna", "Blaze 2")
+    color: string;          // Hex color ("#E57373")
+    created_at: number;
+}
+
+export interface ReidMember {
+    id: number;
+    individual_id: number;
+    detection_id: number;
+}
+
+// Distinct animal-inspired names for reid individuals
+const INDIVIDUAL_NAMES = [
+    'Atlas', 'Blaze', 'Cedar', 'Dusk', 'Echo', 'Fern', 'Ghost', 'Hazel',
+    'Ivy', 'Jasper', 'Kai', 'Luna', 'Moss', 'Nova', 'Oak', 'Pebble',
+    'Quill', 'River', 'Shadow', 'Thorn', 'Uma', 'Vale', 'Willow', 'Zephyr',
+    'Amber', 'Birch', 'Coral', 'Delta', 'Ember', 'Flint', 'Gale', 'Haze',
+    'Iris', 'Jade', 'Koda', 'Leaf', 'Maple', 'Nimbus', 'Onyx', 'Pine',
+    'Quinn', 'Raven', 'Slate', 'Terra', 'Umber', 'Vex', 'Wren', 'Zen',
+    'Ash', 'Brook', 'Cliff', 'Dawn', 'Elm', 'Frost', 'Grove', 'Hollow'
+];
+
+// Distinct, accessible colors (not too similar to each other)
+const INDIVIDUAL_COLORS = [
+    '#E57373', '#64B5F6', '#81C784', '#FFD54F', '#BA68C8',
+    '#4DB6AC', '#FF8A65', '#A1887F', '#90A4AE', '#F06292',
+    '#7986CB', '#AED581', '#FFB74D', '#9575CD', '#4DD0E1',
+    '#DCE775', '#FF8A80', '#80DEEA', '#FFAB91', '#B39DDB',
+    '#C5E1A5', '#FFCC80', '#CE93D8', '#80CBC4', '#EF9A9A',
+    '#81D4FA', '#A5D6A7', '#FFE082', '#B0BEC5', '#F48FB1'
+];
+
+// Generate a unique display name, handling collisions
+function generateDisplayName(existingNames: string[]): { name: string; color: string } {
+    const usedBasenames = new Map<string, number>();
+    
+    // Count existing name usages
+    for (const existing of existingNames) {
+        const match = existing.match(/^(.+?)(?: (\d+))?$/);
+        if (match) {
+            const base = match[1];
+            const num = match[2] ? parseInt(match[2]) : 1;
+            usedBasenames.set(base, Math.max(usedBasenames.get(base) || 0, num));
+        }
+    }
+    
+    // Find first unused name or increment counter
+    for (const baseName of INDIVIDUAL_NAMES) {
+        if (!usedBasenames.has(baseName)) {
+            const colorIndex = existingNames.length % INDIVIDUAL_COLORS.length;
+            return { name: baseName, color: INDIVIDUAL_COLORS[colorIndex] };
+        }
+    }
+    
+    // All names used, find one with lowest counter and increment
+    let minCount = Infinity;
+    let minName = INDIVIDUAL_NAMES[0];
+    for (const baseName of INDIVIDUAL_NAMES) {
+        const count = usedBasenames.get(baseName) || 0;
+        if (count < minCount) {
+            minCount = count;
+            minName = baseName;
+        }
+    }
+    
+    const newCount = (usedBasenames.get(minName) || 1) + 1;
+    const colorIndex = existingNames.length % INDIVIDUAL_COLORS.length;
+    return { name: `${minName} ${newCount}`, color: INDIVIDUAL_COLORS[colorIndex] };
+}
+
+// Query result types for paginated reid data
+export interface ReidDetectionWithImage extends Detection {
+    image_path: string;
+    image_preview_path?: string;
+}
+
+export interface ReidIndividualWithMembers extends ReidIndividual {
+    member_count: number;
+    detections: ReidDetectionWithImage[];
+}
+
+export interface ReidQueryResult {
+    run: ReidRun;
+    individuals: ReidIndividualWithMembers[];
+    pagination: {
+        total_individuals: number;
+        total_detections: number;
+        page: number;
+        page_size: number;
+        has_more: boolean;
+    };
 }
 
 export const DatabaseService = {
@@ -344,5 +482,308 @@ export const DatabaseService = {
         // Let's leave empty groups for now as user might want to keep them.
 
         return deletedCount;
+    },
+
+    // --- ReID Runs ---
+
+    createReidRun: (name: string, species: string): number => {
+        const stmt = db.prepare('INSERT INTO reid_runs (name, species, created_at) VALUES (?, ?, ?)');
+        const now = Date.now();
+        const info = stmt.run(name, species, now);
+        return info.lastInsertRowid as number;
+    },
+
+    getReidRuns: (): ReidRun[] => {
+        const stmt = db.prepare('SELECT * FROM reid_runs ORDER BY created_at DESC');
+        return stmt.all() as ReidRun[];
+    },
+
+    getReidRun: (id: number): ReidRun | undefined => {
+        const stmt = db.prepare('SELECT * FROM reid_runs WHERE id = ?');
+        return stmt.get(id) as ReidRun | undefined;
+    },
+
+    deleteReidRun: (id: number): void => {
+        const stmt = db.prepare('DELETE FROM reid_runs WHERE id = ?');
+        stmt.run(id);
+    },
+
+    updateReidRunName: (id: number, name: string): void => {
+        const stmt = db.prepare('UPDATE reid_runs SET name = ? WHERE id = ?');
+        stmt.run(name, id);
+    },
+
+    // --- ReID Individuals ---
+
+    createReidIndividual: (runId: number, originalName: string): number => {
+        // Get existing display names for this run to avoid collisions
+        const existingStmt = db.prepare('SELECT display_name FROM reid_individuals WHERE run_id = ?');
+        const existingNames = (existingStmt.all(runId) as { display_name: string }[]).map(r => r.display_name);
+        
+        const { name: displayName, color } = generateDisplayName(existingNames);
+        
+        const stmt = db.prepare(`
+            INSERT INTO reid_individuals (run_id, name, display_name, color, created_at) 
+            VALUES (?, ?, ?, ?, ?)
+        `);
+        const now = Date.now();
+        const info = stmt.run(runId, originalName, displayName, color, now);
+        return info.lastInsertRowid as number;
+    },
+
+    getReidIndividuals: (runId: number): ReidIndividual[] => {
+        const stmt = db.prepare('SELECT * FROM reid_individuals WHERE run_id = ? ORDER BY created_at');
+        return stmt.all(runId) as ReidIndividual[];
+    },
+
+    updateReidIndividualName: (id: number, displayName: string): void => {
+        const stmt = db.prepare('UPDATE reid_individuals SET display_name = ? WHERE id = ?');
+        stmt.run(displayName, id);
+    },
+
+    updateReidIndividualColor: (id: number, color: string): void => {
+        const stmt = db.prepare('UPDATE reid_individuals SET color = ? WHERE id = ?');
+        stmt.run(color, id);
+    },
+
+    deleteReidIndividual: (id: number): void => {
+        const stmt = db.prepare('DELETE FROM reid_individuals WHERE id = ?');
+        stmt.run(id);
+    },
+
+    // --- ReID Members ---
+
+    addReidMember: (individualId: number, detectionId: number): number => {
+        const stmt = db.prepare('INSERT INTO reid_members (individual_id, detection_id) VALUES (?, ?)');
+        const info = stmt.run(individualId, detectionId);
+        return info.lastInsertRowid as number;
+    },
+
+    removeReidMember: (id: number): void => {
+        const stmt = db.prepare('DELETE FROM reid_members WHERE id = ?');
+        stmt.run(id);
+    },
+
+    moveReidMember: (memberId: number, newIndividualId: number): void => {
+        const stmt = db.prepare('UPDATE reid_members SET individual_id = ? WHERE id = ?');
+        stmt.run(newIndividualId, memberId);
+    },
+
+    // Merge multiple individuals into one (useful for manual corrections)
+    mergeReidIndividuals: (targetId: number, sourceIds: number[]): void => {
+        const updateStmt = db.prepare('UPDATE reid_members SET individual_id = ? WHERE individual_id = ?');
+        const deleteStmt = db.prepare('DELETE FROM reid_individuals WHERE id = ?');
+        
+        const mergeTransaction = db.transaction(() => {
+            for (const sourceId of sourceIds) {
+                if (sourceId !== targetId) {
+                    updateStmt.run(targetId, sourceId);
+                    deleteStmt.run(sourceId);
+                }
+            }
+        });
+        
+        mergeTransaction();
+    },
+
+    // --- ReID Queries (Paginated with Filtering) ---
+
+    /**
+     * Get comprehensive ReID data with filtering and pagination.
+     * Pagination is by individuals (not detections).
+     */
+    getReidResults: (options: {
+        runId: number;
+        page?: number;
+        pageSize?: number;
+        species?: string[];           // Filter by species (from detection labels)
+        individualIds?: number[];     // Filter to specific individuals
+        searchQuery?: string;         // Search by individual display_name
+        minConfidence?: number;       // Filter detections by confidence
+    }): ReidQueryResult | null => {
+        const {
+            runId,
+            page = 1,
+            pageSize = 20,
+            species,
+            individualIds,
+            searchQuery,
+            minConfidence
+        } = options;
+
+        // Get the run
+        const run = DatabaseService.getReidRun(runId);
+        if (!run) return null;
+
+        // Build individual query with filters
+        let individualQuery = `
+            SELECT ri.*, 
+                   (SELECT COUNT(*) FROM reid_members rm WHERE rm.individual_id = ri.id) as member_count
+            FROM reid_individuals ri
+            WHERE ri.run_id = ?
+        `;
+        const individualParams: any[] = [runId];
+
+        if (individualIds && individualIds.length > 0) {
+            const placeholders = individualIds.map(() => '?').join(',');
+            individualQuery += ` AND ri.id IN (${placeholders})`;
+            individualParams.push(...individualIds);
+        }
+
+        if (searchQuery) {
+            individualQuery += ` AND ri.display_name LIKE ?`;
+            individualParams.push(`%${searchQuery}%`);
+        }
+
+        // If filtering by species, only include individuals that have at least one detection of that species
+        if (species && species.length > 0) {
+            const speciesPlaceholders = species.map(() => '?').join(',');
+            individualQuery += ` AND EXISTS (
+                SELECT 1 FROM reid_members rm
+                JOIN detections d ON rm.detection_id = d.id
+                WHERE rm.individual_id = ri.id AND d.label IN (${speciesPlaceholders})
+            )`;
+            individualParams.push(...species);
+        }
+
+        individualQuery += ` ORDER BY ri.created_at`;
+
+        // Get total count for pagination
+        const countQuery = `SELECT COUNT(*) as count FROM (${individualQuery})`;
+        const countStmt = db.prepare(countQuery);
+        const totalIndividuals = (countStmt.get(...individualParams) as { count: number }).count;
+
+        // Apply pagination
+        const offset = (page - 1) * pageSize;
+        individualQuery += ` LIMIT ? OFFSET ?`;
+        individualParams.push(pageSize, offset);
+
+        const individualStmt = db.prepare(individualQuery);
+        const individuals = individualStmt.all(...individualParams) as (ReidIndividual & { member_count: number })[];
+
+        // For each individual, get their detections with image info
+        const detectionQuery = `
+            SELECT 
+                d.*,
+                i.original_path as image_path,
+                i.preview_path as image_preview_path
+            FROM reid_members rm
+            JOIN detections d ON rm.detection_id = d.id
+            JOIN images i ON d.image_id = i.id
+            WHERE rm.individual_id = ?
+            ${species && species.length > 0 ? `AND d.label IN (${species.map(() => '?').join(',')})` : ''}
+            ${minConfidence !== undefined ? `AND d.confidence >= ?` : ''}
+            ORDER BY d.created_at
+        `;
+
+        let totalDetections = 0;
+        const individualsWithMembers: ReidIndividualWithMembers[] = individuals.map(ind => {
+            const detParams: any[] = [ind.id];
+            if (species && species.length > 0) detParams.push(...species);
+            if (minConfidence !== undefined) detParams.push(minConfidence);
+            
+            const detStmt = db.prepare(detectionQuery);
+            const detections = detStmt.all(...detParams) as ReidDetectionWithImage[];
+            totalDetections += detections.length;
+            
+            return {
+                ...ind,
+                detections
+            };
+        });
+
+        return {
+            run,
+            individuals: individualsWithMembers,
+            pagination: {
+                total_individuals: totalIndividuals,
+                total_detections: totalDetections,
+                page,
+                page_size: pageSize,
+                has_more: offset + individuals.length < totalIndividuals
+            }
+        };
+    },
+
+    /**
+     * Get summary statistics for a ReID run
+     */
+    getReidRunStats: (runId: number): {
+        individual_count: number;
+        detection_count: number;
+        species: string;
+        created_at: number;
+    } | null => {
+        const run = DatabaseService.getReidRun(runId);
+        if (!run) return null;
+
+        const individualCountStmt = db.prepare('SELECT COUNT(*) as count FROM reid_individuals WHERE run_id = ?');
+        const individualCount = (individualCountStmt.get(runId) as { count: number }).count;
+
+        const detectionCountStmt = db.prepare(`
+            SELECT COUNT(*) as count 
+            FROM reid_members rm
+            JOIN reid_individuals ri ON rm.individual_id = ri.id
+            WHERE ri.run_id = ?
+        `);
+        const detectionCount = (detectionCountStmt.get(runId) as { count: number }).count;
+
+        return {
+            individual_count: individualCount,
+            detection_count: detectionCount,
+            species: run.species,
+            created_at: run.created_at
+        };
+    },
+
+    /**
+     * Get all ReID runs with summary stats (for listing)
+     */
+    getReidRunsWithStats: (): (ReidRun & { individual_count: number; detection_count: number })[] => {
+        const stmt = db.prepare(`
+            SELECT 
+                rr.*,
+                (SELECT COUNT(*) FROM reid_individuals ri WHERE ri.run_id = rr.id) as individual_count,
+                (SELECT COUNT(*) FROM reid_members rm 
+                 JOIN reid_individuals ri ON rm.individual_id = ri.id 
+                 WHERE ri.run_id = rr.id) as detection_count
+            FROM reid_runs rr
+            ORDER BY rr.created_at DESC
+        `);
+        return stmt.all() as (ReidRun & { individual_count: number; detection_count: number })[];
+    },
+
+    // --- Helper: Get detections for images (used by smartReID) ---
+
+    getDetectionsForImages: (imageIds: number[]): (Detection & { image_path: string })[] => {
+        if (imageIds.length === 0) return [];
+        const placeholders = imageIds.map(() => '?').join(',');
+        const stmt = db.prepare(`
+            SELECT d.*, i.original_path as image_path
+            FROM detections d
+            JOIN images i ON d.image_id = i.id
+            WHERE d.image_id IN (${placeholders})
+            ORDER BY d.image_id, d.created_at
+        `);
+        return stmt.all(...imageIds) as (Detection & { image_path: string })[];
+    },
+
+    getImagesWithoutDetections: (imageIds: number[]): number[] => {
+        if (imageIds.length === 0) return [];
+        const placeholders = imageIds.map(() => '?').join(',');
+        const stmt = db.prepare(`
+            SELECT i.id 
+            FROM images i
+            WHERE i.id IN (${placeholders})
+            AND NOT EXISTS (SELECT 1 FROM detections d WHERE d.image_id = i.id)
+        `);
+        return (stmt.all(...imageIds) as { id: number }[]).map(r => r.id);
+    },
+
+    getImagesByIds: (imageIds: number[]): Image[] => {
+        if (imageIds.length === 0) return [];
+        const placeholders = imageIds.map(() => '?').join(',');
+        const stmt = db.prepare(`SELECT * FROM images WHERE id IN (${placeholders})`);
+        return stmt.all(...imageIds) as Image[];
     }
 };

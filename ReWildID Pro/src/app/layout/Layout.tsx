@@ -2,7 +2,7 @@ import { Box, useMediaQuery, useTheme } from '@mui/material';
 import { useEffect, useState, useRef } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import LeftSidebar from './navbar/LeftSidebar';
-import Navbar, { NAVBAR_HEIGHT } from './navbar/Navbar';
+import Navbar from './navbar/Navbar';
 import { RightSidebar } from './navbar/RightSidebar';
 import TaskPanel from '../../components/TaskPanel';
 
@@ -14,7 +14,7 @@ export default function Layout() {
     const [leftSidebarOpen, setLeftSidebarOpen] = useState(isDesktop);
     const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
 
-    const getPageMargin = (pathname: string): number => {
+    const getPageMargin = (): number => {
         return 0
     };
 
@@ -72,8 +72,8 @@ export default function Layout() {
                 <Box
                     component="main"
                     sx={{
-                        mt: getPageMargin(location.pathname),
-                        mb: getPageMargin(location.pathname),
+                        mt: getPageMargin(),
+                        mb: getPageMargin(),
                         flexGrow: 1,
                         paddingLeft: { xs: location.pathname === '/chat' ? 0 : 2, sm: 0 },
                         paddingRight: { xs: location.pathname === '/chat' ? 0 : 2, sm: 0 },

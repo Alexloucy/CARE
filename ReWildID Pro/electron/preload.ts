@@ -70,5 +70,20 @@ contextBridge.exposeInMainWorld('api', {
         const handler = (_event: any, jobs: any[]) => callback(jobs);
         ipcRenderer.on('job-update', handler);
         return () => ipcRenderer.removeListener('job-update', handler);
-    }
+    },
+
+    // New Smart ReID (DB-based)
+    smartReID: (imageIds: number[], species: string, onStream: (txt: string) => void) => {
+        ipcRenderer.removeAllListeners('stream');
+        ipcRenderer.on('stream', (_, txt) => onStream(txt));
+        return ipcRenderer.invoke('smartReID', imageIds, species);
+    },
+    getReidRuns: () => ipcRenderer.invoke('getReidRuns'),
+    getReidRun: (id: number) => ipcRenderer.invoke('getReidRun', id),
+    deleteReidRun: (id: number) => ipcRenderer.invoke('deleteReidRun', id),
+    updateReidRunName: (id: number, name: string) => ipcRenderer.invoke('updateReidRunName', id, name),
+    getReidResults: (filter: any) => ipcRenderer.invoke('getReidResults', filter),
+    updateReidIndividualName: (id: number, displayName: string) => ipcRenderer.invoke('updateReidIndividualName', id, displayName),
+    updateReidIndividualColor: (id: number, color: string) => ipcRenderer.invoke('updateReidIndividualColor', id, color),
+    mergeReidIndividuals: (targetId: number, sourceIds: number[]) => ipcRenderer.invoke('mergeReidIndividuals', targetId, sourceIds)
 });

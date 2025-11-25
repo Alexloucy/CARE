@@ -52,6 +52,60 @@ export interface Detection {
     image_path?: string;
 }
 
+// ReID Types
+export interface ReidRun {
+    id: number;
+    name: string;
+    species: string;
+    created_at: number;
+}
+
+export interface ReidRunWithStats extends ReidRun {
+    individual_count: number;
+    detection_count: number;
+}
+
+export interface ReidIndividual {
+    id: number;
+    run_id: number;
+    name: string;           // Original from Python ("ID-0")
+    display_name: string;   // Friendly name ("Luna", "Blaze 2")
+    color: string;          // Hex color ("#E57373")
+    created_at: number;
+}
+
+export interface ReidDetectionWithImage extends Detection {
+    image_path: string;
+    image_preview_path?: string;
+}
+
+export interface ReidIndividualWithMembers extends ReidIndividual {
+    member_count: number;
+    detections: ReidDetectionWithImage[];
+}
+
+export interface ReidQueryResult {
+    run: ReidRun;
+    individuals: ReidIndividualWithMembers[];
+    pagination: {
+        total_individuals: number;
+        total_detections: number;
+        page: number;
+        page_size: number;
+        has_more: boolean;
+    };
+}
+
+export interface ReidResultsFilter {
+    runId: number;
+    page?: number;
+    pageSize?: number;
+    species?: string[];
+    individualIds?: number[];
+    searchQuery?: string;
+    minConfidence?: number;
+}
+
 export interface ElectronApi {
     // ... existing methods ...
     getDetectionBatches: () => Promise<{ ok: boolean; batches?: DetectionBatch[]; error?: string }>;
@@ -81,12 +135,30 @@ export interface ElectronApi {
     getDetectImagePaths: (dirPath: string, filterLabel: string, confLow: number, confHigh: number) => Promise<{ ok: boolean; selectAllPaths?: string[]; error?: string }>;
     downloadDetectImages: (filterLabel: string) => Promise<{ ok: boolean; error?: string }>;
     downloadSelectedDetectImages: (selectPaths: string[]) => Promise<{ ok: boolean; error?: string }>;
+    // Legacy ReID (file-based) - keeping for backward compatibility
     runReid: (selectedPaths: string[], onStream: (txt: string) => void) => Promise<{ ok: boolean; error?: string }>;
     browseReidImage: (date: string, time: string, group_id: string) => Promise<any>;
     downloadReidImages: (date: string, time: string) => Promise<{ ok: boolean; error?: string }>;
     deleteReidResult: (date: string, time: string) => Promise<{ ok: boolean; error?: string }>;
     renameReidGroup: (date: string, time: string, old_group_id: string, new_group_id: string) => Promise<{ ok: boolean; error?: string }>;
     terminateAI: () => Promise<void>;
+
+    // New Smart ReID (DB-based)
+    smartReID: (imageIds: number[], species: string, onStream: (txt: string) => void) => Promise<{ ok: boolean; reidRunId?: number; error?: string }>;
+    
+    // ReID Run Management
+    getReidRuns: () => Promise<{ ok: boolean; runs?: ReidRunWithStats[]; error?: string }>;
+    getReidRun: (id: number) => Promise<{ ok: boolean; run?: ReidRun; error?: string }>;
+    deleteReidRun: (id: number) => Promise<{ ok: boolean; error?: string }>;
+    updateReidRunName: (id: number, name: string) => Promise<{ ok: boolean; error?: string }>;
+    
+    // ReID Results (Paginated)
+    getReidResults: (filter: ReidResultsFilter) => Promise<{ ok: boolean; result?: ReidQueryResult; error?: string }>;
+    
+    // ReID Individual Management
+    updateReidIndividualName: (id: number, displayName: string) => Promise<{ ok: boolean; error?: string }>;
+    updateReidIndividualColor: (id: number, color: string) => Promise<{ ok: boolean; error?: string }>;
+    mergeReidIndividuals: (targetId: number, sourceIds: number[]) => Promise<{ ok: boolean; error?: string }>;
     getPathForFile: (file: File) => string;
     getJobs: () => Promise<any[]>;
     cancelJob: (id: string) => Promise<void>;

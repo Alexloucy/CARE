@@ -153,6 +153,16 @@ electron_1.ipcMain.handle('deleteDetection', (_, id) => (0, controller_1.deleteD
 // Job Management
 electron_1.ipcMain.handle('getJobs', () => jobs_1.JobManager.getInstance().getJobs());
 electron_1.ipcMain.handle('cancelJob', (_, id) => jobs_1.JobManager.getInstance().cancelJob(id));
+// New Smart ReID (DB-based)
+electron_1.ipcMain.handle('smartReID', (_, imageIds, species) => (0, controller_1.smartReID)(imageIds, species, stream));
+electron_1.ipcMain.handle('getReidRuns', () => (0, controller_1.getReidRuns)());
+electron_1.ipcMain.handle('getReidRun', (_, id) => (0, controller_1.getReidRun)(id));
+electron_1.ipcMain.handle('deleteReidRun', (_, id) => (0, controller_1.deleteReidRunById)(id));
+electron_1.ipcMain.handle('updateReidRunName', (_, id, name) => (0, controller_1.updateReidRunName)(id, name));
+electron_1.ipcMain.handle('getReidResults', (_, filter) => (0, controller_1.getReidResults)(filter));
+electron_1.ipcMain.handle('updateReidIndividualName', (_, id, displayName) => (0, controller_1.updateReidIndividualName)(id, displayName));
+electron_1.ipcMain.handle('updateReidIndividualColor', (_, id, color) => (0, controller_1.updateReidIndividualColor)(id, color));
+electron_1.ipcMain.handle('mergeReidIndividuals', (_, targetId, sourceIds) => (0, controller_1.mergeReidIndividuals)(targetId, sourceIds));
 electron_1.app.on('ready', () => {
     createWindow();
     electron_1.app.on('activate', function () {

@@ -35,6 +35,15 @@ exports.terminateAI = terminateAI;
 exports.checkIsDirectory = checkIsDirectory;
 exports.openFileDialog = openFileDialog;
 exports.saveImages = saveImages;
+exports.smartReID = smartReID;
+exports.getReidRuns = getReidRuns;
+exports.getReidRun = getReidRun;
+exports.deleteReidRunById = deleteReidRunById;
+exports.updateReidRunName = updateReidRunName;
+exports.getReidResults = getReidResults;
+exports.updateReidIndividualName = updateReidIndividualName;
+exports.updateReidIndividualColor = updateReidIndividualColor;
+exports.mergeReidIndividuals = mergeReidIndividuals;
 const fs_extra_1 = __importDefault(require("fs-extra"));
 const path_1 = __importDefault(require("path"));
 const archiver_1 = __importDefault(require("archiver"));
@@ -1078,5 +1087,205 @@ async function saveImages(sourcePaths) {
     catch (error) {
         console.error('Error saving images:', error);
         return { ok: false, error: String(error) };
+    }
+}
+// ============================================================================
+// Smart ReID (New DB-based system)
+// ============================================================================
+/**
+ * Smart ReID - Intelligent re-identification workflow
+ *
+ * This function:
+ * 1. Checks which images have detections
+ * 2. Runs detection on images without detections
+ * 3. Filters detections by the specified species
+ * 4. Generates input JSON for Python reid_v2
+ * 5. Runs Python reid process
+ * 6. Parses output and stores results in database
+ */
+async function smartReID(imageIds, species, stream) {
+    const tempDir = path_1.default.join(process.cwd(), 'temp', 'reid_v2');
+    try {
+        // Ensure temp directory exists
+        await fs_extra_1.default.ensureDir(tempDir);
+        stream('Checking images for detections...\n');
+        // Step 1: Get images without detections
+        const imagesWithoutDetections = database_1.DatabaseService.getImagesWithoutDetections(imageIds);
+        // Step 2: Run detection on images that need it
+        if (imagesWithoutDetections.length > 0) {
+            stream(`Running detection on ${imagesWithoutDetections.length} images without detections...\n`);
+            // Get the image paths
+            const imagesToDetect = database_1.DatabaseService.getImagesByIds(imagesWithoutDetections);
+            const pathsToDetect = imagesToDetect.map(img => img.original_path);
+            // Run detection (this adds to job queue, need to wait)
+            // For now, we'll return an error asking user to run detection first
+            // In a more complete implementation, we'd wait for the detection job to complete
+            return {
+                ok: false,
+                error: `${imagesWithoutDetections.length} images need detection first. Please run detection on all images before ReID.`
+            };
+        }
+        // Step 3: Get all detections for the selected images
+        const allDetections = database_1.DatabaseService.getDetectionsForImages(imageIds);
+        // Step 4: Filter by species
+        const speciesLower = species.toLowerCase();
+        const matchingDetections = allDetections.filter(det => det.label?.toLowerCase() === speciesLower);
+        if (matchingDetections.length === 0) {
+            return {
+                ok: false,
+                error: `No ${species} detections found in the selected images.`
+            };
+        }
+        stream(`Found ${matchingDetections.length} ${species} detections. Starting ReID...\n`);
+        // Step 5: Generate input JSON for Python
+        const inputJsonPath = path_1.default.join(tempDir, `reid_input_${Date.now()}.json`);
+        const outputJsonPath = path_1.default.join(tempDir, `reid_output_${Date.now()}.json`);
+        const inputData = {
+            detections: matchingDetections.map(det => ({
+                detection_id: det.id,
+                image_path: det.image_path,
+                bbox: [det.x1, det.y1, det.x2, det.y2]
+            })),
+            output_path: outputJsonPath
+        };
+        await fs_extra_1.default.writeJson(inputJsonPath, inputData, { spaces: 2 });
+        // Step 6: Run Python reid_v2
+        const args = ['reid_v2', inputJsonPath];
+        const ps = (0, python_1.spawnPythonSubprocess)(args);
+        if (!ps) {
+            return { ok: false, error: 'Failed to start Python process' };
+        }
+        (0, python_1.setSubProcess)(ps);
+        // Stream output
+        if (ps.stdout) {
+            ps.stdout.on('data', (data) => {
+                const text = data.toString();
+                console.log(`stdout: ${text}`);
+                stream(text);
+            });
+        }
+        if (ps.stderr) {
+            ps.stderr.on('data', (data) => {
+                const text = data.toString();
+                console.log(`stderr: ${text}`);
+                stream(text);
+            });
+        }
+        // Wait for completion
+        const exitCode = await new Promise((resolve) => {
+            ps.on('close', (code) => {
+                console.log(`reid_v2 process exited with code ${code}`);
+                (0, python_1.setSubProcess)(null);
+                resolve(code || 0);
+            });
+        });
+        if (exitCode !== 0) {
+            return { ok: false, error: 'ReID process failed. Check logs for details.' };
+        }
+        // Step 7: Parse output and store in database
+        if (!await fs_extra_1.default.pathExists(outputJsonPath)) {
+            return { ok: false, error: 'ReID output file not found.' };
+        }
+        const outputData = await fs_extra_1.default.readJson(outputJsonPath);
+        // Create ReID run
+        const runName = `ReID ${species} - ${new Date().toLocaleString()}`;
+        const reidRunId = database_1.DatabaseService.createReidRun(runName, species);
+        // Create individuals and members
+        for (const individual of outputData.individuals) {
+            const individualId = database_1.DatabaseService.createReidIndividual(reidRunId, individual.name);
+            for (const detectionId of individual.detection_ids) {
+                database_1.DatabaseService.addReidMember(individualId, detectionId);
+            }
+        }
+        stream(`\nReID complete! Identified ${outputData.individuals.length} individuals.\n`);
+        // Cleanup temp files
+        await fs_extra_1.default.remove(inputJsonPath);
+        await fs_extra_1.default.remove(outputJsonPath);
+        return { ok: true, reidRunId };
+    }
+    catch (error) {
+        console.error('smartReID error:', error);
+        return { ok: false, error: `smartReID failed: ${error}` };
+    }
+}
+// --- ReID Run Management ---
+async function getReidRuns() {
+    try {
+        const runs = database_1.DatabaseService.getReidRunsWithStats();
+        return { ok: true, runs };
+    }
+    catch (error) {
+        return { ok: false, error: 'getReidRuns failed: ' + error };
+    }
+}
+async function getReidRun(id) {
+    try {
+        const run = database_1.DatabaseService.getReidRun(id);
+        if (!run) {
+            return { ok: false, error: 'ReID run not found' };
+        }
+        return { ok: true, run };
+    }
+    catch (error) {
+        return { ok: false, error: 'getReidRun failed: ' + error };
+    }
+}
+async function deleteReidRunById(id) {
+    try {
+        database_1.DatabaseService.deleteReidRun(id);
+        return { ok: true };
+    }
+    catch (error) {
+        return { ok: false, error: 'deleteReidRun failed: ' + error };
+    }
+}
+async function updateReidRunName(id, name) {
+    try {
+        database_1.DatabaseService.updateReidRunName(id, name);
+        return { ok: true };
+    }
+    catch (error) {
+        return { ok: false, error: 'updateReidRunName failed: ' + error };
+    }
+}
+// --- ReID Results (Paginated) ---
+async function getReidResults(filter) {
+    try {
+        const result = database_1.DatabaseService.getReidResults(filter);
+        if (!result) {
+            return { ok: false, error: 'ReID run not found' };
+        }
+        return { ok: true, result };
+    }
+    catch (error) {
+        return { ok: false, error: 'getReidResults failed: ' + error };
+    }
+}
+// --- ReID Individual Management ---
+async function updateReidIndividualName(id, displayName) {
+    try {
+        database_1.DatabaseService.updateReidIndividualName(id, displayName);
+        return { ok: true };
+    }
+    catch (error) {
+        return { ok: false, error: 'updateReidIndividualName failed: ' + error };
+    }
+}
+async function updateReidIndividualColor(id, color) {
+    try {
+        database_1.DatabaseService.updateReidIndividualColor(id, color);
+        return { ok: true };
+    }
+    catch (error) {
+        return { ok: false, error: 'updateReidIndividualColor failed: ' + error };
+    }
+}
+async function mergeReidIndividuals(targetId, sourceIds) {
+    try {
+        database_1.DatabaseService.mergeReidIndividuals(targetId, sourceIds);
+        return { ok: true };
+    }
+    catch (error) {
+        return { ok: false, error: 'mergeReidIndividuals failed: ' + error };
     }
 }

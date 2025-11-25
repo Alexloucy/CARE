@@ -32,7 +32,17 @@ import {
     getDetectionsForBatch,
     getAvailableSpecies,
     updateDetectionLabel,
-    deleteDetection
+    deleteDetection,
+    // New Smart ReID
+    smartReID,
+    getReidRuns,
+    getReidRun,
+    deleteReidRunById,
+    updateReidRunName,
+    getReidResults,
+    updateReidIndividualName,
+    updateReidIndividualColor,
+    mergeReidIndividuals
 } from './controller';
 import { JobManager } from './jobs';
 
@@ -201,6 +211,17 @@ ipcMain.handle('deleteDetection', (_, id) => deleteDetection(id));
 // Job Management
 ipcMain.handle('getJobs', () => JobManager.getInstance().getJobs());
 ipcMain.handle('cancelJob', (_, id) => JobManager.getInstance().cancelJob(id));
+
+// New Smart ReID (DB-based)
+ipcMain.handle('smartReID', (_, imageIds, species) => smartReID(imageIds, species, stream));
+ipcMain.handle('getReidRuns', () => getReidRuns());
+ipcMain.handle('getReidRun', (_, id) => getReidRun(id));
+ipcMain.handle('deleteReidRun', (_, id) => deleteReidRunById(id));
+ipcMain.handle('updateReidRunName', (_, id, name) => updateReidRunName(id, name));
+ipcMain.handle('getReidResults', (_, filter) => getReidResults(filter));
+ipcMain.handle('updateReidIndividualName', (_, id, displayName) => updateReidIndividualName(id, displayName));
+ipcMain.handle('updateReidIndividualColor', (_, id, color) => updateReidIndividualColor(id, color));
+ipcMain.handle('mergeReidIndividuals', (_, targetId, sourceIds) => mergeReidIndividuals(targetId, sourceIds));
 
 
 app.on('ready', () => {
