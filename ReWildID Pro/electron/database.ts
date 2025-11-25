@@ -437,7 +437,7 @@ export const DatabaseService = {
     },
 
     getAvailableSpecies: (): string[] => {
-        const stmt = db.prepare("SELECT DISTINCT label FROM detections WHERE label IS NOT NULL AND label != '' ORDER BY label");
+        const stmt = db.prepare("SELECT DISTINCT label FROM detections WHERE label IS NOT NULL AND label != '' AND LOWER(label) != 'blank' ORDER BY label");
         const rows = stmt.all() as { label: string }[];
         return rows.map(r => r.label);
     },

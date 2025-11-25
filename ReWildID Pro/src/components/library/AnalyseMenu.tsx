@@ -8,12 +8,10 @@ import {
     IconButton,
     alpha,
     useTheme,
-    MenuItem,
-    Select,
-    FormControl,
-    InputLabel,
     Button,
-    Divider
+    Divider,
+    Autocomplete,
+    TextField
 } from '@mui/material';
 import { X, Sparkle, Fingerprint } from '@phosphor-icons/react';
 
@@ -117,13 +115,19 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
                                 p: 2,
                                 borderRadius: 2,
                                 cursor: 'pointer',
-                                bgcolor: alpha(theme.palette.primary.main, 0.08),
-                                border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                                bgcolor: theme.palette.mode === 'light' 
+                                    ? alpha('#000000', 0.04) 
+                                    : alpha('#FFFFFF', 0.06),
+                                border: `1px solid ${theme.palette.divider}`,
                                 transition: 'all 0.2s ease',
                                 '&:hover': {
-                                    bgcolor: alpha(theme.palette.primary.main, 0.15),
+                                    bgcolor: theme.palette.mode === 'light' 
+                                        ? alpha('#000000', 0.08) 
+                                        : alpha('#FFFFFF', 0.10),
                                     transform: 'translateY(-1px)',
-                                    boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`
+                                    boxShadow: theme.palette.mode === 'light'
+                                        ? '0 4px 12px rgba(0, 0, 0, 0.1)'
+                                        : '0 4px 12px rgba(0, 0, 0, 0.3)'
                                 }
                             }}
                         >
@@ -134,8 +138,10 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                bgcolor: alpha(theme.palette.primary.main, 0.15),
-                                color: theme.palette.primary.main
+                                bgcolor: theme.palette.mode === 'light' 
+                                    ? alpha('#000000', 0.08) 
+                                    : alpha('#FFFFFF', 0.12),
+                                color: theme.palette.text.primary
                             }}>
                                 <Sparkle size={24} weight="fill" />
                             </Box>
@@ -157,13 +163,19 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
                                 p: 2,
                                 borderRadius: 2,
                                 cursor: 'pointer',
-                                bgcolor: alpha(theme.palette.secondary.main, 0.08),
-                                border: `1px solid ${alpha(theme.palette.secondary.main, 0.2)}`,
+                                bgcolor: theme.palette.mode === 'light' 
+                                    ? alpha('#000000', 0.04) 
+                                    : alpha('#FFFFFF', 0.06),
+                                border: `1px solid ${theme.palette.divider}`,
                                 transition: 'all 0.2s ease',
                                 '&:hover': {
-                                    bgcolor: alpha(theme.palette.secondary.main, 0.15),
+                                    bgcolor: theme.palette.mode === 'light' 
+                                        ? alpha('#000000', 0.08) 
+                                        : alpha('#FFFFFF', 0.10),
                                     transform: 'translateY(-1px)',
-                                    boxShadow: `0 4px 12px ${alpha(theme.palette.secondary.main, 0.2)}`
+                                    boxShadow: theme.palette.mode === 'light'
+                                        ? '0 4px 12px rgba(0, 0, 0, 0.1)'
+                                        : '0 4px 12px rgba(0, 0, 0, 0.3)'
                                 }
                             }}
                         >
@@ -174,8 +186,10 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                bgcolor: alpha(theme.palette.secondary.main, 0.15),
-                                color: theme.palette.secondary.main
+                                bgcolor: theme.palette.mode === 'light' 
+                                    ? alpha('#000000', 0.08) 
+                                    : alpha('#FFFFFF', 0.12),
+                                color: theme.palette.text.primary
                             }}>
                                 <Fingerprint size={24} weight="fill" />
                             </Box>
@@ -190,7 +204,7 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
                 ) : (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                            <Fingerprint size={20} weight="fill" color={theme.palette.secondary.main} />
+                            <Fingerprint size={20} weight="fill" color={theme.palette.text.primary} />
                             <Typography fontWeight={600}>Re-identification</Typography>
                         </Box>
                         
@@ -198,38 +212,85 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
                             Select a species to identify individuals
                         </Typography>
 
-                        <FormControl fullWidth size="small">
-                            <InputLabel>Species</InputLabel>
-                            <Select
-                                value={selectedSpecies}
-                                onChange={(e) => setSelectedSpecies(e.target.value)}
-                                label="Species"
-                                sx={{ borderRadius: 2 }}
-                            >
-                                {availableSpecies.length === 0 ? (
-                                    <MenuItem disabled>
-                                        <em>No species detected yet</em>
-                                    </MenuItem>
-                                ) : (
-                                    availableSpecies.map(species => (
-                                        <MenuItem key={species} value={species}>
-                                            {species}
-                                        </MenuItem>
-                                    ))
-                                )}
-                            </Select>
-                        </FormControl>
+                        <Autocomplete
+                            fullWidth
+                            size="small"
+                            options={availableSpecies}
+                            value={selectedSpecies || null}
+                            onChange={(_, newValue) => setSelectedSpecies(newValue || '')}
+                            getOptionLabel={(option) => option.charAt(0).toUpperCase() + option.slice(1)}
+                            noOptionsText="No species detected yet"
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label="Species"
+                                    placeholder="Type to search..."
+                                    sx={{
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 2,
+                                            '& .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: theme.palette.divider
+                                            },
+                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: theme.palette.text.secondary
+                                            }
+                                        }
+                                    }}
+                                />
+                            )}
+                            slotProps={{
+                                paper: {
+                                    sx: {
+                                        borderRadius: 2,
+                                        mt: 0.5,
+                                        bgcolor: theme.palette.mode === 'light' 
+                                            ? 'rgba(255, 255, 255, 0.95)' 
+                                            : 'rgba(40, 40, 40, 0.95)',
+                                        backdropFilter: 'blur(10px)',
+                                        boxShadow: theme.palette.mode === 'light'
+                                            ? '0 4px 20px rgba(0, 0, 0, 0.15)'
+                                            : '0 4px 20px rgba(0, 0, 0, 0.4)',
+                                        border: `1px solid ${theme.palette.divider}`,
+                                        '& .MuiAutocomplete-option': {
+                                            borderRadius: 1,
+                                            mx: 0.5,
+                                            my: 0.25,
+                                            '&:hover': {
+                                                bgcolor: theme.palette.mode === 'light' 
+                                                    ? alpha('#000000', 0.06) 
+                                                    : alpha('#FFFFFF', 0.08)
+                                            },
+                                            '&[aria-selected="true"]': {
+                                                bgcolor: theme.palette.mode === 'light' 
+                                                    ? alpha('#000000', 0.08) 
+                                                    : alpha('#FFFFFF', 0.12),
+                                                '&:hover': {
+                                                    bgcolor: theme.palette.mode === 'light' 
+                                                        ? alpha('#000000', 0.10) 
+                                                        : alpha('#FFFFFF', 0.15)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }}
+                        />
 
                         <Divider sx={{ my: 1 }} />
 
                         <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'flex-end' }}>
-                            <Button 
-                                variant="text" 
-                                onClick={() => setShowReIDOptions(false)}
-                                sx={{ borderRadius: 2 }}
-                            >
-                                Back
-                            </Button>
+                            {!reidOnly && (
+                                <Button 
+                                    variant="text" 
+                                    onClick={() => setShowReIDOptions(false)}
+                                    sx={{ 
+                                        borderRadius: 2,
+                                        color: theme.palette.text.secondary
+                                    }}
+                                >
+                                    Back
+                                </Button>
+                            )}
                             <Button
                                 variant="contained"
                                 onClick={handleReID}
@@ -238,9 +299,18 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
                                 sx={{ 
                                     borderRadius: 2,
                                     textTransform: 'none',
-                                    bgcolor: theme.palette.secondary.main,
+                                    bgcolor: theme.palette.mode === 'light' ? '#000000' : '#FFFFFF',
+                                    color: theme.palette.mode === 'light' ? '#FFFFFF' : '#000000',
                                     '&:hover': {
-                                        bgcolor: theme.palette.secondary.dark
+                                        bgcolor: theme.palette.mode === 'light' ? '#333333' : '#E0E0E0'
+                                    },
+                                    '&.Mui-disabled': {
+                                        bgcolor: theme.palette.mode === 'light' 
+                                            ? alpha('#000000', 0.3) 
+                                            : alpha('#FFFFFF', 0.3),
+                                        color: theme.palette.mode === 'light' 
+                                            ? alpha('#FFFFFF', 0.5) 
+                                            : alpha('#000000', 0.5)
                                     }
                                 }}
                             >
