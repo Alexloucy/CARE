@@ -69,6 +69,7 @@ interface MediaExplorerProps {
     // Actions
     onBatchDelete: () => void;
     onBatchDetect: () => void;
+    onBatchReID?: (species: string) => void;
     onBatchSave: () => void;
     onDeleteImage: (img: DBImage) => Promise<void>; // Single image delete from modal
     onDeleteDetection?: (id: number) => void; // Single detection delete from modal
@@ -91,6 +92,11 @@ interface MediaExplorerProps {
 
     // Filter Options (for detection page)
     availableSpecies?: string[];
+
+    // AI Analysis support
+    aiButtonMode?: 'detect' | 'reid' | 'analyse';
+    onReID?: (images: DBImage[], species: string) => void;
+    onClassify?: (images: DBImage[]) => void;
 }
 
 export const MediaExplorer: React.FC<MediaExplorerProps> = ({
@@ -117,6 +123,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     setIsSelectionMode,
     onBatchDelete,
     onBatchDetect,
+    onBatchReID,
     onBatchSave,
     onDeleteImage,
     onDeleteDetection,
@@ -128,7 +135,10 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     groupMenu,
     leftSidebarOpen,
     rightSidebarOpen,
-    availableSpecies
+    availableSpecies,
+    aiButtonMode = 'detect',
+    onReID,
+    onClassify
 }) => {
     const theme = useTheme();
 
@@ -347,6 +357,10 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         fullImageUrls={fullImageUrls}
                         loadFullImage={loadFullImage}
                         onActiveItemChange={setActiveId}
+                        aiButtonMode={aiButtonMode}
+                        onReID={onReID}
+                        onClassify={onClassify}
+                        availableSpecies={availableSpecies}
                         headerContent={
                             <>
                                 <Box sx={{ height: `${NAVBAR_HEIGHT}px` }} />
@@ -539,10 +553,12 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         clearSelection();
                     }}
                     onDelete={onBatchDelete}
-                    onDetect={onBatchDetect}
+                    onClassify={onBatchDetect}
+                    onReID={onBatchReID || (() => {})}
                     onSave={onBatchSave}
                     leftSidebarOpen={leftSidebarOpen}
                     rightSidebarOpen={rightSidebarOpen}
+                    availableSpecies={availableSpecies}
                 />
             )}
         </Box>

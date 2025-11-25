@@ -213,7 +213,7 @@ ipcMain.handle('getJobs', () => JobManager.getInstance().getJobs());
 ipcMain.handle('cancelJob', (_, id) => JobManager.getInstance().cancelJob(id));
 
 // New Smart ReID (DB-based)
-ipcMain.handle('smartReID', (_, imageIds, species) => smartReID(imageIds, species, stream));
+ipcMain.handle('smartReID', (_, imageIds, species) => smartReID(imageIds, species));
 ipcMain.handle('getReidRuns', () => getReidRuns());
 ipcMain.handle('getReidRun', (_, id) => getReidRun(id));
 ipcMain.handle('deleteReidRun', (_, id) => deleteReidRunById(id));

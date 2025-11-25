@@ -66,9 +66,7 @@ electron_1.contextBridge.exposeInMainWorld('api', {
         return () => electron_1.ipcRenderer.removeListener('job-update', handler);
     },
     // New Smart ReID (DB-based)
-    smartReID: (imageIds, species, onStream) => {
-        electron_1.ipcRenderer.removeAllListeners('stream');
-        electron_1.ipcRenderer.on('stream', (_, txt) => onStream(txt));
+    smartReID: (imageIds, species) => {
         return electron_1.ipcRenderer.invoke('smartReID', imageIds, species);
     },
     getReidRuns: () => electron_1.ipcRenderer.invoke('getReidRuns'),

@@ -144,7 +144,7 @@ export interface ElectronApi {
     terminateAI: () => Promise<void>;
 
     // New Smart ReID (DB-based)
-    smartReID: (imageIds: number[], species: string, onStream: (txt: string) => void) => Promise<{ ok: boolean; reidRunId?: number; error?: string }>;
+    smartReID: (imageIds: number[], species: string) => Promise<{ ok: boolean; reidRunId?: number; error?: string }>;
     
     // ReID Run Management
     getReidRuns: () => Promise<{ ok: boolean; runs?: ReidRunWithStats[]; error?: string }>;

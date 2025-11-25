@@ -281,6 +281,28 @@ const DetectionPage: React.FC = () => {
         }
     };
 
+    // ReID Handler
+    const handleReID = async (images: DBImage[], species: string) => {
+        const imageIds = images.map(img => img.id);
+        if (imageIds.length === 0) {
+            alert('No images selected for ReID.');
+            return;
+        }
+
+        try {
+            const result = await window.api.smartReID(imageIds, species);
+
+            if (result.ok) {
+                clearSelection();
+            } else {
+                alert('ReID failed: ' + result.error);
+            }
+        } catch (error) {
+            console.error('ReID error:', error);
+            alert('ReID failed: ' + error);
+        }
+    };
+
     // Detection Batch (Group) Menu Handlers
     const handleMenuOpen = (e: React.MouseEvent<HTMLElement>, groupId: number) => {
         e.stopPropagation();
@@ -371,6 +393,8 @@ const DetectionPage: React.FC = () => {
             rightSidebarOpen={rightSidebarOpen}
             availableSpecies={availableSpecies}
             onGroupMenuOpen={handleMenuOpen}
+            aiButtonMode="reid"
+            onReID={handleReID}
             groupMenu={
                 <Menu
                     anchorEl={anchorEl}

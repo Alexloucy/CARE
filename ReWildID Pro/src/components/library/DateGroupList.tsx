@@ -1,4 +1,5 @@
-import { Box, IconButton, Tooltip, Typography, useTheme, Chip } from '@mui/material';
+import { Box, IconButton, Tooltip, Typography, useTheme, Chip, Select, MenuItem, FormControl } from '@mui/material';
+import { AnalyseMenu } from './AnalyseMenu';
 import { CaretDown, CaretRight, Check as CheckIcon, DotsThreeVertical, UploadSimple } from '@phosphor-icons/react';
 import React, { useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
@@ -33,6 +34,11 @@ interface DateGroupListProps {
     aspectRatio?: string;
     fullImageUrls?: Record<number, string>;
     loadFullImage?: (image: DBImage) => void;
+    // AI Analysis support
+    aiButtonMode?: 'detect' | 'reid' | 'analyse';
+    onReID?: (images: DBImage[], species: string) => void;
+    onClassify?: (images: DBImage[]) => void;
+    availableSpecies?: string[];
 }
 
 type FlatItem =
@@ -60,7 +66,11 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
         onActiveItemChange,
         aspectRatio = '1.618/1',
         fullImageUrls = {},
-        loadFullImage
+        loadFullImage,
+        aiButtonMode = 'detect',
+        onReID,
+        onClassify,
+        availableSpecies = []
     } = props;
 
     const theme = useTheme();
@@ -68,6 +78,11 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
     const [containerWidth, setContainerWidth] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
     const virtuosoRef = useRef<VirtuosoHandle>(null);
+    const [selectedSpecies, setSelectedSpecies] = useState<string>('');
+    
+    // Analyse menu state
+    const [analyseMenuOpen, setAnalyseMenuOpen] = useState(false);
+    const [analyseMenuGroup, setAnalyseMenuGroup] = useState<GroupData | null>(null);
 
     // Resize Observer to get width
     useEffect(() => {
@@ -351,15 +366,92 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                             <DotsThreeVertical size={20} />
                         </IconButton>
                     </Box>
-                    <AiModeButton
-                        text={group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length > 0
-                            ? `Detect (${group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length})`
-                            : "Detect"}
-                        onClick={() => {
-                            const selectedInGroup = group.images.filter((img: DBImage) => selectedImageIds.has(img.id));
-                            handleDetect(selectedInGroup.length > 0 ? selectedInGroup : group.images);
-                        }}
-                    />
+                    {aiButtonMode === 'analyse' ? (
+                        <>
+                            <AiModeButton
+                                text={group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length > 0
+                                    ? `Analyse (${group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length})`
+                                    : "Analyse"}
+                                onClick={() => {
+                                    setAnalyseMenuGroup(group);
+                                    setAnalyseMenuOpen(true);
+                                }}
+                            />
+                            {analyseMenuGroup?.id === group.id && (
+                                <AnalyseMenu
+                                    open={analyseMenuOpen}
+                                    onClose={() => {
+                                        setAnalyseMenuOpen(false);
+                                        setAnalyseMenuGroup(null);
+                                    }}
+                                    onClassify={() => {
+                                        const selectedInGroup = group.images.filter((img: DBImage) => selectedImageIds.has(img.id));
+                                        const imagesToProcess = selectedInGroup.length > 0 ? selectedInGroup : group.images;
+                                        if (onClassify) onClassify(imagesToProcess);
+                                    }}
+                                    onReID={(species) => {
+                                        const selectedInGroup = group.images.filter((img: DBImage) => selectedImageIds.has(img.id));
+                                        const imagesToProcess = selectedInGroup.length > 0 ? selectedInGroup : group.images;
+                                        if (onReID) onReID(imagesToProcess, species);
+                                    }}
+                                    availableSpecies={availableSpecies}
+                                    selectedCount={
+                                        group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length > 0
+                                            ? group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length
+                                            : group.images.length
+                                    }
+                                />
+                            )}
+                        </>
+                    ) : aiButtonMode === 'reid' ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <FormControl size="small" sx={{ minWidth: 120 }}>
+                                <Select
+                                    value={selectedSpecies}
+                                    onChange={(e) => setSelectedSpecies(e.target.value)}
+                                    displayEmpty
+                                    sx={{ 
+                                        height: 32,
+                                        fontSize: '0.875rem',
+                                        '& .MuiSelect-select': { py: 0.5 }
+                                    }}
+                                >
+                                    <MenuItem value="" disabled>
+                                        <em>Select species</em>
+                                    </MenuItem>
+                                    {availableSpecies.map(species => (
+                                        <MenuItem key={species} value={species}>
+                                            {species}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <AiModeButton
+                                text={group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length > 0
+                                    ? `ReID (${group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length})`
+                                    : "ReID"}
+                                onClick={() => {
+                                    if (!selectedSpecies) {
+                                        alert('Please select a species first');
+                                        return;
+                                    }
+                                    const selectedInGroup = group.images.filter((img: DBImage) => selectedImageIds.has(img.id));
+                                    const imagesToProcess = selectedInGroup.length > 0 ? selectedInGroup : group.images;
+                                    if (onReID) onReID(imagesToProcess, selectedSpecies);
+                                }}
+                            />
+                        </Box>
+                    ) : (
+                        <AiModeButton
+                            text={group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length > 0
+                                ? `Detect (${group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length})`
+                                : "Detect"}
+                            onClick={() => {
+                                const selectedInGroup = group.images.filter((img: DBImage) => selectedImageIds.has(img.id));
+                                handleDetect(selectedInGroup.length > 0 ? selectedInGroup : group.images);
+                            }}
+                        />
+                    )}
                 </Box>
             );
         } else {

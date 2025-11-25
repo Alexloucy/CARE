@@ -81,10 +81,13 @@ class CustomDino(nn.Module):
                 self.adapter_dict[f"adapter_{i}"] = Adapter(output_dim, 4)
         self.domains = domains
 
+    # single domain assumed, restriction imposed in front-end
     def forward(self, image, time):
         adapter_ratio = 0.4  
+        # Get cls token from DINO
         x_tokens_list = self.dino_model.get_intermediate_layers(image, n=1, return_class_token=True)
         image_features = create_linear_input(x_tokens_list, 1, False)
+        # Normalize only at the end; keep raw features here
         base_features = image_features
         if isinstance(time, int):
             time = torch.tensor([time]).to(base_features.device)
@@ -92,19 +95,22 @@ class CustomDino(nn.Module):
             time = torch.tensor(time).to(base_features.device)
         
         unique_times = torch.unique(time)
+        # Mix in-place; avoid cloning to save memory
         mixed_features = base_features
 
+        
         if self.day_night_adapter:
             if time is None:
                 raise ValueError("Time information (day/night) must be provided when using day/night adapters.")
             day_adapter = self.adapter_dict["adapter_0_day"]
             night_adapter = self.adapter_dict["adapter_0_night"]
+            # iterate through day and night adapters
             for t in unique_times.tolist():
                 idx = (time == t).nonzero(as_tuple=False).squeeze(1)
                 sub_base_features = base_features.index_select(0, idx)
-                if t == 1:
+                if t == 1:  # day
                     sub_adapter_features = day_adapter(sub_base_features)
-                else:
+                else:  # night
                     sub_adapter_features = night_adapter(sub_base_features)
                 sub_mixed_features = (
                     adapter_ratio * sub_adapter_features + (1 - adapter_ratio) * sub_base_features
@@ -117,18 +123,20 @@ class CustomDino(nn.Module):
                 adapter_ratio * sub_adapter_features + (1 - adapter_ratio) * base_features
             )
 
+        # Normalize mixed features for retrieval/metric learning
         mixed_features_norm = torch.nn.functional.normalize(mixed_features, dim=-1, eps=1e-6)
         return mixed_features_norm
 
 
 def create_linear_input(x_tokens_list, use_n_blocks, use_avgpool):
+    """Create linear input from DINO intermediate layers"""
     intermediate_output = x_tokens_list[-use_n_blocks:]
     output = torch.cat([class_token for _, class_token in intermediate_output], dim=-1)
     if use_avgpool:
         output = torch.cat(
             (
                 output,
-                torch.mean(intermediate_output[-1][0], dim=1),
+                torch.mean(intermediate_output[-1][0], dim=1),  # patch tokens
             ),
             dim=-1,
         )
@@ -138,30 +146,42 @@ def create_linear_input(x_tokens_list, use_n_blocks, use_avgpool):
 
 def check_day_night(img):
     arr = np.array(img)
+
     r, g, b = arr[:,:,0], arr[:,:,1], arr[:,:,2]
+
     dff_rg = np.median(np.abs(r - g))
     dff_rb = np.median(np.abs(r - b))
     dff_gb = np.median(np.abs(g - b))
+
     mean_diff = np.max([dff_rg, dff_rb, dff_gb])
+
+    # 255 is for extreme cases, night time photos usually have diff of 0
     if mean_diff < 3 or mean_diff == 255:
         return 0  # night
     else:
-        return 1  # day
+        return 1
 
 
-def load_and_crop_image(image_path: str, bbox: list):
+def load_and_crop_image(image_path, bbox):
     """
-    Load image, crop to bbox, and preprocess for model.
-    bbox format: [x1, y1, x2, y2]
+    Load image, crop by bbox, and preprocess.
+    
+    Args:
+        image_path: Path to the original image.
+        bbox: [x1, y1, x2, y2] coordinates.
+    
+    Returns:
+        (tensor, is_day): Preprocessed image tensor and day/night flag.
     """
     img = Image.open(image_path).convert("RGB")
     
-    # Crop to bbox
+    # Crop the image using bbox
     x1, y1, x2, y2 = map(int, bbox)
     cropped_img = img.crop((x1, y1, x2, y2))
     
+    # Check day/night on cropped image
     is_day = check_day_night(cropped_img)
-
+    
     image_transforms = T.Compose([
         T.Resize(cfg.INPUT.SIZE),
         T.ToTensor(),
@@ -174,13 +194,14 @@ def load_and_crop_image(image_path: str, bbox: list):
 
 
 def _fp16_supported(device):
-    return device.type == "cuda" or (device.type == "mps" and torch.backends.mps.is_built())
+    fp16_supported = device.type == "cuda" or (device.type == "mps" and torch.backends.mps.is_built())
+    return fp16_supported
 
 
-def get_embedding(model, image, device, is_day):
+def get_dino_with_adapter_embedding(model, image, device, is_day_list=None):
     with torch.no_grad(), autocast(device_type=device.type, dtype=torch.float16, enabled=_fp16_supported(device)):
         image = image.to(device)
-        feature = model(image, is_day)
+        feature = model(image, is_day_list)
         feature = feature.to(device)
     return feature
 
@@ -188,6 +209,16 @@ def get_embedding(model, image, device, is_day):
 def compute_embeddings_batched(model, images, times, device, batch_size: int) -> np.ndarray:
     """
     Compute L2-normalized embeddings for all images in mini-batches.
+
+    Args:
+        model: DINO+adapter model.
+        images: list of tensors, each of shape [1, C, H, W].
+        times: list of day/night flags aligned with images.
+        device: torch.device to run on.
+        batch_size: batch size for inference.
+
+    Returns:
+        embeddings: NumPy array of shape [N, D].
     """
     embeddings = []
     total = len(images)
@@ -198,31 +229,41 @@ def compute_embeddings_batched(model, images, times, device, batch_size: int) ->
         batch_images = images[start:end]
         batch_times = times[start:end]
 
+        # Concatenate into a single batch tensor: [B, C, H, W]
         batch_tensor = torch.cat(batch_images, dim=0)
 
-        batch_embedding = get_embedding(
+        batch_embedding = get_dino_with_adapter_embedding(
             model,
             batch_tensor,
             device,
             batch_times,
         )
+        # batch_embedding: [B, D]
         batch_np = batch_embedding.cpu().float().numpy()
         embeddings.append(batch_np)
 
         processed += (end - start)
         print(f"PROCESS: {processed}/{total}", flush=True)
 
-    return np.concatenate(embeddings, axis=0)
+    return np.concatenate(embeddings, axis=0)  # [N, D], L2-normalized
 
 
 def compute_distance_matrix(embeddings: np.ndarray) -> np.ndarray:
     """
-    Build a cosine distance matrix.
+    Build a cosine distance matrix and apply the same per-row masking
+    behavior as the original compute_distances(is_duplicate=True).
+
+    Args:
+        embeddings: NumPy array of shape [N, D].
+
+    Returns:
+        distance_mat: NumPy array of shape [N, N].
     """
+    # Cosine similarity matrix: sim[i, j] = <emb_i, emb_j>
     sim_matrix = embeddings @ embeddings.T
     distance_mat = 1.0 - sim_matrix
 
-    # For each row, set the minimum-distance entry (self) to infinity
+    # For each row, set the minimum-distance entry to infinity.
     for r in range(distance_mat.shape[0]):
         row = distance_mat[r]
         min_idx = np.argmin(row)
@@ -233,13 +274,14 @@ def compute_distance_matrix(embeddings: np.ndarray) -> np.ndarray:
 
 def process_dist_mat_v2(dist_mat):
     """
-    Process the distance matrix to cluster individuals.
+    Process the distance matrix to count the number of individuals.
     """
     number_of_images = len(dist_mat)
     keys = np.array([-1] * number_of_images)
 
     for r in range(len(dist_mat)):
         row = dist_mat[r]
+        print(f"Row {r} distances: {row}")
         min_dist = np.min(row)
         candidates_bool = np.abs(row - min_dist) <= 0.00065
         candidates_index = np.where(candidates_bool)[0]
@@ -248,9 +290,11 @@ def process_dist_mat_v2(dist_mat):
 
         if keys[r] != -1:
             keys[candidates_index] = keys[r]
+
         elif keys[r] == -1 and np.all(candidates_key == -1):
             keys[r] = current_counter + 1
             keys[candidates_index] = current_counter + 1
+
         elif keys[r] == -1 and np.any(candidates_key != -1):
             min_pos_key = np.min(candidates_key[candidates_key != -1])
             selected_indices = candidates_index[np.where(candidates_key != min_pos_key)[0]]
@@ -268,9 +312,9 @@ def process_dist_mat_v2(dist_mat):
     return output_dict
 
 
-def format_output_with_detection_ids(detection_ids: list, cluster_dict: dict) -> dict:
+def format_output_with_detection_ids(detection_ids, cluster_dict):
     """
-    Convert cluster indices to detection IDs.
+    Format output with detection IDs instead of file paths.
     """
     individuals = []
     for cluster_id, indices in cluster_dict.items():
@@ -316,7 +360,7 @@ def run(input_json_path: str, batch_size: int = 4):
     adapter_path = os.path.join(script_dir, "models", "DinoAdapter_Stoat_day_night_mixed_precision.pth.tar25")
     cfg_file_path = os.path.join(script_dir, "models", "dinoadapter_inference.yaml")
     
-    # Device selection
+    # Set the device to GPU if available, otherwise use CPU.
     if torch.cuda.is_available():
         DEVICE = torch.device("cuda")
         print(f"Using GPU: {torch.cuda.get_device_name(0)}", flush=True)
@@ -325,15 +369,15 @@ def run(input_json_path: str, batch_size: int = 4):
         print("Using Apple Silicon GPU", flush=True)
     else:
         DEVICE = torch.device("cpu")
-        print("Using CPU", flush=True)
+        print("Using CPU. Note: Using CPU may be slow.", flush=True)
     
-    # Load config
+    # Read and import the cfg file.
     cfg.set_new_allowed(True)
     cfg.merge_from_file(cfg_file_path)
     cfg.merge_from_list([])
     cfg.freeze()
     
-    # Load model
+    # Load the model
     print("Loading model...", flush=True)
     repo = os.path.join(script_dir, "dinov3")
     dino_model = torch.hub.load(
@@ -355,13 +399,17 @@ def run(input_json_path: str, batch_size: int = 4):
         if k.startswith("adapter_dict."):
             checkpoint[k[len("adapter_dict."):]] = v
             del checkpoint[k]
-    dino_with_adapter.adapter_dict.load_state_dict(checkpoint, strict=False)
+    missing, unexpected = dino_with_adapter.adapter_dict.load_state_dict(
+        checkpoint, strict=False
+    )
+    print("Missing", missing)
+    print("Unexpected", unexpected)
     dino_with_adapter = dino_with_adapter.to(DEVICE)
     dino_with_adapter.eval()
     
     print("STATUS: PROCESSING", flush=True)
     
-    # Load and crop images directly from paths (no file copying!)
+    # Load and crop images directly from paths
     detection_ids = []
     images = []
     is_day_list = []
@@ -388,7 +436,7 @@ def run(input_json_path: str, batch_size: int = 4):
         print("STATUS: DONE", flush=True)
         return
     
-    # Compute embeddings
+    # Compute embeddings in mini-batches
     embeddings = compute_embeddings_batched(
         dino_with_adapter,
         images,
@@ -397,12 +445,12 @@ def run(input_json_path: str, batch_size: int = 4):
         batch_size,
     )
     
-    # Compute distance matrix and cluster
     distance_mat = compute_distance_matrix(embeddings)
-    cluster_dict = process_dist_mat_v2(distance_mat)
+    
+    id_dict = process_dist_mat_v2(distance_mat)
     
     # Format output with detection IDs
-    output = format_output_with_detection_ids(detection_ids, cluster_dict)
+    output = format_output_with_detection_ids(detection_ids, id_dict)
     
     # Write output
     with open(output_path, 'w') as f:

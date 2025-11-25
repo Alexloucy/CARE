@@ -73,9 +73,7 @@ contextBridge.exposeInMainWorld('api', {
     },
 
     // New Smart ReID (DB-based)
-    smartReID: (imageIds: number[], species: string, onStream: (txt: string) => void) => {
-        ipcRenderer.removeAllListeners('stream');
-        ipcRenderer.on('stream', (_, txt) => onStream(txt));
+    smartReID: (imageIds: number[], species: string) => {
         return ipcRenderer.invoke('smartReID', imageIds, species);
     },
     getReidRuns: () => ipcRenderer.invoke('getReidRuns'),

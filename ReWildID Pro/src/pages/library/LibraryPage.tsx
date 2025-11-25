@@ -47,6 +47,16 @@ const LibraryPage: React.FC = () => {
     // Fetch Filtered Library (for View)
     const { dateSections: filteredDateSections, loading, refreshLibrary: refreshFilteredLibrary } = useLibraryData(dbFilter);
 
+    // Available species for ReID
+    const [availableSpecies, setAvailableSpecies] = useState<string[]>([]);
+    useEffect(() => {
+        window.api.getAvailableSpecies().then(result => {
+            if (result.ok && result.species) {
+                setAvailableSpecies(result.species);
+            }
+        });
+    }, []);
+
     // Unified Refresh
     const refreshLibrary = async () => {
         await Promise.all([refreshFullLibrary(), refreshFilteredLibrary()]);
@@ -158,13 +168,55 @@ const LibraryPage: React.FC = () => {
             clearSelection();
         } catch (error) {
             console.error('Batch detect error:', error);
-            alert('Failed to start detection: ' + error);
+            alert('Failed to start classification: ' + error);
+        }
+    };
+
+    const handleBatchReID = async (species: string) => {
+        if (selectedImageIds.size === 0) return;
+        const imageIds = Array.from(selectedImageIds);
+
+        try {
+            const result = await window.api.smartReID(imageIds, species);
+            if (result.ok) {
+                setIsSelectionMode(false);
+                clearSelection();
+            } else {
+                alert('ReID failed: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Batch ReID error:', error);
+            alert('Failed to start ReID: ' + error);
         }
     };
 
     const handleDeleteImage = async (image: DBImage) => {
         await window.api.deleteImage(image.id);
         await refreshLibrary();
+    };
+
+    // Group-level handlers for Analyse menu
+    const handleGroupClassify = async (images: DBImage[]) => {
+        const paths = images.map(img => img.original_path);
+        try {
+            await window.api.detect(paths, (txt) => console.log(txt));
+        } catch (error) {
+            console.error('Classification error:', error);
+            alert('Failed to start classification: ' + error);
+        }
+    };
+
+    const handleGroupReID = async (images: DBImage[], species: string) => {
+        const imageIds = images.map(img => img.id);
+        try {
+            const result = await window.api.smartReID(imageIds, species);
+            if (!result.ok) {
+                alert('ReID failed: ' + result.error);
+            }
+        } catch (error) {
+            console.error('ReID error:', error);
+            alert('Failed to start ReID: ' + error);
+        }
     };
 
     // Drag Drop Handlers
@@ -203,7 +255,12 @@ const LibraryPage: React.FC = () => {
                 setIsSelectionMode={setIsSelectionMode}
                 onBatchDelete={handleBatchDelete}
                 onBatchDetect={handleBatchDetect}
+                onBatchReID={handleBatchReID}
                 onBatchSave={handleBatchSave}
+                availableSpecies={availableSpecies}
+                aiButtonMode="analyse"
+                onClassify={handleGroupClassify}
+                onReID={handleGroupReID}
                 onDeleteImage={handleDeleteImage}
                 onDrop={handleDrop}
                 leftSidebarOpen={leftSidebarOpen}

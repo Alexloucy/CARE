@@ -144,6 +144,9 @@ export class JobManager {
                 case 'detect':
                     await this.handleDetectJob(job);
                     break;
+                case 'reid':
+                    await this.handleReidJob(job);
+                    break;
                 default:
                     throw new Error(`Unknown job type: ${job.type}`);
             }
@@ -338,6 +341,139 @@ export class JobManager {
     private async handleThumbnailJob(job: Job) {
         const { imageId, originalPath } = job.payload;
         await this.generateThumbnail(imageId, originalPath);
+    }
+
+    private async handleReidJob(job: Job) {
+        const { imageIds, species } = job.payload;
+        const tempDir = path.join(process.cwd(), 'temp', 'reid_v2');
+
+        try {
+            await fs.ensureDir(tempDir);
+
+            job.message = 'Checking images for detections...';
+            this.emitUpdate();
+
+            // Step 1: Get images without detections
+            const imagesWithoutDetections = DatabaseService.getImagesWithoutDetections(imageIds);
+
+            if (imagesWithoutDetections.length > 0) {
+                throw new Error(`${imagesWithoutDetections.length} images need detection first. Please run classification on all images before ReID.`);
+            }
+
+            // Step 2: Get all detections for selected images
+            const allDetections = DatabaseService.getDetectionsForImages(imageIds);
+
+            // Step 3: Filter by species
+            const speciesLower = species.toLowerCase();
+            const matchingDetections = allDetections.filter(
+                (det: any) => det.label?.toLowerCase() === speciesLower
+            );
+
+            if (matchingDetections.length === 0) {
+                throw new Error(`No ${species} detections found in the selected images.`);
+            }
+
+            job.message = `Found ${matchingDetections.length} ${species} detections. Starting ReID...`;
+            this.emitUpdate();
+
+            // Step 4: Generate input JSON for Python
+            const inputJsonPath = path.join(tempDir, `reid_input_${job.id}.json`);
+            const outputJsonPath = path.join(tempDir, `reid_output_${job.id}.json`);
+
+            const inputData = {
+                detections: matchingDetections.map((det: any) => ({
+                    detection_id: det.id,
+                    image_path: det.image_path,
+                    bbox: [det.x1, det.y1, det.x2, det.y2]
+                })),
+                output_path: outputJsonPath
+            };
+
+            await fs.writeJson(inputJsonPath, inputData, { spaces: 2 });
+
+            // Step 5: Run Python reid_v2
+            const args = ['reid_v2', inputJsonPath];
+            const ps = spawnPythonSubprocess(args);
+
+            if (!ps) {
+                throw new Error('Failed to start Python process');
+            }
+
+            setSubProcess(ps);
+
+            job.message = 'Loading AI models...';
+            this.emitUpdate();
+
+            // Wait for completion
+            await new Promise<void>((resolve, reject) => {
+                ps.stdout?.on('data', (data: Buffer) => {
+                    const txt = data.toString();
+                    console.log(`[ReID Job ${job.id}] ${txt.trim()}`);
+
+                    // Parse progress
+                    const processMatch = txt.match(/PROCESS:\s*(\d+)\/(\d+)/);
+                    if (processMatch) {
+                        const current = parseInt(processMatch[1]);
+                        const total = parseInt(processMatch[2]);
+                        if (total > 0) {
+                            job.progress = Math.floor((current / total) * 100);
+                            job.message = `Processing embeddings: ${current}/${total}`;
+                            this.emitUpdate();
+                        }
+                    } else if (txt.includes('Loading model')) {
+                        job.message = 'Loading AI models...';
+                        this.emitUpdate();
+                    } else if (txt.includes('STATUS: PROCESSING')) {
+                        job.message = 'Computing embeddings...';
+                        this.emitUpdate();
+                    }
+                });
+
+                ps.on('close', (code) => {
+                    setSubProcess(null);
+                    if (code === 0) {
+                        resolve();
+                    } else {
+                        reject(new Error(`ReID process exited with code ${code}`));
+                    }
+                });
+
+                ps.on('error', (err) => {
+                    reject(err);
+                });
+            });
+
+            // Step 6: Parse output and store in database
+            if (!await fs.pathExists(outputJsonPath)) {
+                throw new Error('ReID output file not found.');
+            }
+
+            const outputData = await fs.readJson(outputJsonPath);
+
+            // Create ReID run
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const runName = `ReID ${species} ${dateStr} ${timeStr}`;
+            const reidRunId = DatabaseService.createReidRun(runName, species);
+
+            // Create individuals and members
+            for (const individual of outputData.individuals) {
+                const individualId = DatabaseService.createReidIndividual(reidRunId, individual.name);
+                for (const detectionId of individual.detection_ids) {
+                    DatabaseService.addReidMember(individualId, detectionId);
+                }
+            }
+
+            job.message = `Identified ${outputData.individuals.length} individuals`;
+
+            // Cleanup temp files
+            await fs.remove(inputJsonPath).catch(() => {});
+            await fs.remove(outputJsonPath).catch(() => {});
+
+        } catch (error) {
+            throw error;
+        }
     }
 
     private async handleDetectJob(job: Job) {
