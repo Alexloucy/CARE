@@ -145,10 +145,38 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
     const dragStartIdRef = useRef<number | null>(null);
     const initialSelectionRef = useRef<Set<number>>(new Set());
     const isSelectingRef = useRef(true);
+    const autoScrollFrameRef = useRef<number | null>(null);
 
-    // Auto Scroll State (Simplified or removed if Virtuoso handles scrolling well enough, 
-    // but for drag-select we might need custom auto-scroll logic if we want to scroll while dragging at edges.
-    // For now, let's keep the logic simple: Standard click/drag selection within view)
+    // Auto Scroll Logic
+    const checkAutoScroll = (clientY: number) => {
+        if (!virtuosoRef.current || !isPointerDownRef.current) return;
+
+        const viewportHeight = window.innerHeight;
+        const scrollZoneHeight = 100; // px from edge to trigger scroll
+        const maxScrollSpeed = 15; // px per frame
+
+        if (autoScrollFrameRef.current) {
+            cancelAnimationFrame(autoScrollFrameRef.current);
+            autoScrollFrameRef.current = null;
+        }
+
+        let scrollAmount = 0;
+        if (clientY < scrollZoneHeight) {
+            // Scroll Up
+            // Speed increases as we get closer to the edge
+            const factor = 1 - (clientY / scrollZoneHeight);
+            scrollAmount = -Math.max(1, factor * maxScrollSpeed);
+        } else if (clientY > viewportHeight - scrollZoneHeight) {
+            // Scroll Down
+            const factor = 1 - ((viewportHeight - clientY) / scrollZoneHeight);
+            scrollAmount = Math.max(1, factor * maxScrollSpeed);
+        }
+
+        if (scrollAmount !== 0) {
+            virtuosoRef.current.scrollBy({ top: scrollAmount, behavior: 'auto' });
+            autoScrollFrameRef.current = requestAnimationFrame(() => checkAutoScroll(clientY));
+        }
+    };
 
     // ... (Keeping selection logic helpers but adapted) ...
 
@@ -201,12 +229,28 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
     };
 
     useEffect(() => {
+        const handleGlobalPointerMove = (e: PointerEvent) => {
+            if (isPointerDownRef.current) {
+                checkAutoScroll(e.clientY);
+            }
+        };
+
         const handleGlobalPointerUp = () => {
             isPointerDownRef.current = false;
             dragStartIdRef.current = null;
+            if (autoScrollFrameRef.current) {
+                cancelAnimationFrame(autoScrollFrameRef.current);
+                autoScrollFrameRef.current = null;
+            }
         };
+
+        window.addEventListener('pointermove', handleGlobalPointerMove);
         window.addEventListener('pointerup', handleGlobalPointerUp);
-        return () => window.removeEventListener('pointerup', handleGlobalPointerUp);
+        return () => {
+            window.removeEventListener('pointermove', handleGlobalPointerMove);
+            window.removeEventListener('pointerup', handleGlobalPointerUp);
+            if (autoScrollFrameRef.current) cancelAnimationFrame(autoScrollFrameRef.current);
+        };
     }, []);
 
     // Actions
@@ -396,7 +440,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                 style={{ height: '100%' }}
                 data={flatItems}
                 itemContent={itemContent}
-                overscan={500}
+                overscan={1000}
                 context={{ headerContent }}
                 rangeChanged={({ startIndex }) => {
                     if (!onActiveItemChange) return;
