@@ -1,5 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { Menu, MenuItem, useTheme } from '@mui/material';
+import { PencilSimple, Trash } from '@phosphor-icons/react';
 import { DBImage } from '../../types/electron';
 
 // Hooks
@@ -10,9 +12,11 @@ import { useSelection } from '../../hooks/useSelection';
 // Components
 import { LibraryFilter } from '../../components/library/LibraryFilterDialog';
 import { MediaExplorer } from '../../components/library/MediaExplorer';
+import { GroupNameDialog } from '../../components/GroupNameDialog';
 import { DateSection, GroupData } from '../../types/library';
 
 const DetectionPage: React.FC = () => {
+    const theme = useTheme();
     const { leftSidebarOpen, rightSidebarOpen } = useOutletContext<{ leftSidebarOpen: boolean; rightSidebarOpen: boolean }>();
 
     // 1. Filter & Search State
@@ -26,6 +30,12 @@ const DetectionPage: React.FC = () => {
     const [fullDateSections, setFullDateSections] = useState<DateSection[]>([]); // Needed for timeline?
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [availableSpecies, setAvailableSpecies] = useState<string[]>([]);
+
+    // Detection Batch (Group) Actions State
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
+    const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+    const [batchToRename, setBatchToRename] = useState<{ id: number; name: string } | null>(null);
 
     const refreshLibrary = async () => {
         setRefreshTrigger(prev => prev + 1);
@@ -194,15 +204,30 @@ const DetectionPage: React.FC = () => {
     // Batch Actions
     const handleBatchDelete = async () => {
         if (selectedImageIds.size === 0) return;
-        if (window.confirm(`Are you sure you want to delete ${selectedImageIds.size} images?`)) {
+        
+        // Gather all detections from selected images
+        const detectionsToDelete = allImages
+            .filter(img => selectedImageIds.has(img.id))
+            .flatMap(img => img.detections || []);
+
+        if (detectionsToDelete.length === 0) {
+            alert('No detections found in the selected images.');
+            return;
+        }
+
+        if (window.confirm(`Are you sure you want to delete ${detectionsToDelete.length} detections from ${selectedImageIds.size} images?`)) {
             try {
-                for (const id of selectedImageIds) {
-                    await window.api.deleteImage(id);
+                setLoading(true);
+                for (const det of detectionsToDelete) {
+                    await window.api.deleteDetection(det.id);
                 }
                 await refreshLibrary();
                 clearSelection();
             } catch (error) {
                 console.error('Batch delete error:', error);
+                alert('Failed to delete some detections.');
+            } finally {
+                setLoading(false);
             }
         }
     };
@@ -249,7 +274,71 @@ const DetectionPage: React.FC = () => {
         await refreshLibrary();
     };
 
+    const handleDeleteDetection = async (id: number) => {
+        if (window.confirm('Are you sure you want to delete this detection?')) {
+            await window.api.deleteDetection(id);
+            await refreshLibrary();
+        }
+    };
+
+    // Detection Batch (Group) Menu Handlers
+    const handleMenuOpen = (e: React.MouseEvent<HTMLElement>, groupId: number) => {
+        e.stopPropagation();
+        setAnchorEl(e.currentTarget);
+        setSelectedBatchId(groupId);
+    };
+
+    const handleMenuClose = () => {
+        setAnchorEl(null);
+        setSelectedBatchId(null);
+    };
+
+    const handleRenameBatchClick = () => {
+        if (selectedBatchId === null) return;
+        const batch = fullDateSections
+            .flatMap(s => s.groups)
+            .find(g => g.id === selectedBatchId);
+        if (batch) {
+            setBatchToRename({ id: batch.id, name: batch.name });
+            setRenameDialogOpen(true);
+        }
+        handleMenuClose();
+    };
+
+    const handleConfirmRename = async (newName: string) => {
+        if (!batchToRename) return;
+        try {
+            await window.api.updateDetectionBatchName(batchToRename.id, newName);
+            await refreshLibrary();
+        } catch (error) {
+            console.error('Rename batch error:', error);
+            alert('Failed to rename detection batch.');
+        }
+        setRenameDialogOpen(false);
+        setBatchToRename(null);
+    };
+
+    const handleDeleteBatch = async () => {
+        if (selectedBatchId === null) return;
+        const batch = fullDateSections
+            .flatMap(s => s.groups)
+            .find(g => g.id === selectedBatchId);
+        if (!batch) return;
+
+        if (window.confirm(`Are you sure you want to delete the detection batch "${batch.name}"? This will delete all detections in this batch.`)) {
+            try {
+                await window.api.deleteDetectionBatch(selectedBatchId);
+                await refreshLibrary();
+            } catch (error) {
+                console.error('Delete batch error:', error);
+                alert('Failed to delete detection batch.');
+            }
+        }
+        handleMenuClose();
+    };
+
     return (
+        <>
         <MediaExplorer
             title="Detection"
             loading={loading}
@@ -277,10 +366,50 @@ const DetectionPage: React.FC = () => {
             onBatchDetect={handleBatchDetect}
             onBatchSave={handleBatchSave}
             onDeleteImage={handleDeleteImage}
+            onDeleteDetection={handleDeleteDetection}
             leftSidebarOpen={leftSidebarOpen}
             rightSidebarOpen={rightSidebarOpen}
             availableSpecies={availableSpecies}
+            onGroupMenuOpen={handleMenuOpen}
+            groupMenu={
+                <Menu
+                    anchorEl={anchorEl}
+                    open={Boolean(anchorEl)}
+                    onClose={handleMenuClose}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                    transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                    PaperProps={{
+                        elevation: 0,
+                        sx: {
+                            backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(45, 45, 45, 0.85)',
+                            backdropFilter: 'blur(8px)',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+                            border: `1px solid ${theme.palette.divider}`,
+                            minWidth: '160px',
+                            mt: 0.5
+                        }
+                    }}
+                    MenuListProps={{ sx: { padding: '6px' } }}
+                >
+                    <MenuItem onClick={handleRenameBatchClick} sx={{ borderRadius: '6px', margin: '2px 0', gap: 1 }}>
+                        <PencilSimple size={18} /> Rename
+                    </MenuItem>
+                    <MenuItem onClick={handleDeleteBatch} sx={{ borderRadius: '6px', margin: '2px 0', gap: 1, color: 'error.main' }}>
+                        <Trash size={18} /> Delete
+                    </MenuItem>
+                </Menu>
+            }
         />
+
+        <GroupNameDialog
+            open={renameDialogOpen}
+            onClose={() => { setRenameDialogOpen(false); setBatchToRename(null); }}
+            onConfirm={handleConfirmRename}
+            title="Rename Detection Batch"
+            initialValue={batchToRename?.name || ''}
+        />
+        </>
     );
 };
 

@@ -71,6 +71,7 @@ interface MediaExplorerProps {
     onBatchDetect: () => void;
     onBatchSave: () => void;
     onDeleteImage: (img: DBImage) => Promise<void>; // Single image delete from modal
+    onDeleteDetection?: (id: number) => void; // Single detection delete from modal
 
     // Custom Header Actions (e.g. Upload)
     headerActions?: React.ReactNode;
@@ -118,6 +119,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     onBatchDetect,
     onBatchSave,
     onDeleteImage,
+    onDeleteDetection,
     headerActions,
     onDrop,
     isDragging = false,
@@ -427,6 +429,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                 }}
                 detections={selectedImage?.image.detections}
                 useLiquidGlass={useLiquidGlass}
+                onDeleteDetection={onDeleteDetection}
             />
 
             {groupMenu}

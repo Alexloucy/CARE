@@ -11,9 +11,10 @@ interface DetectionBoxProps {
     containerWidth: number;
     containerHeight: number;
     useLiquidGlass?: boolean;
+    onDelete?: (id: number) => void;
 }
 
-const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, containerWidth, containerHeight, useLiquidGlass = true }) => {
+const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, containerWidth, containerHeight, useLiquidGlass = true, onDelete }) => {
     const [isHovered, setIsHovered] = useState(false);
     const boxRef = useRef<HTMLDivElement>(null);
     const theme = useTheme();
@@ -117,6 +118,16 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, containerW
                         <Typography variant="caption" display="block" color="text.secondary">
                             Confidence: {(detection.confidence * 100).toFixed(1)}%
                         </Typography>
+                        {onDelete && (
+                            <IconButton
+                                size="small"
+                                onClick={(e) => { e.stopPropagation(); onDelete(detection.id); }}
+                                sx={{ mt: 1, color: '#ff4444', '&:hover': { bgcolor: 'rgba(255,68,68,0.1)' } }}
+                            >
+                                <Trash size={16} />
+                                <Typography variant="caption" sx={{ ml: 0.5 }}>Delete Detection</Typography>
+                            </IconButton>
+                        )}
                     </Paper>
                 </Fade>
             </Box>
@@ -295,6 +306,16 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, containerW
                                     {(detection.detection_confidence * 100).toFixed(1)}%
                                 </Typography>
                             </Box>
+                            {onDelete && (
+                                <IconButton
+                                    size="small"
+                                    onClick={(e) => { e.stopPropagation(); onDelete(detection.id); }}
+                                    sx={{ mt: 1, color: '#ff4444', width: '100%', borderRadius: 1, '&:hover': { bgcolor: 'rgba(255,68,68,0.1)' } }}
+                                >
+                                    <Trash size={16} />
+                                    <Typography variant="caption" sx={{ ml: 0.5 }}>Delete Detection</Typography>
+                                </IconButton>
+                            )}
                         </Box>
                     </Paper>
                 </Box>
@@ -315,6 +336,7 @@ interface ImageModalProps {
     onDelete?: () => void;
     detections?: Detection[];
     useLiquidGlass?: boolean;
+    onDeleteDetection?: (id: number) => void;
 }
 
 const ImageModal: React.FC<ImageModalProps> = ({
@@ -328,7 +350,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
     hasPrev,
     onDelete,
     detections,
-    useLiquidGlass = true
+    useLiquidGlass = true,
+    onDeleteDetection
 }) => {
     const [zoom, setZoom] = useState(1);
     const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -557,6 +580,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
                                             containerWidth={imageDimensions.displayed.width}
                                             containerHeight={imageDimensions.displayed.height}
                                             useLiquidGlass={useLiquidGlass}
+                                            onDelete={onDeleteDetection}
                                         />
                                     );
                                 })}
