@@ -1,8 +1,9 @@
-import { Box, Collapse, IconButton, Tooltip, Typography, useTheme, Chip } from '@mui/material';
+import { Box, IconButton, Tooltip, Typography, useTheme, Chip } from '@mui/material';
 import { CaretDown, CaretRight, Check as CheckIcon, DotsThreeVertical, UploadSimple } from '@phosphor-icons/react';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Virtuoso } from 'react-virtuoso';
 import { DBImage } from '../../types/electron';
-import { DateSection } from '../../types/library';
+import { DateSection, GroupData } from '../../types/library';
 import AiModeButton from '../AiModeButton';
 import ImageCard from '../ImageCard';
 
@@ -20,8 +21,14 @@ interface DateGroupListProps {
     onImageClick: (image: DBImage) => void;
     onMenuOpen: (event: React.MouseEvent<HTMLElement>, groupId: number) => void;
     gridItemSize?: number;
-    showNames?: boolean; // Toggle for showing file names
+    showNames?: boolean;
+    headerContent?: React.ReactNode;
 }
+
+type FlatItem = 
+    | { type: 'date-header'; date: string; id: string }
+    | { type: 'group-header'; group: GroupData; id: string }
+    | { type: 'image-row'; images: DBImage[]; groupId: number; id: string };
 
 export const DateGroupList: React.FC<DateGroupListProps> = ({
     dateSections,
@@ -37,144 +44,96 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
     onImageClick,
     onMenuOpen,
     gridItemSize = 180,
-    showNames = false
+    showNames = false,
+    headerContent
 }) => {
     const theme = useTheme();
     const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(new Set());
+    const [containerWidth, setContainerWidth] = useState(0);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Resize Observer to get width
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver(entries => {
+            for (const entry of entries) {
+                setContainerWidth(entry.contentRect.width);
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
+
+    // Calculate columns
+    // Account for px: 4 (32px * 2 = 64px) padding on the rows
+    const horizontalPadding = 64;
+    const availableWidth = containerWidth - horizontalPadding;
+    const gap = 16; // 2 * 8px (theme spacing 2)
+    const minItemWidth = gridItemSize;
+    
+    // Avoid division by zero or negative width
+    const columns = availableWidth > 0 
+        ? Math.max(1, Math.floor((availableWidth + gap) / (minItemWidth + gap)))
+        : 0;
+
+    // Flatten Data
+    const flatItems = useMemo(() => {
+        const items: FlatItem[] = [];
+        if (columns === 0) return items;
+
+        dateSections.forEach(section => {
+            items.push({ type: 'date-header', date: section.date, id: `date-${section.date}` });
+            
+            section.groups.forEach(group => {
+                items.push({ type: 'group-header', group, id: `group-header-${group.id}` });
+                
+                if (!collapsedGroups.has(group.id)) {
+                    // Chunk images into rows
+                    for (let i = 0; i < group.images.length; i += columns) {
+                        const rowImages = group.images.slice(i, i + columns);
+                        items.push({ 
+                            type: 'image-row', 
+                            images: rowImages, 
+                            groupId: group.id, 
+                            id: `group-${group.id}-row-${i}` 
+                        });
+                    }
+                }
+            });
+        });
+        return items;
+    }, [dateSections, collapsedGroups, columns]);
 
     // Drag Selection State
     const isPointerDownRef = useRef(false);
     const dragStartIdRef = useRef<number | null>(null);
     const initialSelectionRef = useRef<Set<number>>(new Set());
-    const isSelectingRef = useRef(true); // true = add to selection, false = remove
+    const isSelectingRef = useRef(true);
 
-    // Auto Scroll State
-    const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    const scrollContainerRef = useRef<HTMLElement | null>(null);
-    const lastPointerYRef = useRef<number>(0);
-
-    const getScrollParent = (node: HTMLElement | null): HTMLElement | null => {
-        if (!node) return null;
-        const style = window.getComputedStyle(node);
-        const overflowY = style.overflowY;
-        const isScrollable = overflowY !== 'visible' && overflowY !== 'hidden';
-
-        if (isScrollable && node.scrollHeight > node.clientHeight) {
-            return node;
-        }
-        return getScrollParent(node.parentElement);
-    };
-
-    const checkAutoScroll = () => {
-        if (!isPointerDownRef.current) return;
-
-        const y = lastPointerYRef.current;
-        const threshold = 100; // px from edge
-        const maxSpeed = 20; // px per frame
-
-        let speed = 0;
-        if (y < threshold) {
-            // Scroll Up - faster as we get closer to 0
-            speed = -maxSpeed * (1 - y / threshold);
-        } else if (y > window.innerHeight - threshold) {
-            // Scroll Down
-            speed = maxSpeed * (1 - (window.innerHeight - y) / threshold);
-        }
-
-        if (speed !== 0) {
-            // Find container if needed
-            if (!scrollContainerRef.current) {
-                // Try to find it starting from a known element ID or just the document body?
-                // We can try finding an element we rendered.
-                // Let's pick the first date header as a starting point if it exists
-                const firstDate = dateSections[0]?.date;
-                if (firstDate) {
-                    const el = document.getElementById(`date-${firstDate}`);
-                    if (el) {
-                        scrollContainerRef.current = getScrollParent(el);
-                    }
-                }
-            }
-
-            if (scrollContainerRef.current) {
-                scrollContainerRef.current.scrollBy(0, speed);
-            } else {
-                // Fallback to window
-                window.scrollBy(0, speed);
-            }
-        }
-    };
-
-    useEffect(() => {
-        const handleGlobalPointerUp = () => {
-            isPointerDownRef.current = false;
-            dragStartIdRef.current = null;
-            if (scrollIntervalRef.current) {
-                clearInterval(scrollIntervalRef.current);
-                scrollIntervalRef.current = null;
-            }
-        };
-
-        const handleGlobalPointerMove = (e: PointerEvent) => {
-            if (isPointerDownRef.current) {
-                lastPointerYRef.current = e.clientY;
-                // Ensure loop is running
-                if (!scrollIntervalRef.current) {
-                    scrollIntervalRef.current = setInterval(checkAutoScroll, 16); // ~60fps
-                }
-            }
-        };
-
-        window.addEventListener('pointerup', handleGlobalPointerUp);
-        window.addEventListener('pointermove', handleGlobalPointerMove);
-
-        return () => {
-            window.removeEventListener('pointerup', handleGlobalPointerUp);
-            window.removeEventListener('pointermove', handleGlobalPointerMove);
-            if (scrollIntervalRef.current) clearInterval(scrollIntervalRef.current);
-        };
-    }, [dateSections]); // Re-bind if dateSections change (for getElementById fallback), though unlikely needed.
+    // Auto Scroll State (Simplified or removed if Virtuoso handles scrolling well enough, 
+    // but for drag-select we might need custom auto-scroll logic if we want to scroll while dragging at edges.
+    // For now, let's keep the logic simple: Standard click/drag selection within view)
+    
+    // ... (Keeping selection logic helpers but adapted) ...
 
     const startDragSession = (imgId: number) => {
         dragStartIdRef.current = imgId;
-
-        // Snapshot current selection
         initialSelectionRef.current = new Set(selectedImageIds);
-
-        // Determine behavior based on the clicked item's state IN THE SNAPSHOT
-        // Standard: If clicking unselected -> Select. If clicking selected -> Deselect.
         const wasSelected = initialSelectionRef.current.has(imgId);
         isSelectingRef.current = !wasSelected;
-
-        // Apply to the start item immediately
+        
         const newSelection = new Set(initialSelectionRef.current);
-        if (isSelectingRef.current) {
-            newSelection.add(imgId);
-        } else {
-            newSelection.delete(imgId);
-        }
-
-        if (onSetSelection) {
-            onSetSelection(newSelection);
-        } else {
-            onToggleSelection(imgId);
-        }
+        if (isSelectingRef.current) newSelection.add(imgId);
+        else newSelection.delete(imgId);
+        
+        if (onSetSelection) onSetSelection(newSelection);
+        else onToggleSelection(imgId);
     };
 
     const handleLongPress = (imgId: number) => {
         if (!isSelectionMode && onEnableSelectionMode) {
             onEnableSelectionMode();
-
-            // Manually start drag session immediately
             isPointerDownRef.current = true;
-
-            // Since we are just enabling selection mode, the item is currently unselected (visually).
-            // We want to select it and start drag-select mode (adding).
-            // Note: selectedImageIds might be stale if onEnableSelectionMode triggers update,
-            // but usually it's empty or cleared when entering mode.
-
-            // We need to assume 'selectedImageIds' matches what user sees (unselected).
-            // But if we reuse startDragSession, it uses current props.
             startDragSession(imgId);
         }
     };
@@ -188,91 +147,61 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
 
     const handlePointerEnter = (imgId: number) => {
         if (isSelectionMode && isPointerDownRef.current && dragStartIdRef.current !== null && onSetSelection && allImages.length > 0) {
-            // Find indices
-            // Optimization: We could cache indices map, but findIndex on array of ~thousands is fast enough for UI
-            const startIndex = allImages.findIndex(img => img.id === dragStartIdRef.current);
-            const currentIndex = allImages.findIndex(img => img.id === imgId);
+             const startIndex = allImages.findIndex(img => img.id === dragStartIdRef.current);
+             const currentIndex = allImages.findIndex(img => img.id === imgId);
+             if (startIndex === -1 || currentIndex === -1) return;
 
-            if (startIndex === -1 || currentIndex === -1) return;
+             const minIndex = Math.min(startIndex, currentIndex);
+             const maxIndex = Math.max(startIndex, currentIndex);
+             const newSelection = new Set(initialSelectionRef.current);
 
-            const minIndex = Math.min(startIndex, currentIndex);
-            const maxIndex = Math.max(startIndex, currentIndex);
-
-            // Start with the INITIAL state (before drag started)
-            const newSelection = new Set(initialSelectionRef.current);
-
-            // Apply operation to the range
-            for (let i = minIndex; i <= maxIndex; i++) {
-                const id = allImages[i].id;
-                if (isSelectingRef.current) {
-                    newSelection.add(id);
-                } else {
-                    newSelection.delete(id);
-                }
-            }
-
-            onSetSelection(newSelection);
+             for (let i = minIndex; i <= maxIndex; i++) {
+                 const id = allImages[i].id;
+                 if (isSelectingRef.current) newSelection.add(id);
+                 else newSelection.delete(id);
+             }
+             onSetSelection(newSelection);
         }
     };
 
+    useEffect(() => {
+        const handleGlobalPointerUp = () => {
+            isPointerDownRef.current = false;
+            dragStartIdRef.current = null;
+        };
+        window.addEventListener('pointerup', handleGlobalPointerUp);
+        return () => window.removeEventListener('pointerup', handleGlobalPointerUp);
+    }, []);
+
+    // Actions
     const handleSelectGroup = (groupImages: DBImage[]) => {
         if (!onSetSelection) return;
-
-        // Enable selection mode if not active
-        if (!isSelectionMode && onEnableSelectionMode) {
-            onEnableSelectionMode();
-        }
-
+        if (!isSelectionMode && onEnableSelectionMode) onEnableSelectionMode();
+        
         const groupIds = groupImages.map(img => img.id);
-        // Check against current props. Note: If onEnableSelectionMode just ran, selectedImageIds might be empty/stale
-        // in this render cycle, so we might default to selecting all.
         const allSelected = groupIds.every(id => selectedImageIds.has(id));
-
         const newSelection = new Set(selectedImageIds);
-
-        if (allSelected) {
-            // Deselect all
-            groupIds.forEach(id => newSelection.delete(id));
-        } else {
-            // Select all
-            groupIds.forEach(id => newSelection.add(id));
-        }
-
+        
+        if (allSelected) groupIds.forEach(id => newSelection.delete(id));
+        else groupIds.forEach(id => newSelection.add(id));
+        
         onSetSelection(newSelection);
-
-        // Exit selection mode if nothing is left selected
-        if (newSelection.size === 0 && onExitSelectionMode) {
-            onExitSelectionMode();
-        }
+        if (newSelection.size === 0 && onExitSelectionMode) onExitSelectionMode();
     };
 
     const toggleGroup = (groupId: number) => {
         const newCollapsed = new Set(collapsedGroups);
-        if (newCollapsed.has(groupId)) {
-            newCollapsed.delete(groupId);
-        } else {
-            newCollapsed.add(groupId);
-        }
+        if (newCollapsed.has(groupId)) newCollapsed.delete(groupId);
+        else newCollapsed.add(groupId);
         setCollapsedGroups(newCollapsed);
     };
 
     const handleDetect = async (images: DBImage[]) => {
-        console.log('Running detection on', images.length, 'images');
         const paths = images.map(img => img.original_path);
         try {
-            const response = await window.api.detect(paths, (text: string) => {
-                console.log('Detection Stream:', text);
-            });
-
-            if (response.ok) {
-                console.log('Detection completed successfully');
-                // TODO: Show success notification or navigate
-            } else {
-                console.error('Detection failed:', response.error);
-                alert('Detection failed: ' + response.error);
-            }
+            const response = await window.api.detect(paths, () => {});
+            if (!response.ok) alert('Detection failed: ' + response.error);
         } catch (error) {
-            console.error('Error triggering detection:', error);
             alert('Error triggering detection: ' + error);
         }
     };
@@ -286,169 +215,142 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
         return date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     };
 
+    // Render Item
+    const itemContent = (_: number, item: FlatItem) => {
+        if (item.type === 'date-header') {
+            return (
+                <Box id={item.id} sx={{ mt: 4, mb: 2, px: 4 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.text.secondary, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.875rem' }}>
+                        {formatDate(item.date)}
+                    </Typography>
+                </Box>
+            );
+        } else if (item.type === 'group-header') {
+            const group = item.group;
+            const isCollapsed = collapsedGroups.has(group.id);
+            const isAllSelected = group.images.every((img: DBImage) => selectedImageIds.has(img.id));
+            
+            return (
+                <Box id={`group-${group.id}`} sx={{ 
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, mt: 1, px: 4,
+                    '&:hover .collapse-arrow': { opacity: 1, transform: 'translateX(0)' },
+                    '&:hover .group-menu-button': { opacity: 1 },
+                    '&:hover .group-select-button': { opacity: 1 },
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative' }}>
+                         <Box sx={{ position: 'absolute', left: -29, display: 'flex', alignItems: 'center', height: '100%' }}>
+                            <IconButton
+                                className="collapse-arrow"
+                                size="small"
+                                onClick={() => toggleGroup(group.id)}
+                                sx={{ padding: 0.5, opacity: 0, transition: 'all 0.2s ease' }}
+                            >
+                                {isCollapsed ? <CaretRight size={20} /> : <CaretDown size={20} />}
+                            </IconButton>
+                        </Box>
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>{group.name}</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ bgcolor: theme.palette.action.selected, px: 1, py: 0.5, borderRadius: 1 }}>
+                            {group.images.length}
+                        </Typography>
+                        <Tooltip title="Select all in group">
+                            <IconButton
+                                className="group-select-button"
+                                size="small"
+                                onClick={(e) => { e.stopPropagation(); handleSelectGroup(group.images); }}
+                                sx={{ opacity: isAllSelected ? 1 : 0, transition: 'opacity 0.2s ease', color: isAllSelected ? 'primary.main' : 'text.secondary' }}
+                            >
+                                <CheckIcon size={20} weight={isAllSelected ? "bold" : "regular"} />
+                            </IconButton>
+                        </Tooltip>
+                         <IconButton
+                            className="group-menu-button"
+                            size="small"
+                            onClick={(e) => onMenuOpen(e, group.id)}
+                            sx={{ opacity: 0, transition: 'opacity 0.2s ease' }}
+                        >
+                            <DotsThreeVertical size={20} />
+                        </IconButton>
+                    </Box>
+                    <AiModeButton
+                        text={group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length > 0
+                            ? `Detect (${group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length})`
+                            : "Detect"}
+                        onClick={() => {
+                            const selectedInGroup = group.images.filter((img: DBImage) => selectedImageIds.has(img.id));
+                            handleDetect(selectedInGroup.length > 0 ? selectedInGroup : group.images);
+                        }}
+                    />
+                </Box>
+            );
+        } else {
+            // Image Row
+            return (
+                <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 2, mb: 2, px: 4 }}>
+                    {item.images.map(img => {
+                        const fileDetails = {
+                            name: img.original_path.split(/[\\/]/).pop() || 'image.jpg',
+                            path: img.original_path,
+                            isDirectory: false
+                        };
+                        let badge = null;
+                        if (img.detections && img.detections.length > 0) {
+                            const labels = Array.from(new Set(img.detections.map(d => d.label).filter(l => l && l !== 'blank')));
+                            if (labels.length === 0) {
+                                badge = <Chip label="Empty" size="small" sx={{ bgcolor: 'rgba(0,0,0,0.6)', color: 'white', height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
+                            } else {
+                                const text = labels.length > 1 ? `${labels[0]} +${labels.length - 1}` : labels[0];
+                                badge = <Chip label={text} size="small" sx={{ bgcolor: '#ffffff', color: '#000000', height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
+                            }
+                        }
+
+                        return (
+                            <Box key={img.id} sx={{ minWidth: 0 }}>
+                                <ImageCard
+                                    file={fileDetails}
+                                    date={item.id} // Just needs a string
+                                    // @ts-ignore
+                                    loadImage={() => loadImage(img)}
+                                    imageUrl={imageUrls[img.id]}
+                                    onClick={() => onImageClick(img)}
+                                    selectable={isSelectionMode}
+                                    selected={selectedImageIds.has(img.id)}
+                                    onToggleSelection={() => onToggleSelection(img.id)}
+                                    showNames={showNames}
+                                    onLongPress={() => handleLongPress(img.id)}
+                                    onPointerDown={(e) => handlePointerDown(e, img.id)}
+                                    onPointerEnter={() => handlePointerEnter(img.id)}
+                                    badge={badge}
+                                />
+                            </Box>
+                        );
+                    })}
+                </Box>
+            );
+        }
+    };
+
     if (dateSections.length === 0) {
         return (
-            <Box
-                sx={{
-                    height: '60vh',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: 0.6
-                }}
-            >
+            <Box sx={{ height: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
                 <UploadSimple size={64} color={theme.palette.text.primary} weight="thin" />
-                <Typography variant="h5" fontWeight="500" sx={{ mt: 3, color: 'text.primary' }}>
-                    No images yet
-                </Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-                    Drag and drop or click Upload to start
-                </Typography>
+                <Typography variant="h5" fontWeight="500" sx={{ mt: 3, color: 'text.primary' }}>No images yet</Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>Drag and drop or click Upload to start</Typography>
             </Box>
         );
     }
 
     return (
-        <Box>
-            {dateSections.map((section) => (
-                <Box key={section.date} id={`date-${section.date}`} sx={{ mb: 5, mt: 2, scrollMarginTop: '100px' }}>
-                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, color: theme.palette.text.secondary, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.875rem' }}>
-                        {formatDate(section.date)}
-                    </Typography>
-
-                    {section.groups.map(group => {
-                        const isCollapsed = collapsedGroups.has(group.id);
-                        // Check if all in group are selected for button state (optional visual feedback)
-                        const isAllSelected = group.images.every(img => selectedImageIds.has(img.id));
-
-                        return (
-                            <Box key={group.id} id={`group-${group.id}`} sx={{ mb: 4, scrollMarginTop: '100px' }}>
-                                <Box sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    mb: 2,
-                                    position: 'relative', // Establish positioning context
-                                    '&:hover .collapse-arrow': { opacity: 1, transform: 'translateX(0)' },
-                                    '&:hover .group-menu-button': { opacity: 1 },
-                                    '&:hover .group-select-button': { opacity: 1 },
-                                    '& .collapse-arrow': {
-                                        opacity: 0,
-                                        transition: 'all 0.2s ease'
-                                    }
-                                }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}> {/* Restored gap: 2 */}
-                                        {/* Arrow positioned absolutely to the left */}
-                                        <Box sx={{ position: 'absolute', left: -29, display: 'flex', alignItems: 'center', height: '100%' }}>
-                                            <IconButton
-                                                className="collapse-arrow"
-                                                size="small"
-                                                onClick={() => toggleGroup(group.id)}
-                                                sx={{ padding: 0.5 }}
-                                            >
-                                                {isCollapsed ? <CaretRight size={20} /> : <CaretDown size={20} />}
-                                            </IconButton>
-                                        </Box>
-
-                                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                            {group.name}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary" sx={{ bgcolor: theme.palette.action.selected, px: 1, py: 0.5, borderRadius: 1 }}>
-                                            {group.images.length}
-                                        </Typography>
-
-                                        {/* Select All Button */}
-                                        <Tooltip title="Select all in group" enterDelay={0}>
-                                            <IconButton
-                                                className="group-select-button"
-                                                size="small"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleSelectGroup(group.images);
-                                                }}
-                                                sx={{
-                                                    opacity: isAllSelected ? 1 : 0, // Show if selected, else hover
-                                                    transition: 'opacity 0.2s ease',
-                                                    color: isAllSelected ? 'primary.main' : 'text.secondary'
-                                                }}
-                                            >
-                                                <CheckIcon size={20} weight={isAllSelected ? "bold" : "regular"} />
-                                            </IconButton>
-                                        </Tooltip>
-
-                                        <IconButton
-                                            className="group-menu-button"
-                                            size="small"
-                                            onClick={(e) => onMenuOpen(e, group.id)}
-                                            sx={{ opacity: 0, transition: 'opacity 0.2s ease' }}
-                                        >
-                                            <DotsThreeVertical size={20} />
-                                        </IconButton>
-                                    </Box>
-                                    <AiModeButton
-                                        text={group.images.filter(img => selectedImageIds.has(img.id)).length > 0
-                                            ? `Detect (${group.images.filter(img => selectedImageIds.has(img.id)).length})`
-                                            : "Detect"}
-                                        onClick={() => {
-                                            const selectedInGroup = group.images.filter(img => selectedImageIds.has(img.id));
-                                            handleDetect(selectedInGroup.length > 0 ? selectedInGroup : group.images);
-                                        }}
-                                    />
-                                </Box>
-
-                                <Collapse in={!isCollapsed} timeout={300}>
-                                    <Box sx={{
-                                        display: 'grid',
-                                        gridTemplateColumns: `repeat(auto-fill, minmax(${gridItemSize}px, 1fr))`,
-                                        gap: 2
-                                    }}>
-                                        {group.images.map((img) => {
-                                            const fileDetails = {
-                                                name: img.original_path.split(/[\\/]/).pop() || 'image.jpg',
-                                                path: img.original_path,
-                                                isDirectory: false
-                                            };
-
-                                            let badge = null;
-                                            if (img.detections && img.detections.length > 0) {
-                                                const labels = Array.from(new Set(img.detections.map(d => d.label).filter(l => l && l !== 'blank')));
-                                                if (labels.length === 0) {
-                                                    badge = <Chip label="Empty" size="small" sx={{ bgcolor: 'rgba(0,0,0,0.6)', color: 'white', height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
-                                                } else {
-                                                    const text = labels.length > 1 ? `${labels[0]} +${labels.length - 1}` : labels[0];
-                                                    badge = <Chip label={text} size="small" sx={{ bgcolor: '#ffffff', color: '#000000', height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
-                                                }
-                                            }
-
-                                            return (
-                                                <Box key={img.id}>
-                                                    <ImageCard
-                                                        file={fileDetails}
-                                                        date={section.date}
-                                                        // @ts-ignore - Wrapper to match prop type if necessary
-                                                        loadImage={() => loadImage(img)}
-                                                        imageUrl={imageUrls[img.id]}
-                                                        onClick={() => onImageClick(img)}
-                                                        selectable={isSelectionMode}
-                                                        selected={selectedImageIds.has(img.id)}
-                                                        onToggleSelection={() => onToggleSelection(img.id)}
-                                                        showNames={showNames}
-                                                        onLongPress={() => handleLongPress(img.id)}
-                                                        onPointerDown={(e) => handlePointerDown(e, img.id)}
-                                                        onPointerEnter={() => handlePointerEnter(img.id)}
-                                                        badge={badge}
-                                                    />
-                                                </Box>
-                                            );
-                                        })}
-                                    </Box>
-                                </Collapse>
-                            </Box>
-                        );
-                    })}
-                </Box>
-            ))}
+        <Box ref={containerRef} sx={{ height: '100%', width: '100%' }}>
+            <Virtuoso
+                style={{ height: '100%' }}
+                data={flatItems}
+                itemContent={itemContent}
+                overscan={500}
+                components={{
+                    Header: () => <Box>{headerContent}</Box>
+                }}
+            />
         </Box>
     );
 };
+

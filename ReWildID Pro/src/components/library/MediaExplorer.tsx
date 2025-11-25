@@ -19,7 +19,8 @@ import {
     Gear,
     X
 } from '@phosphor-icons/react';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { NAVBAR_HEIGHT } from '../../app/layout/navbar/Navbar';
 import { DBImage } from '../../types/electron';
 import { DateSection } from '../../types/library';
 
@@ -146,16 +147,26 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     }, [isSelectionMode, clearSelection]);
 
     // Zoom Handler
-    const handleWheel = (e: React.WheelEvent) => {
-        if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            const delta = e.deltaY * -2.5;
-            setGridItemSize(prev => {
-                const newVal = prev + delta;
-                return Math.min(Math.max(newVal, 100), 400);
-            });
-        }
-    };
+    const zoomContainerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const container = zoomContainerRef.current;
+        if (!container) return;
+
+        const handleWheel = (e: WheelEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                const delta = e.deltaY * -2.5;
+                setGridItemSize(prev => {
+                    const newVal = prev + delta;
+                    return Math.min(Math.max(newVal, 100), 400);
+                });
+            }
+        };
+
+        container.addEventListener('wheel', handleWheel, { passive: false });
+        return () => container.removeEventListener('wheel', handleWheel);
+    }, []);
 
     const handleResetView = () => {
         setGridItemSize(180);
@@ -273,65 +284,18 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                 />
             )}
 
-            {/* Header */}
-            <Box sx={{ p: 3, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: theme.palette.background.default, zIndex: 10 }}>
-                <Typography variant="h4" fontWeight="bold">{title}</Typography>
-                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                    <LibrarySearchBar onSearch={onSearchChange} />
-
-                    <Tooltip title="Filter">
-                        <IconButton
-                            onClick={() => setFilterDialogOpen(true)}
-                            color={activeFilter ? 'inherit' : 'default'}
-                            sx={{
-                                bgcolor: activeFilter ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
-                                '&:hover': { bgcolor: activeFilter ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.20)') : theme.palette.action.hover }
-                            }}
-                        >
-                            <Funnel weight={activeFilter ? "fill" : "regular"} />
-                        </IconButton>
-                    </Tooltip>
-
-                    <Tooltip title="View Settings">
-                        <IconButton
-                            onClick={(e) => setSettingsAnchorEl(e.currentTarget)}
-                            sx={{ '&:hover': { bgcolor: theme.palette.action.hover } }}
-                        >
-                            <Gear weight="regular" />
-                        </IconButton>
-                    </Tooltip>
-
-                    <Tooltip title={isSelectionMode ? "Cancel Selection" : "Select Items"}>
-                        <IconButton
-                            onClick={toggleSelectionMode}
-                            color={isSelectionMode ? "inherit" : "default"}
-                            sx={{
-                                bgcolor: isSelectionMode ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
-                                '&:hover': { bgcolor: isSelectionMode ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.20)') : theme.palette.action.hover }
-                            }}
-                        >
-                            {isSelectionMode ? <X weight="bold" /> : <CheckSquare weight={isSelectionMode ? "fill" : "regular"} />}
-                        </IconButton>
-                    </Tooltip>
-
-                    {headerActions}
-                </Box>
-            </Box>
-
             {/* Content */}
             <Box
+                ref={zoomContainerRef}
                 sx={{
                     flex: 1,
-                    overflowY: 'auto',
-                    p: 4,
+                    overflow: 'hidden', // Virtualized list handles scrolling
+                    p: 0, // Remove padding here, let list items handle it
                     pt: 0,
-                    '&::-webkit-scrollbar': { display: 'none' },
-                    scrollbarWidth: 'none',
                 }}
-                onWheel={handleWheel}
             >
                 {loading ? (
-                    <Box sx={{ mt: 2 }}>
+                    <Box sx={{ p: 4 }}> {/* Add padding back for loading state */}
                         <Skeleton variant="text" sx={{ fontSize: '0.875rem', width: 200, mb: 2 }} />
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                             <Skeleton variant="text" sx={{ fontSize: '1.25rem', width: 150 }} />
@@ -364,6 +328,54 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         onMenuOpen={(e, id) => onGroupMenuOpen && onGroupMenuOpen(e, id)}
                         gridItemSize={gridItemSize}
                         showNames={showFileNames}
+                        headerContent={
+                            <>
+                                <Box sx={{ height: `${NAVBAR_HEIGHT}px` }} />
+                                <Box sx={{ p: 3, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: theme.palette.background.default, zIndex: 10 }}>
+                                    <Typography variant="h4" fontWeight="bold">{title}</Typography>
+                                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                                        <LibrarySearchBar onSearch={onSearchChange} />
+
+                                        <Tooltip title="Filter">
+                                            <IconButton
+                                                onClick={() => setFilterDialogOpen(true)}
+                                                color={activeFilter ? 'inherit' : 'default'}
+                                                sx={{
+                                                    bgcolor: activeFilter ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
+                                                    '&:hover': { bgcolor: activeFilter ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.20)') : theme.palette.action.hover }
+                                                }}
+                                            >
+                                                <Funnel weight={activeFilter ? "fill" : "regular"} />
+                                            </IconButton>
+                                        </Tooltip>
+
+                                        <Tooltip title="View Settings">
+                                            <IconButton
+                                                onClick={(e) => setSettingsAnchorEl(e.currentTarget)}
+                                                sx={{ '&:hover': { bgcolor: theme.palette.action.hover } }}
+                                            >
+                                                <Gear weight="regular" />
+                                            </IconButton>
+                                        </Tooltip>
+
+                                        <Tooltip title={isSelectionMode ? "Cancel Selection" : "Select Items"}>
+                                            <IconButton
+                                                onClick={toggleSelectionMode}
+                                                color={isSelectionMode ? "inherit" : "default"}
+                                                sx={{
+                                                    bgcolor: isSelectionMode ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
+                                                    '&:hover': { bgcolor: isSelectionMode ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.20)') : theme.palette.action.hover }
+                                                }}
+                                            >
+                                                {isSelectionMode ? <X weight="bold" /> : <CheckSquare weight={isSelectionMode ? "fill" : "regular"} />}
+                                            </IconButton>
+                                        </Tooltip>
+
+                                        {headerActions}
+                                    </Box>
+                                </Box>
+                            </>
+                        }
                     />
                 )}
             </Box>

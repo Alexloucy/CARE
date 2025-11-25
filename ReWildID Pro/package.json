@@ -28,6 +28,7 @@
         "react-dom": "^18.3.1",
         "react-redux": "^9.2.0",
         "react-router-dom": "^7.9.6",
+        "react-virtuoso": "^4.14.1",
         "readable-stream": "^4.7.0"
     },
     "devDependencies": {

@@ -15,11 +15,7 @@ export default function Layout() {
     const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
 
     const getPageMargin = (pathname: string): number => {
-        const exactPaths = ['/', '/chat'];
-        if (exactPaths.includes(pathname)) return 0;
-        if (pathname.startsWith('/admin')) return 0;
-        if (pathname.startsWith('/agent')) return 0;
-        return 4;
+        return 0
     };
 
     useEffect(() => {
@@ -46,17 +42,19 @@ export default function Layout() {
     }, []);
 
     return (
-        <Box sx={{ display: 'flex' }}>
+        <Box sx={{ display: 'flex', height: '100vh'}}>
             <LeftSidebar open={leftSidebarOpen} onClose={() => setLeftSidebarOpen(false)} />
 
             <Box sx={{
                 display: 'flex',
                 flexDirection: 'column',
                 flexGrow: 1,
+                overflow: 'hidden',
                 width: {
                     xs: '100%',
                     md: `calc(100% - ${leftSidebarOpen ? 212 : 0}px - ${rightSidebarOpen ? 300 : 0}px)`
                 },
+                height: '100vh',
                 ml: { xs: 0, md: leftSidebarOpen ? 0 : 0 },
                 transition: theme => theme.transitions.create(['width', 'margin'], {
                     easing: theme.transitions.easing.sharp,
@@ -70,8 +68,6 @@ export default function Layout() {
                     rightSidebarOpen={rightSidebarOpen}
                     agentIconShow={!location.pathname.startsWith('/agent')}
                 />
-
-                <Box sx={{ height: `${NAVBAR_HEIGHT}px` }} />
 
                 <Box
                     component="main"
