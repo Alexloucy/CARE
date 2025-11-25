@@ -316,25 +316,159 @@ class JobManager {
         const { imageId, originalPath } = job.payload;
         await this.generateThumbnail(imageId, originalPath);
     }
+    /**
+     * Run detection inline (used by ReID job when images need detection first)
+     * @param imageIdsToDetect - The actual image IDs from the database
+     */
+    async runDetectionInline(job, imageIdsToDetect) {
+        const baseDataDir = process.cwd();
+        const detectionJobDir = path_1.default.join(baseDataDir, 'data', 'detections', `reid_${job.id}`);
+        const imageOutputDir = path_1.default.join(detectionJobDir, 'images');
+        const jsonOutputDir = path_1.default.join(detectionJobDir, 'json');
+        const manifestPath = path_1.default.join(baseDataDir, 'data', 'temp', `detection_manifest_reid_${job.id}.json`);
+        try {
+            (0, python_1.terminateSubprocess)();
+            await fs_extra_1.default.remove(manifestPath).catch(() => { });
+            // Get images from database - this gives us the correct ID -> path mapping
+            const images = database_1.DatabaseService.getImagesByIds(imageIdsToDetect);
+            // Build path -> id mapping for later
+            const pathToIdMap = new Map();
+            const absolutePaths = [];
+            for (const img of images) {
+                if (await fs_extra_1.default.pathExists(img.original_path)) {
+                    absolutePaths.push(img.original_path);
+                    // Map by filename since that's what we'll have in JSON output
+                    const filename = path_1.default.parse(img.original_path).name;
+                    pathToIdMap.set(filename, img.id);
+                }
+            }
+            if (absolutePaths.length === 0) {
+                throw new Error('No valid images found for detection.');
+            }
+            // Write Manifest
+            await fs_extra_1.default.ensureDir(path_1.default.dirname(manifestPath));
+            await fs_extra_1.default.writeJson(manifestPath, { files: absolutePaths }, { spaces: 2 });
+            // Ensure output directories exist
+            await fs_extra_1.default.ensureDir(imageOutputDir);
+            await fs_extra_1.default.ensureDir(jsonOutputDir);
+            // Spawn Python
+            const args = [
+                'detection',
+                manifestPath,
+                imageOutputDir,
+                jsonOutputDir,
+                path_1.default.join(baseDataDir, 'logs')
+            ];
+            const ps = (0, python_1.spawnPythonSubprocess)(args);
+            (0, python_1.setSubProcess)(ps);
+            if (!ps || !ps.stdout) {
+                throw new Error('Failed to spawn Python process for detection.');
+            }
+            // Wrap process in promise
+            await new Promise((resolve, reject) => {
+                ps.stdout?.on('data', (data) => {
+                    const txt = data.toString();
+                    console.log(`[ReID Detection ${job.id}] ${txt.trim()}`);
+                    // Parse progress
+                    const processMatch = txt.match(/PROCESS:\s*(\d+)\/(\d+)/);
+                    if (processMatch) {
+                        const current = parseInt(processMatch[1]);
+                        const total = parseInt(processMatch[2]);
+                        if (total > 0) {
+                            // Use 0-50% for detection, 50-100% for ReID
+                            job.progress = Math.floor((current / total) * 50);
+                            job.message = `Classification: ${current}/${total}`;
+                            this.emitUpdate();
+                        }
+                    }
+                    else if (txt.includes('Loading models')) {
+                        job.message = 'Loading classification models...';
+                        this.emitUpdate();
+                    }
+                });
+                ps.on('close', (code) => {
+                    (0, python_1.setSubProcess)(null);
+                    if (code === 0) {
+                        resolve();
+                    }
+                    else {
+                        reject(new Error(`Detection process exited with code ${code}`));
+                    }
+                });
+                ps.on('error', (err) => {
+                    reject(err);
+                });
+            });
+            // Import detection results to Database using the ID mapping
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const batchName = `ReID Pre-Detection ${dateStr} ${timeStr}`;
+            const batchId = database_1.DatabaseService.createDetectionBatch(batchName);
+            // Read all JSON files in the output directory
+            const jsonFiles = await fs_extra_1.default.readdir(jsonOutputDir);
+            for (const jsonFile of jsonFiles) {
+                if (!jsonFile.endsWith('.json'))
+                    continue;
+                const jsonPath = path_1.default.join(jsonOutputDir, jsonFile);
+                const baseName = path_1.default.parse(jsonFile).name;
+                const imageId = pathToIdMap.get(baseName);
+                if (!imageId) {
+                    console.warn(`[ReID Detection] No image ID found for ${baseName}`);
+                    continue;
+                }
+                try {
+                    const result = await fs_extra_1.default.readJson(jsonPath);
+                    if (result.boxes && Array.isArray(result.boxes)) {
+                        for (const box of result.boxes) {
+                            if (box.bbox && box.bbox.length === 4) {
+                                database_1.DatabaseService.addDetection(batchId, imageId, box.label, box.pred_conf || 0, box.detection_conf || 0, box.bbox, box.source || 'unknown');
+                            }
+                        }
+                    }
+                }
+                catch (e) {
+                    console.error(`Failed to parse detection result for ${jsonFile}`, e);
+                }
+            }
+            console.log(`[ReID Detection] Saved detections for ${jsonFiles.length} images to batch ${batchId}`);
+        }
+        finally {
+            // Cleanup
+            await fs_extra_1.default.remove(manifestPath).catch(() => { });
+        }
+    }
     async handleReidJob(job) {
         const { imageIds, species } = job.payload;
-        const tempDir = path_1.default.join(process.cwd(), 'temp', 'reid_v2');
+        const baseDataDir = process.cwd();
+        const tempDir = path_1.default.join(baseDataDir, 'temp', 'reid_v2');
         try {
             await fs_extra_1.default.ensureDir(tempDir);
             job.message = 'Checking images for detections...';
             this.emitUpdate();
             // Step 1: Get images without detections
             const imagesWithoutDetections = database_1.DatabaseService.getImagesWithoutDetections(imageIds);
+            // Step 2: If images need detection, run it first
             if (imagesWithoutDetections.length > 0) {
-                throw new Error(`${imagesWithoutDetections.length} images need detection first. Please run classification on all images before ReID.`);
+                job.message = `Running classification on ${imagesWithoutDetections.length} images first...`;
+                this.emitUpdate();
+                // Run detection inline with image IDs
+                await this.runDetectionInline(job, imagesWithoutDetections);
+                job.message = 'Classification complete. Starting ReID...';
+                this.emitUpdate();
             }
-            // Step 2: Get all detections for selected images
+            // Step 3: Get all detections for selected images (now should have all)
             const allDetections = database_1.DatabaseService.getDetectionsForImages(imageIds);
-            // Step 3: Filter by species
+            console.log(`[ReID Debug] imageIds: ${JSON.stringify(imageIds)}`);
+            console.log(`[ReID Debug] allDetections count: ${allDetections.length}`);
+            console.log(`[ReID Debug] allDetections labels: ${JSON.stringify(allDetections.map((d) => d.label))}`);
+            // Step 4: Filter by species
             const speciesLower = species.toLowerCase();
+            console.log(`[ReID Debug] Looking for species: "${speciesLower}"`);
             const matchingDetections = allDetections.filter((det) => det.label?.toLowerCase() === speciesLower);
+            console.log(`[ReID Debug] matchingDetections count: ${matchingDetections.length}`);
             if (matchingDetections.length === 0) {
-                throw new Error(`No ${species} detections found in the selected images.`);
+                throw new Error(`No ${species} detections found in the selected images. Found ${allDetections.length} detections with labels: ${[...new Set(allDetections.map((d) => d.label))].join(', ')}`);
             }
             job.message = `Found ${matchingDetections.length} ${species} detections. Starting ReID...`;
             this.emitUpdate();
@@ -370,13 +504,15 @@ class JobManager {
                         const current = parseInt(processMatch[1]);
                         const total = parseInt(processMatch[2]);
                         if (total > 0) {
-                            job.progress = Math.floor((current / total) * 100);
-                            job.message = `Processing embeddings: ${current}/${total}`;
+                            // Use 50-100% range for ReID (0-50% was detection)
+                            job.progress = 50 + Math.floor((current / total) * 50);
+                            job.message = `ReID: ${current}/${total}`;
                             this.emitUpdate();
                         }
                     }
                     else if (txt.includes('Loading model')) {
-                        job.message = 'Loading AI models...';
+                        job.message = 'Loading ReID models...';
+                        job.progress = 50;
                         this.emitUpdate();
                     }
                     else if (txt.includes('STATUS: PROCESSING')) {

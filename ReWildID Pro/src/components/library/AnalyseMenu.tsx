@@ -20,10 +20,12 @@ import { X, Sparkle, Fingerprint } from '@phosphor-icons/react';
 interface AnalyseMenuProps {
     open: boolean;
     onClose: () => void;
-    onClassify: () => void;
+    onClassify?: () => void;
     onReID: (species: string) => void;
     availableSpecies: string[];
     selectedCount: number;
+    reidOnly?: boolean; // If true, skip to species selection directly
+    title?: string; // Custom title
 }
 
 export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
@@ -32,14 +34,16 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
     onClassify,
     onReID,
     availableSpecies,
-    selectedCount
+    selectedCount,
+    reidOnly = false,
+    title = 'Analyse'
 }) => {
     const theme = useTheme();
     const [selectedSpecies, setSelectedSpecies] = useState<string>('');
-    const [showReIDOptions, setShowReIDOptions] = useState(false);
+    const [showReIDOptions, setShowReIDOptions] = useState(reidOnly);
 
     const handleClassify = () => {
-        onClassify();
+        if (onClassify) onClassify();
         onClose();
     };
 
@@ -54,7 +58,7 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
 
     const handleClose = () => {
         onClose();
-        setShowReIDOptions(false);
+        setShowReIDOptions(reidOnly); // Reset to initial state
         setSelectedSpecies('');
     };
 
@@ -86,9 +90,9 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
                 pb: 1
             }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <Sparkle size={24} weight="duotone" />
+                    {reidOnly ? <Fingerprint size={24} weight="duotone" /> : <Sparkle size={24} weight="duotone" />}
                     <Typography variant="h6" fontWeight={600}>
-                        Analyse
+                        {title}
                     </Typography>
                 </Box>
                 <IconButton onClick={handleClose} size="small">

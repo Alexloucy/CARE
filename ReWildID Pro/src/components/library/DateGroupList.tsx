@@ -1,4 +1,4 @@
-import { Box, IconButton, Tooltip, Typography, useTheme, Chip, Select, MenuItem, FormControl } from '@mui/material';
+import { Box, IconButton, Tooltip, Typography, useTheme, Chip } from '@mui/material';
 import { AnalyseMenu } from './AnalyseMenu';
 import { CaretDown, CaretRight, Check as CheckIcon, DotsThreeVertical, UploadSimple } from '@phosphor-icons/react';
 import React, { useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react';
@@ -78,7 +78,6 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
     const [containerWidth, setContainerWidth] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
     const virtuosoRef = useRef<VirtuosoHandle>(null);
-    const [selectedSpecies, setSelectedSpecies] = useState<string>('');
     
     // Analyse menu state
     const [analyseMenuOpen, setAnalyseMenuOpen] = useState(false);
@@ -377,7 +376,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                                     setAnalyseMenuOpen(true);
                                 }}
                             />
-                            {analyseMenuGroup?.id === group.id && (
+                            {analyseMenuGroup?.id === group.id && analyseMenuGroup && (
                                 <AnalyseMenu
                                     open={analyseMenuOpen}
                                     onClose={() => {
@@ -385,62 +384,67 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                                         setAnalyseMenuGroup(null);
                                     }}
                                     onClassify={() => {
-                                        const selectedInGroup = group.images.filter((img: DBImage) => selectedImageIds.has(img.id));
-                                        const imagesToProcess = selectedInGroup.length > 0 ? selectedInGroup : group.images;
+                                        const groupImages = analyseMenuGroup.images;
+                                        const selectedInGroup = groupImages.filter((img: DBImage) => selectedImageIds.has(img.id));
+                                        const imagesToProcess = selectedInGroup.length > 0 ? selectedInGroup : groupImages;
                                         if (onClassify) onClassify(imagesToProcess);
+                                        setAnalyseMenuOpen(false);
+                                        setAnalyseMenuGroup(null);
                                     }}
                                     onReID={(species) => {
-                                        const selectedInGroup = group.images.filter((img: DBImage) => selectedImageIds.has(img.id));
-                                        const imagesToProcess = selectedInGroup.length > 0 ? selectedInGroup : group.images;
+                                        const groupImages = analyseMenuGroup.images;
+                                        const selectedInGroup = groupImages.filter((img: DBImage) => selectedImageIds.has(img.id));
+                                        const imagesToProcess = selectedInGroup.length > 0 ? selectedInGroup : groupImages;
                                         if (onReID) onReID(imagesToProcess, species);
+                                        setAnalyseMenuOpen(false);
+                                        setAnalyseMenuGroup(null);
                                     }}
                                     availableSpecies={availableSpecies}
                                     selectedCount={
-                                        group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length > 0
-                                            ? group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length
-                                            : group.images.length
+                                        analyseMenuGroup.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length > 0
+                                            ? analyseMenuGroup.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length
+                                            : analyseMenuGroup.images.length
                                     }
                                 />
                             )}
                         </>
                     ) : aiButtonMode === 'reid' ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <FormControl size="small" sx={{ minWidth: 120 }}>
-                                <Select
-                                    value={selectedSpecies}
-                                    onChange={(e) => setSelectedSpecies(e.target.value)}
-                                    displayEmpty
-                                    sx={{ 
-                                        height: 32,
-                                        fontSize: '0.875rem',
-                                        '& .MuiSelect-select': { py: 0.5 }
-                                    }}
-                                >
-                                    <MenuItem value="" disabled>
-                                        <em>Select species</em>
-                                    </MenuItem>
-                                    {availableSpecies.map(species => (
-                                        <MenuItem key={species} value={species}>
-                                            {species}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                        <>
                             <AiModeButton
                                 text={group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length > 0
                                     ? `ReID (${group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length})`
                                     : "ReID"}
                                 onClick={() => {
-                                    if (!selectedSpecies) {
-                                        alert('Please select a species first');
-                                        return;
-                                    }
-                                    const selectedInGroup = group.images.filter((img: DBImage) => selectedImageIds.has(img.id));
-                                    const imagesToProcess = selectedInGroup.length > 0 ? selectedInGroup : group.images;
-                                    if (onReID) onReID(imagesToProcess, selectedSpecies);
+                                    setAnalyseMenuGroup(group);
+                                    setAnalyseMenuOpen(true);
                                 }}
                             />
-                        </Box>
+                            {analyseMenuGroup?.id === group.id && analyseMenuGroup && (
+                                <AnalyseMenu
+                                    open={analyseMenuOpen}
+                                    onClose={() => {
+                                        setAnalyseMenuOpen(false);
+                                        setAnalyseMenuGroup(null);
+                                    }}
+                                    onReID={(species) => {
+                                        const groupImages = analyseMenuGroup.images;
+                                        const selectedInGroup = groupImages.filter((img: DBImage) => selectedImageIds.has(img.id));
+                                        const imagesToProcess = selectedInGroup.length > 0 ? selectedInGroup : groupImages;
+                                        if (onReID) onReID(imagesToProcess, species);
+                                        setAnalyseMenuOpen(false);
+                                        setAnalyseMenuGroup(null);
+                                    }}
+                                    availableSpecies={availableSpecies}
+                                    selectedCount={
+                                        analyseMenuGroup.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length > 0
+                                            ? analyseMenuGroup.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length
+                                            : analyseMenuGroup.images.length
+                                    }
+                                    reidOnly={true}
+                                    title="Re-identification"
+                                />
+                            )}
+                        </>
                     ) : (
                         <AiModeButton
                             text={group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length > 0
