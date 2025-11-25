@@ -143,6 +143,10 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     const [aspectRatio, setAspectRatio] = useState(() => {
         return localStorage.getItem('mediaExplorer_aspectRatio') || '1.618/1';
     });
+    const [useLiquidGlass, setUseLiquidGlass] = useState(() => {
+        const saved = localStorage.getItem('mediaExplorer_useLiquidGlass');
+        return saved === null ? true : saved === 'true';
+    });
     
     const [settingsAnchorEl, setSettingsAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedImage, setSelectedImage] = useState<{ image: DBImage, url: string } | null>(null);
@@ -164,7 +168,8 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
         localStorage.setItem('mediaExplorer_gridSize', gridItemSize.toString());
         localStorage.setItem('mediaExplorer_showNames', showFileNames.toString());
         localStorage.setItem('mediaExplorer_aspectRatio', aspectRatio);
-    }, [gridItemSize, showFileNames, aspectRatio]);
+        localStorage.setItem('mediaExplorer_useLiquidGlass', useLiquidGlass.toString());
+    }, [gridItemSize, showFileNames, aspectRatio, useLiquidGlass]);
 
     // Hotkey: ESC to exit selection mode
     useEffect(() => {
@@ -421,6 +426,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                     }
                 }}
                 detections={selectedImage?.image.detections}
+                useLiquidGlass={useLiquidGlass}
             />
 
             {groupMenu}
@@ -508,6 +514,16 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         size="small"
                         checked={showFileNames}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowFileNames(e.target.checked)}
+                    />
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                    <Typography variant="subtitle2" fontWeight="600">
+                        Liquid Glass BBox
+                    </Typography>
+                    <Switch
+                        size="small"
+                        checked={useLiquidGlass}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUseLiquidGlass(e.target.checked)}
                     />
                 </Box>
             </Menu>

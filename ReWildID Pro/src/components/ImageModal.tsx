@@ -9,15 +9,43 @@ interface DetectionBoxProps {
     detection: Detection;
     zoom: number;
     containerWidth: number;
+    containerHeight: number;
+    useLiquidGlass?: boolean;
 }
 
-const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, containerWidth }) => {
+const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, containerWidth, containerHeight, useLiquidGlass = true }) => {
     const [isHovered, setIsHovered] = useState(false);
     const boxRef = useRef<HTMLDivElement>(null);
     const theme = useTheme();
     const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
 
-    const isRightAligned = bbox.x + bbox.width + 240 > containerWidth;
+    // Local state for Liquid Glass animation (Start at center, then move to bbox)
+    const [activeBbox, setActiveBbox] = useState(() => {
+        if (useLiquidGlass) {
+            // Initial Center Position
+            const size = Math.min(containerWidth, containerHeight) * 0.2; // 20% of viewport or fixed
+            return {
+                x: (containerWidth / 2) - (size / 2),
+                y: (containerHeight / 2) - (size / 2),
+                width: size,
+                height: size
+            };
+        }
+        return bbox;
+    });
+
+    // Sync activeBbox with prop bbox for animation
+    useEffect(() => {
+        if (useLiquidGlass) {
+            // Small delay to ensure the initial 'center' position is painted
+            const timer = requestAnimationFrame(() => {
+                 setActiveBbox(bbox);
+            });
+            return () => cancelAnimationFrame(timer);
+        }
+    }, [bbox, useLiquidGlass]);
+
+    const isRightAligned = activeBbox.x + activeBbox.width + 240 > containerWidth;
 
     const handleMouseEnter = () => {
         if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
@@ -30,6 +58,72 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, containerW
         }, 300);
     };
 
+    // --- Standard BBox Style ---
+    if (!useLiquidGlass) {
+        return (
+            <Box
+                ref={boxRef}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+                sx={{
+                    position: 'absolute',
+                    left: bbox.x,
+                    top: bbox.y,
+                    width: bbox.width,
+                    height: bbox.height,
+                    border: '2px solid #4285F4',
+                    backgroundColor: 'rgba(66, 133, 244, 0.1)',
+                    cursor: 'pointer',
+                    zIndex: 100,
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                        backgroundColor: 'rgba(66, 133, 244, 0.2)',
+                        borderColor: '#5c9aff'
+                    }
+                }}
+            >
+                {/* Standard Label */}
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: -24,
+                        left: -2,
+                        bgcolor: '#4285F4',
+                        color: 'white',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        px: 1,
+                        py: 0.2,
+                        borderRadius: '4px 4px 0 0',
+                    }}
+                >
+                    {detection.label} ({Math.round(detection.confidence * 100)}%)
+                </Box>
+                
+                {/* Info Popup for Standard Mode */}
+                <Fade in={isHovered}>
+                    <Paper sx={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        mt: 1,
+                        p: 1.5,
+                        zIndex: 101,
+                        width: 200,
+                        bgcolor: 'background.paper',
+                        boxShadow: 3
+                    }}>
+                        <Typography variant="subtitle2" fontWeight="bold">{detection.label}</Typography>
+                        <Typography variant="caption" display="block" color="text.secondary">
+                            Confidence: {(detection.confidence * 100).toFixed(1)}%
+                        </Typography>
+                    </Paper>
+                </Fade>
+            </Box>
+        );
+    }
+
+    // --- Liquid Glass Style ---
     return (
         <Box
             ref={boxRef}
@@ -37,26 +131,54 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, containerW
             onMouseLeave={handleMouseLeave}
             sx={{
                 position: 'absolute',
-                left: bbox.x,
-                top: bbox.y,
-                width: bbox.width,
-                height: bbox.height,
+                left: activeBbox.x - (activeBbox.width * 0.03), // Center the expanded box
+                top: activeBbox.y - (activeBbox.height * 0.03),
+                width: activeBbox.width * 1.06, // Expand by 6%
+                height: activeBbox.height * 1.06,
                 borderRadius: '30px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 pointerEvents: 'auto',
                 zIndex: 100,
+                transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)', // Slow, fluid movement for liquid glass
+                bgcolor: 'rgba(255, 255, 255, 0.03)',
                 
-                // Inner border/shadow layer (from .glassContainer::before)
+                // Hover State - Slight Light Up of Entire Glass
+                '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 0.00)', // Subtle light up
+                    '&::before': {
+                        opacity: 0.15, // Boost rainbow visibility slightly
+                    }
+                },
+                
+                // Glass Rim (White highlights)
+                boxShadow: `
+                    inset 0 0 0 1px rgba(255, 255, 255, 0.15), 
+                    inset 2px 2px 6px -2px rgba(255, 255, 255, 0.6), 
+                    inset -2px -2px 6px -2px rgba(255, 255, 255, 0.2)
+                `,
+                
+                // Rainbow Refraction Edge (::before)
                 '&::before': {
                     content: '""',
                     position: 'absolute',
                     inset: 0,
-                    zIndex: 0,
-                    overflow: 'hidden',
+                    zIndex: 1,
                     borderRadius: '30px',
-                    boxShadow: 'inset 2px 2px 0px -2px rgba(255, 255, 255, 0.7), inset 0 0 3px 1px rgba(255, 255, 255, 0.7)',
+                    padding: '1.5px', // Very thin thickness
+                    
+                    // Bright Rainbow Gradient
+                    background: 'linear-gradient(125deg, #ff0000, #ff8800, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff)',
+                    
+                    // Masking magic to show only the border
+                    mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                    maskComposite: 'exclude',
+                    WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                    WebkitMaskComposite: 'xor',
+                    
+                    opacity: 0.08, // Bright but slightly transparent
+                    pointerEvents: 'none'
                 },
                 
                 // Glass distortion layer (from .glassContainer::after) - ONLY AT EDGES
@@ -192,6 +314,7 @@ interface ImageModalProps {
     hasPrev?: boolean;
     onDelete?: () => void;
     detections?: Detection[];
+    useLiquidGlass?: boolean;
 }
 
 const ImageModal: React.FC<ImageModalProps> = ({
@@ -204,7 +327,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
     hasNext,
     hasPrev,
     onDelete,
-    detections
+    detections,
+    useLiquidGlass = true
 }) => {
     const [zoom, setZoom] = useState(1);
     const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -431,6 +555,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
                                             detection={det} 
                                             zoom={zoom} 
                                             containerWidth={imageDimensions.displayed.width}
+                                            containerHeight={imageDimensions.displayed.height}
+                                            useLiquidGlass={useLiquidGlass}
                                         />
                                     );
                                 })}
