@@ -75,10 +75,33 @@ export default function Layout() {
                         mt: getPageMargin(),
                         mb: getPageMargin(),
                         flexGrow: 1,
+                        overflow: 'auto',
                         paddingLeft: { xs: location.pathname === '/chat' ? 0 : 2, sm: 0 },
                         paddingRight: { xs: location.pathname === '/chat' ? 0 : 2, sm: 0 },
                         paddingTop: 0,
                         paddingBottom: 0,
+                        // Modern thin scrollbar
+                        '&::-webkit-scrollbar': {
+                            width: '6px',
+                        },
+                        '&::-webkit-scrollbar-track': {
+                            background: 'transparent',
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                            background: theme.palette.mode === 'dark' 
+                                ? 'rgba(255, 255, 255, 0.2)' 
+                                : 'rgba(0, 0, 0, 0.2)',
+                            borderRadius: '3px',
+                            '&:hover': {
+                                background: theme.palette.mode === 'dark' 
+                                    ? 'rgba(255, 255, 255, 0.3)' 
+                                    : 'rgba(0, 0, 0, 0.3)',
+                            },
+                        },
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: theme.palette.mode === 'dark' 
+                            ? 'rgba(255, 255, 255, 0.2) transparent' 
+                            : 'rgba(0, 0, 0, 0.2) transparent',
                     }}
                 >
                     <Outlet context={{ leftSidebarOpen, rightSidebarOpen }} />

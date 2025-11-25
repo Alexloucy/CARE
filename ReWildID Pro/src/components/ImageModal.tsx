@@ -12,9 +12,22 @@ interface DetectionBoxProps {
     containerHeight: number;
     useLiquidGlass?: boolean;
     onDelete?: (id: number) => void;
+    customPopupContent?: React.ReactNode;
+    popupTitle?: string;
+    popupIcon?: React.ReactNode;
 }
 
-const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, containerWidth, containerHeight, useLiquidGlass = true, onDelete }) => {
+const DetectionBox: React.FC<DetectionBoxProps> = ({ 
+    bbox, 
+    detection, 
+    containerWidth, 
+    containerHeight, 
+    useLiquidGlass = true, 
+    onDelete,
+    customPopupContent,
+    popupTitle = "Detection Details",
+    popupIcon = <Sparkle size={18} weight="fill" color="#4285F4" />
+}) => {
     const [isHovered, setIsHovered] = useState(false);
     const boxRef = useRef<HTMLDivElement>(null);
     const theme = useTheme();
@@ -273,50 +286,56 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({ bbox, detection, containerW
                             pointerEvents: 'auto',
                         }}
                     >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                            <Sparkle size={18} weight="fill" color="#4285F4" />
-                            <Typography variant="subtitle2" fontWeight="700">
-                                Detection Details
-                            </Typography>
-                        </Box>
-                        
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Typography variant="caption" color="text.secondary">Species</Typography>
-                                <Box sx={{ 
-                                    bgcolor: 'rgba(66, 133, 244, 0.1)', 
-                                    color: '#4285F4', 
-                                    px: 1, py: 0.2, 
-                                    borderRadius: 1,
-                                    fontSize: '0.75rem',
-                                    fontWeight: 600
-                                }}>
-                                    {detection.label}
+                        {customPopupContent ? (
+                            customPopupContent
+                        ) : (
+                            <>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                                    {popupIcon}
+                                    <Typography variant="subtitle2" fontWeight="700">
+                                        {popupTitle}
+                                    </Typography>
                                 </Box>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="caption" color="text.secondary">Confidence</Typography>
-                                <Typography variant="caption" fontWeight="600" sx={{ fontFamily: 'monospace' }}>
-                                    {(detection.confidence * 100).toFixed(1)}%
-                                </Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="caption" color="text.secondary">Detection Score</Typography>
-                                <Typography variant="caption" fontWeight="600" sx={{ fontFamily: 'monospace' }}>
-                                    {(detection.detection_confidence * 100).toFixed(1)}%
-                                </Typography>
-                            </Box>
-                            {onDelete && (
-                                <IconButton
-                                    size="small"
-                                    onClick={(e) => { e.stopPropagation(); onDelete(detection.id); }}
-                                    sx={{ mt: 1, color: '#ff4444', width: '100%', borderRadius: 1, '&:hover': { bgcolor: 'rgba(255,68,68,0.1)' } }}
-                                >
-                                    <Trash size={16} />
-                                    <Typography variant="caption" sx={{ ml: 0.5 }}>Delete Detection</Typography>
-                                </IconButton>
-                            )}
-                        </Box>
+                                
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Typography variant="caption" color="text.secondary">Species</Typography>
+                                        <Box sx={{ 
+                                            bgcolor: 'rgba(66, 133, 244, 0.1)', 
+                                            color: '#4285F4', 
+                                            px: 1, py: 0.2, 
+                                            borderRadius: 1,
+                                            fontSize: '0.75rem',
+                                            fontWeight: 600
+                                        }}>
+                                            {detection.label}
+                                        </Box>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <Typography variant="caption" color="text.secondary">Confidence</Typography>
+                                        <Typography variant="caption" fontWeight="600" sx={{ fontFamily: 'monospace' }}>
+                                            {(detection.confidence * 100).toFixed(1)}%
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <Typography variant="caption" color="text.secondary">Detection Score</Typography>
+                                        <Typography variant="caption" fontWeight="600" sx={{ fontFamily: 'monospace' }}>
+                                            {(detection.detection_confidence * 100).toFixed(1)}%
+                                        </Typography>
+                                    </Box>
+                                    {onDelete && (
+                                        <IconButton
+                                            size="small"
+                                            onClick={(e) => { e.stopPropagation(); onDelete(detection.id); }}
+                                            sx={{ mt: 1, color: '#ff4444', width: '100%', borderRadius: 1, '&:hover': { bgcolor: 'rgba(255,68,68,0.1)' } }}
+                                        >
+                                            <Trash size={16} />
+                                            <Typography variant="caption" sx={{ ml: 0.5 }}>Delete Detection</Typography>
+                                        </IconButton>
+                                    )}
+                                </Box>
+                            </>
+                        )}
                     </Paper>
                 </Box>
             </Fade>
@@ -700,3 +719,5 @@ const ImageModal: React.FC<ImageModalProps> = ({
 };
 
 export default ImageModal;
+export { DetectionBox };
+export type { DetectionBoxProps };
