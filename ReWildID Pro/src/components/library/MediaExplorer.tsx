@@ -23,6 +23,7 @@ import {
 } from '@phosphor-icons/react';
 import React, { useEffect, useRef, useState } from 'react';
 import { NAVBAR_HEIGHT } from '../../app/layout/navbar/Navbar';
+import { AiModeContext } from '../../contexts/AiModeContext';
 import { DBImage } from '../../types/electron';
 import { DateSection } from '../../types/library';
 
@@ -147,6 +148,17 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     const [selectedImage, setSelectedImage] = useState<{ image: DBImage, url: string } | null>(null);
     const dateGroupListRef = useRef<DateGroupListHandle>(null);
 
+    // Global AI Button Effect State
+    const [shouldPlayEffect, setShouldPlayEffect] = useState(false);
+
+    // Trigger effect once on mount
+    useEffect(() => {
+        setShouldPlayEffect(true);
+        // Optional: Auto-off after a timeout as a safety net, though buttons will handle it
+        const timer = setTimeout(() => setShouldPlayEffect(false), 3000);
+        return () => clearTimeout(timer);
+    }, []);
+
     // Persist Settings
     useEffect(() => {
         localStorage.setItem('mediaExplorer_gridSize', gridItemSize.toString());
@@ -250,24 +262,25 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     };
 
     return (
-        <Box
-            sx={{
-                height: '100%',
-                position: 'relative',
-                outline: 'none',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-            }}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={onDrop}
-        >
-            <GlobalStyles styles={{
-                '*::-webkit-scrollbar': { display: 'none' },
-                '*': { scrollbarWidth: 'none', '-ms-overflow-style': 'none' }
-            }} />
-            <DragDropOverlay isDragging={isDragging} />
+        <AiModeContext.Provider value={{ shouldPlayEffect, setShouldPlayEffect }}>
+            <Box
+                sx={{
+                    height: '100%',
+                    position: 'relative',
+                    outline: 'none',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                }}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={onDrop}
+            >
+                <GlobalStyles styles={{
+                    '*::-webkit-scrollbar': { display: 'none' },
+                    '*': { scrollbarWidth: 'none', '-ms-overflow-style': 'none' }
+                }} />
+                <DragDropOverlay isDragging={isDragging} />
 
             {!loading && dateSections.length > 0 && (
                 <Timeline
@@ -514,5 +527,6 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                 />
             )}
         </Box>
+    </AiModeContext.Provider>
     );
 };

@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { Box, Typography, useTheme, ButtonBase, SxProps, Theme, TypographyProps } from '@mui/material';
 import { SparkleIcon } from '@phosphor-icons/react';
+import { AiModeContext } from '../contexts/AiModeContext';
 
 interface AiModeButtonProps {
     text?: string;
@@ -20,12 +21,20 @@ const AiModeButton: React.FC<AiModeButtonProps> = ({
     const [renderPosition, setRenderPosition] = useState({ x: 0, y: 0 });
     const targetPosition = useRef({ x: 0, y: 0 });
     const [isHovered, setIsHovered] = useState(false);
-    const [introActive, setIntroActive] = useState(true);
+    
+    const aiContext = useContext(AiModeContext);
+    // Fallback to local state if context is missing (though instructions implied global context is key)
+    // But if context is missing, we default to false as per instructions "by default ... false"
+    const shouldPlay = aiContext?.shouldPlayEffect ?? false;
+    const setShouldPlay = aiContext?.setShouldPlayEffect ?? (() => {});
+
     const buttonRef = useRef<HTMLDivElement>(null);
     const theme = useTheme();
 
     // Intro Animation
     useEffect(() => {
+        if (!shouldPlay) return;
+
         // Small delay to ensure layout is done
         const timer = setTimeout(() => {
             if (!buttonRef.current) return;
@@ -46,9 +55,11 @@ const AiModeButton: React.FC<AiModeButtonProps> = ({
                 });
 
                 if (progress < 1) {
-                    if (introActive) requestAnimationFrame(step);
+                    // Check context again in case it was cancelled externally? 
+                    // Actually we can just let it finish.
+                    requestAnimationFrame(step);
                 } else {
-                    setIntroActive(false);
+                    setShouldPlay(false);
                 }
             };
 
@@ -56,16 +67,16 @@ const AiModeButton: React.FC<AiModeButtonProps> = ({
         }, 500);
 
         return () => clearTimeout(timer);
-    }, []);
+    }, [shouldPlay, setShouldPlay]);
 
     // Stop intro on hover
     useEffect(() => {
-        if (isHovered) setIntroActive(false);
-    }, [isHovered]);
+        if (isHovered && shouldPlay) setShouldPlay(false);
+    }, [isHovered, shouldPlay, setShouldPlay]);
 
     // Smooth mouse following effect
     useEffect(() => {
-        if (introActive) return; // Skip if intro is playing
+        if (shouldPlay) return; // Skip if intro is playing
 
         let animationFrameId: number;
         
@@ -146,7 +157,7 @@ const AiModeButton: React.FC<AiModeButtonProps> = ({
                     inset: 0,
                     borderRadius: '9999px',
                     background: gradient,
-                    opacity: isHovered || introActive ? 1 : 0,
+                    opacity: isHovered || shouldPlay ? 1 : 0,
                     transition: 'opacity 0.4s ease', // Slightly slower fade for elegance
                     zIndex: 1,
                     maskImage: `radial-gradient(85px circle at ${renderPosition.x}px ${renderPosition.y}px, black, transparent)`,

@@ -442,7 +442,7 @@ export class JobManager {
             const now = new Date();
             const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
             const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const batchName = `Detection/Species Classification Finished`;
+            const batchName = `Detection ${dateStr} ${timeStr}`;
             
             const batchId = DatabaseService.createDetectionBatch(batchName);
 
