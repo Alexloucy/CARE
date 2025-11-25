@@ -30,6 +30,9 @@ interface DateGroupListProps {
     showNames?: boolean;
     headerContent?: React.ReactNode;
     onActiveItemChange?: (id: string) => void;
+    aspectRatio?: string;
+    fullImageUrls?: Record<number, string>;
+    loadFullImage?: (image: DBImage) => void;
 }
 
 type FlatItem =
@@ -54,7 +57,10 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
         gridItemSize = 180,
         showNames = false,
         headerContent,
-        onActiveItemChange
+        onActiveItemChange,
+        aspectRatio = '1.618/1',
+        fullImageUrls = {},
+        loadFullImage
     } = props;
 
     const theme = useTheme();
@@ -339,8 +345,14 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                                     file={fileDetails}
                                     date={item.id} // Just needs a string
                                     // @ts-ignore
-                                    loadImage={() => loadImage(img)}
-                                    imageUrl={imageUrls[img.id]}
+                                    loadImage={() => {
+                                        if (gridItemSize > 500 && loadFullImage) {
+                                            loadFullImage(img);
+                                        } else {
+                                            loadImage(img);
+                                        }
+                                    }}
+                                    imageUrl={(gridItemSize > 500 && fullImageUrls[img.id]) ? fullImageUrls[img.id] : imageUrls[img.id]}
                                     onClick={() => onImageClick(img)}
                                     selectable={isSelectionMode}
                                     selected={selectedImageIds.has(img.id)}
@@ -350,6 +362,8 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                                     onPointerDown={(e) => handlePointerDown(e, img.id)}
                                     onPointerEnter={() => handlePointerEnter(img.id)}
                                     badge={badge}
+                                    aspectRatio={aspectRatio}
+                                    isPlaceholder={gridItemSize > 500 && !fullImageUrls[img.id]}
                                 />
                             </Box>
                         );

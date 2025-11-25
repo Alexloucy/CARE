@@ -8,6 +8,8 @@ import {
     Skeleton,
     Slider,
     Switch,
+    ToggleButton,
+    ToggleButtonGroup,
     Tooltip,
     Typography,
     useTheme
@@ -129,11 +131,28 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
 
     // Local View State
     const [activeId, setActiveId] = useState<string>('');
-    const [gridItemSize, setGridItemSize] = useState(180);
-    const [showFileNames, setShowFileNames] = useState(false);
+    const [gridItemSize, setGridItemSize] = useState(() => {
+        const saved = localStorage.getItem('mediaExplorer_gridSize');
+        return saved ? parseInt(saved, 10) : 180;
+    });
+    const [showFileNames, setShowFileNames] = useState(() => {
+        const saved = localStorage.getItem('mediaExplorer_showNames');
+        return saved === 'true';
+    });
+    const [aspectRatio, setAspectRatio] = useState(() => {
+        return localStorage.getItem('mediaExplorer_aspectRatio') || '1.618/1';
+    });
+    
     const [settingsAnchorEl, setSettingsAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedImage, setSelectedImage] = useState<{ image: DBImage, url: string } | null>(null);
     const dateGroupListRef = useRef<DateGroupListHandle>(null);
+
+    // Persist Settings
+    useEffect(() => {
+        localStorage.setItem('mediaExplorer_gridSize', gridItemSize.toString());
+        localStorage.setItem('mediaExplorer_showNames', showFileNames.toString());
+        localStorage.setItem('mediaExplorer_aspectRatio', aspectRatio);
+    }, [gridItemSize, showFileNames, aspectRatio]);
 
     // Hotkey: ESC to exit selection mode
     useEffect(() => {
@@ -160,7 +179,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                 const delta = e.deltaY * -2.5;
                 setGridItemSize(prev => {
                     const newVal = prev + delta;
-                    return Math.min(Math.max(newVal, 100), 400);
+                    return Math.min(Math.max(newVal, 100), 715);
                 });
             }
         };
@@ -171,7 +190,6 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
 
     const handleResetView = () => {
         setGridItemSize(180);
-        setShowFileNames(false);
     };
 
     // Drag Handlers
@@ -305,6 +323,9 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         onMenuOpen={(e, id) => onGroupMenuOpen && onGroupMenuOpen(e, id)}
                         gridItemSize={gridItemSize}
                         showNames={showFileNames}
+                        aspectRatio={aspectRatio}
+                        fullImageUrls={fullImageUrls}
+                        loadFullImage={loadFullImage}
                         onActiveItemChange={setActiveId}
                         headerContent={
                             <>
@@ -427,7 +448,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         size="small"
                         value={gridItemSize}
                         min={100}
-                        max={400}
+                        max={715}
                         onChange={(_, value) => setGridItemSize(value as number)}
                         valueLabelDisplay="auto"
                         valueLabelFormat={(value) => `${value}px`}
@@ -437,6 +458,32 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         <Typography variant="caption" color="text.secondary">Large</Typography>
                     </Box>
                 </Box>
+
+                <Divider sx={{ my: 1 }} />
+
+                <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    Aspect Ratio
+                    <Tooltip title="Reset to Default">
+                        <IconButton size="small" onClick={() => setAspectRatio('1.618/1')}>
+                            <ArrowCounterClockwise size={14} />
+                        </IconButton>
+                    </Tooltip>
+                </Typography>
+                <ToggleButtonGroup
+                    value={aspectRatio}
+                    exclusive
+                    onChange={(_, value) => value && setAspectRatio(value)}
+                    size="small"
+                    fullWidth
+                    sx={{ mb: 2, display: 'flex' }}
+                >
+                    <ToggleButton value="1/1" sx={{ flexGrow: 1, py: 0.5 }}>1:1</ToggleButton>
+                    <ToggleButton value="4/3" sx={{ flexGrow: 1, py: 0.5 }}>4:3</ToggleButton>
+                    <ToggleButton value="16/9" sx={{ flexGrow: 1, py: 0.5 }}>16:9</ToggleButton>
+                    <ToggleButton value="9/16" sx={{ flexGrow: 1, py: 0.5 }}>9:16</ToggleButton>
+                    <ToggleButton value="1.618/1" sx={{ flexGrow: 1, py: 0.5 }}>Φ</ToggleButton>
+                    <ToggleButton value="1/1.618" sx={{ flexGrow: 1, py: 0.5 }}>Φ</ToggleButton>
+                </ToggleButtonGroup>
 
                 <Divider sx={{ my: 1 }} />
 

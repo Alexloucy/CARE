@@ -17,6 +17,8 @@ interface ImageCardProps {
     onPointerEnter?: () => void;
     onPointerDown?: (e: React.PointerEvent) => void;
     badge?: React.ReactNode;
+    aspectRatio?: string;
+    isPlaceholder?: boolean;
 }
 
 const ImageCard: React.FC<ImageCardProps> = ({
@@ -32,7 +34,9 @@ const ImageCard: React.FC<ImageCardProps> = ({
     onLongPress,
     onPointerEnter,
     onPointerDown,
-    badge
+    badge,
+    aspectRatio = '1.618/1',
+    isPlaceholder = false
 }) => {
     const theme = useTheme();
     const [showImage, setShowImage] = useState(false);
@@ -64,10 +68,10 @@ const ImageCard: React.FC<ImageCardProps> = ({
     }, []);
 
     useEffect(() => {
-        if (showImage && !imageUrl) {
+        if (showImage && (!imageUrl || isPlaceholder)) {
             loadImage(date, file.path);
         }
-    }, [showImage, imageUrl, date, file.path, loadImage]);
+    }, [showImage, imageUrl, date, file.path, loadImage, isPlaceholder]);
 
     // Long Press Logic
     const handlePointerDown = (e: React.PointerEvent) => {
@@ -145,7 +149,7 @@ const ImageCard: React.FC<ImageCardProps> = ({
                 borderRadius: 3,
                 overflow: 'hidden',
                 boxShadow: 'none', // Removed border style
-                aspectRatio: '1/1',
+                aspectRatio: aspectRatio,
                 position: 'relative',
                 bgcolor: theme.palette.action.hover,
                 cursor: 'pointer',
@@ -154,7 +158,8 @@ const ImageCard: React.FC<ImageCardProps> = ({
                 '&:hover': {
                     transform: selected ? 'scale(0.98)' : 'translateY(-2px)',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                }
+                },
+                minHeight: '35px'
             }}
         >
             {imageUrl && showImage && (
