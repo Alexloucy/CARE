@@ -369,6 +369,12 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
         );
     }
 
+    const components = useMemo(() => ({
+        Header: ({ context }: { context?: { headerContent: React.ReactNode } }) => (
+            <Box>{context?.headerContent}</Box>
+        )
+    }), []);
+
     return (
         <Box ref={containerRef} sx={{ height: '100%', width: '100%' }}>
             <Virtuoso
@@ -377,6 +383,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                 data={flatItems}
                 itemContent={itemContent}
                 overscan={500}
+                context={{ headerContent }}
                 rangeChanged={({ startIndex }) => {
                     if (!onActiveItemChange) return;
 
@@ -389,9 +396,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                         }
                     }
                 }}
-                components={{
-                    Header: () => <Box>{headerContent}</Box>
-                }}
+                components={components}
             />
         </Box>
     );
