@@ -26,7 +26,7 @@ import { DateSection } from '../../types/library';
 
 // Components
 import ImageModal from '../ImageModal';
-import { DateGroupList } from './DateGroupList';
+import { DateGroupList, DateGroupListHandle } from './DateGroupList';
 import { DragDropOverlay } from './DragDropOverlay';
 import { LibraryFilter, LibraryFilterDialog } from './LibraryFilterDialog';
 import { LibrarySearchBar } from './LibrarySearchBar';
@@ -133,6 +133,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     const [showFileNames, setShowFileNames] = useState(false);
     const [settingsAnchorEl, setSettingsAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedImage, setSelectedImage] = useState<{ image: DBImage, url: string } | null>(null);
+    const dateGroupListRef = useRef<DateGroupListHandle>(null);
 
     // Hotkey: ESC to exit selection mode
     useEffect(() => {
@@ -187,32 +188,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
         }
     };
 
-    // Scroll Observer
-    useEffect(() => {
-        if (loading || dateSections.length === 0) return;
-
-        const observer = new IntersectionObserver((entries) => {
-            const visibleEntries = entries
-                .filter(entry => entry.isIntersecting)
-                .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-
-            if (visibleEntries.length > 0) {
-                setActiveId(visibleEntries[0].target.id);
-            }
-        }, {
-            rootMargin: '0px 0px -80% 0px',
-            threshold: 0
-        });
-
-        dateSections.forEach(section => {
-            section.groups.forEach(group => {
-                const groupEl = document.getElementById(`group-${group.id}`);
-                if (groupEl) observer.observe(groupEl);
-            });
-        });
-
-        return () => observer.disconnect();
-    }, [loading, dateSections]);
+    // Active item detection is now handled by DateGroupList's rangeChanged callback
 
     // Image Modal Logic
     useEffect(() => {
@@ -248,11 +224,11 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     };
 
     const handleDateClick = (date: string) => {
-        document.getElementById(`date-${date}`)?.scrollIntoView({ behavior: 'smooth' });
+        dateGroupListRef.current?.scrollToDate(date);
     };
 
     const handleGroupClick = (groupId: number) => {
-        document.getElementById(`group-${groupId}`)?.scrollIntoView({ behavior: 'smooth' });
+        dateGroupListRef.current?.scrollToGroup(groupId);
     };
 
     return (
@@ -311,6 +287,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                     </Box>
                 ) : (
                     <DateGroupList
+                        ref={dateGroupListRef}
                         dateSections={dateSections}
                         imageUrls={imageUrls}
                         loadImage={loadImage}
@@ -328,6 +305,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         onMenuOpen={(e, id) => onGroupMenuOpen && onGroupMenuOpen(e, id)}
                         gridItemSize={gridItemSize}
                         showNames={showFileNames}
+                        onActiveItemChange={setActiveId}
                         headerContent={
                             <>
                                 <Box sx={{ height: `${NAVBAR_HEIGHT}px` }} />
@@ -419,19 +397,22 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                 onClose={() => setSettingsAnchorEl(null)}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                 transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                PaperProps={{
-                    elevation: 0,
-                    sx: {
-                        backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(45, 45, 45, 0.95)',
-                        backdropFilter: 'blur(8px)',
-                        borderRadius: '12px',
-                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-                        border: `1px solid ${theme.palette.divider}`,
-                        minWidth: '250px',
-                        p: 2,
-                        mt: 1
+                slotProps={{
+                    paper: {
+                        elevation: 0,
+                        sx: {
+                            backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(45, 45, 45, 0.95)',
+                            backdropFilter: 'blur(8px)',
+                            borderRadius: '12px',
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                            border: `1px solid ${theme.palette.divider}`,
+                            minWidth: '250px',
+                            p: 2,
+                            mt: 1
+                        }
                     }
                 }}
+                disablePortal={false}
             >
                 <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     Grid Size

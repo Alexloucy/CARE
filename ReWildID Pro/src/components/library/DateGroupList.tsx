@@ -1,11 +1,17 @@
 import { Box, IconButton, Tooltip, Typography, useTheme, Chip } from '@mui/material';
 import { CaretDown, CaretRight, Check as CheckIcon, DotsThreeVertical, UploadSimple } from '@phosphor-icons/react';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Virtuoso } from 'react-virtuoso';
+import React, { useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react';
+import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { DBImage } from '../../types/electron';
 import { DateSection, GroupData } from '../../types/library';
 import AiModeButton from '../AiModeButton';
 import ImageCard from '../ImageCard';
+
+export interface DateGroupListHandle {
+    scrollToIndex: (index: number) => void;
+    scrollToDate: (date: string) => void;
+    scrollToGroup: (groupId: number) => void;
+}
 
 interface DateGroupListProps {
     dateSections: DateSection[];
@@ -23,34 +29,39 @@ interface DateGroupListProps {
     gridItemSize?: number;
     showNames?: boolean;
     headerContent?: React.ReactNode;
+    onActiveItemChange?: (id: string) => void;
 }
 
-type FlatItem = 
+type FlatItem =
     | { type: 'date-header'; date: string; id: string }
     | { type: 'group-header'; group: GroupData; id: string }
     | { type: 'image-row'; images: DBImage[]; groupId: number; id: string };
 
-export const DateGroupList: React.FC<DateGroupListProps> = ({
-    dateSections,
-    imageUrls,
-    loadImage,
-    isSelectionMode,
-    selectedImageIds,
-    onToggleSelection,
-    onSetSelection,
-    onEnableSelectionMode,
-    onExitSelectionMode,
-    allImages = [],
-    onImageClick,
-    onMenuOpen,
-    gridItemSize = 180,
-    showNames = false,
-    headerContent
-}) => {
+export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>((props, ref) => {
+    const {
+        dateSections,
+        imageUrls,
+        loadImage,
+        isSelectionMode,
+        selectedImageIds,
+        onToggleSelection,
+        onSetSelection,
+        onEnableSelectionMode,
+        onExitSelectionMode,
+        allImages = [],
+        onImageClick,
+        onMenuOpen,
+        gridItemSize = 180,
+        showNames = false,
+        headerContent,
+        onActiveItemChange
+    } = props;
+
     const theme = useTheme();
     const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(new Set());
     const [containerWidth, setContainerWidth] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
+    const virtuosoRef = useRef<VirtuosoHandle>(null);
 
     // Resize Observer to get width
     useEffect(() => {
@@ -70,9 +81,9 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
     const availableWidth = containerWidth - horizontalPadding;
     const gap = 16; // 2 * 8px (theme spacing 2)
     const minItemWidth = gridItemSize;
-    
+
     // Avoid division by zero or negative width
-    const columns = availableWidth > 0 
+    const columns = availableWidth > 0
         ? Math.max(1, Math.floor((availableWidth + gap) / (minItemWidth + gap)))
         : 0;
 
@@ -83,19 +94,19 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
 
         dateSections.forEach(section => {
             items.push({ type: 'date-header', date: section.date, id: `date-${section.date}` });
-            
+
             section.groups.forEach(group => {
-                items.push({ type: 'group-header', group, id: `group-header-${group.id}` });
-                
+                items.push({ type: 'group-header', group, id: `group-${group.id}` });
+
                 if (!collapsedGroups.has(group.id)) {
                     // Chunk images into rows
                     for (let i = 0; i < group.images.length; i += columns) {
                         const rowImages = group.images.slice(i, i + columns);
-                        items.push({ 
-                            type: 'image-row', 
-                            images: rowImages, 
-                            groupId: group.id, 
-                            id: `group-${group.id}-row-${i}` 
+                        items.push({
+                            type: 'image-row',
+                            images: rowImages,
+                            groupId: group.id,
+                            id: `group-${group.id}-row-${i}`
                         });
                     }
                 }
@@ -103,6 +114,25 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
         });
         return items;
     }, [dateSections, collapsedGroups, columns]);
+
+    // Expose scrollToIndex to parent via ref
+    useImperativeHandle(ref, () => ({
+        scrollToIndex: (index: number) => {
+            virtuosoRef.current?.scrollToIndex({ index, align: 'start', behavior: 'smooth' });
+        },
+        scrollToDate: (date: string) => {
+            const index = flatItems.findIndex(item => item.type === 'date-header' && item.date === date);
+            if (index !== -1) {
+                virtuosoRef.current?.scrollToIndex({ index, align: 'start', behavior: 'smooth' });
+            }
+        },
+        scrollToGroup: (groupId: number) => {
+            const index = flatItems.findIndex(item => item.type === 'group-header' && item.group.id === groupId);
+            if (index !== -1) {
+                virtuosoRef.current?.scrollToIndex({ index, align: 'start', behavior: 'smooth' });
+            }
+        }
+    }), [flatItems]);
 
     // Drag Selection State
     const isPointerDownRef = useRef(false);
@@ -113,7 +143,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
     // Auto Scroll State (Simplified or removed if Virtuoso handles scrolling well enough, 
     // but for drag-select we might need custom auto-scroll logic if we want to scroll while dragging at edges.
     // For now, let's keep the logic simple: Standard click/drag selection within view)
-    
+
     // ... (Keeping selection logic helpers but adapted) ...
 
     const startDragSession = (imgId: number) => {
@@ -121,11 +151,11 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
         initialSelectionRef.current = new Set(selectedImageIds);
         const wasSelected = initialSelectionRef.current.has(imgId);
         isSelectingRef.current = !wasSelected;
-        
+
         const newSelection = new Set(initialSelectionRef.current);
         if (isSelectingRef.current) newSelection.add(imgId);
         else newSelection.delete(imgId);
-        
+
         if (onSetSelection) onSetSelection(newSelection);
         else onToggleSelection(imgId);
     };
@@ -147,20 +177,20 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
 
     const handlePointerEnter = (imgId: number) => {
         if (isSelectionMode && isPointerDownRef.current && dragStartIdRef.current !== null && onSetSelection && allImages.length > 0) {
-             const startIndex = allImages.findIndex(img => img.id === dragStartIdRef.current);
-             const currentIndex = allImages.findIndex(img => img.id === imgId);
-             if (startIndex === -1 || currentIndex === -1) return;
+            const startIndex = allImages.findIndex(img => img.id === dragStartIdRef.current);
+            const currentIndex = allImages.findIndex(img => img.id === imgId);
+            if (startIndex === -1 || currentIndex === -1) return;
 
-             const minIndex = Math.min(startIndex, currentIndex);
-             const maxIndex = Math.max(startIndex, currentIndex);
-             const newSelection = new Set(initialSelectionRef.current);
+            const minIndex = Math.min(startIndex, currentIndex);
+            const maxIndex = Math.max(startIndex, currentIndex);
+            const newSelection = new Set(initialSelectionRef.current);
 
-             for (let i = minIndex; i <= maxIndex; i++) {
-                 const id = allImages[i].id;
-                 if (isSelectingRef.current) newSelection.add(id);
-                 else newSelection.delete(id);
-             }
-             onSetSelection(newSelection);
+            for (let i = minIndex; i <= maxIndex; i++) {
+                const id = allImages[i].id;
+                if (isSelectingRef.current) newSelection.add(id);
+                else newSelection.delete(id);
+            }
+            onSetSelection(newSelection);
         }
     };
 
@@ -177,14 +207,14 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
     const handleSelectGroup = (groupImages: DBImage[]) => {
         if (!onSetSelection) return;
         if (!isSelectionMode && onEnableSelectionMode) onEnableSelectionMode();
-        
+
         const groupIds = groupImages.map(img => img.id);
         const allSelected = groupIds.every(id => selectedImageIds.has(id));
         const newSelection = new Set(selectedImageIds);
-        
+
         if (allSelected) groupIds.forEach(id => newSelection.delete(id));
         else groupIds.forEach(id => newSelection.add(id));
-        
+
         onSetSelection(newSelection);
         if (newSelection.size === 0 && onExitSelectionMode) onExitSelectionMode();
     };
@@ -199,7 +229,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
     const handleDetect = async (images: DBImage[]) => {
         const paths = images.map(img => img.original_path);
         try {
-            const response = await window.api.detect(paths, () => {});
+            const response = await window.api.detect(paths, () => { });
             if (!response.ok) alert('Detection failed: ' + response.error);
         } catch (error) {
             alert('Error triggering detection: ' + error);
@@ -229,16 +259,16 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
             const group = item.group;
             const isCollapsed = collapsedGroups.has(group.id);
             const isAllSelected = group.images.every((img: DBImage) => selectedImageIds.has(img.id));
-            
+
             return (
-                <Box id={`group-${group.id}`} sx={{ 
+                <Box id={`group-${group.id}`} sx={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, mt: 1, px: 4,
                     '&:hover .collapse-arrow': { opacity: 1, transform: 'translateX(0)' },
                     '&:hover .group-menu-button': { opacity: 1 },
                     '&:hover .group-select-button': { opacity: 1 },
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative' }}>
-                         <Box sx={{ position: 'absolute', left: -29, display: 'flex', alignItems: 'center', height: '100%' }}>
+                        <Box sx={{ position: 'absolute', left: -29, display: 'flex', alignItems: 'center', height: '100%' }}>
                             <IconButton
                                 className="collapse-arrow"
                                 size="small"
@@ -262,7 +292,7 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
                                 <CheckIcon size={20} weight={isAllSelected ? "bold" : "regular"} />
                             </IconButton>
                         </Tooltip>
-                         <IconButton
+                        <IconButton
                             className="group-menu-button"
                             size="small"
                             onClick={(e) => onMenuOpen(e, group.id)}
@@ -342,15 +372,27 @@ export const DateGroupList: React.FC<DateGroupListProps> = ({
     return (
         <Box ref={containerRef} sx={{ height: '100%', width: '100%' }}>
             <Virtuoso
+                ref={virtuosoRef}
                 style={{ height: '100%' }}
                 data={flatItems}
                 itemContent={itemContent}
                 overscan={500}
+                rangeChanged={({ startIndex }) => {
+                    if (!onActiveItemChange) return;
+
+                    // Search backward from startIndex to find the most recent header that "owns" this content
+                    for (let i = startIndex; i >= 0; i--) {
+                        const item = flatItems[i];
+                        if (item.type === 'date-header' || item.type === 'group-header') {
+                            onActiveItemChange(item.id);
+                            break;
+                        }
+                    }
+                }}
                 components={{
                     Header: () => <Box>{headerContent}</Box>
                 }}
             />
         </Box>
     );
-};
-
+});
