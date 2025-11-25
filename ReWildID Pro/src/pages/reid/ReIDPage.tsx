@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
     Box, Typography, CircularProgress, IconButton, Menu, MenuItem,
-    Chip, alpha, useTheme, Collapse, Modal, Backdrop, Fade
+    Chip, alpha, useTheme, Collapse, Modal, Backdrop, Fade, Skeleton
 } from '@mui/material';
 import {
     Fingerprint, DotsThreeVertical, PencilSimple, Trash, CaretDown, CaretRight,
@@ -15,7 +15,20 @@ import { Detection } from '../../types/electron';
 interface ReidRun { id: number; name: string; species: string; created_at: number; individual_count: number; detection_count: number; }
 interface ReidDetection { id: number; image_id: number; label: string; confidence: number; detection_confidence: number; x1: number; y1: number; x2: number; y2: number; source: string; batch_id: number; created_at: number; image_path: string; image_preview_path?: string; }
 interface ReidIndividual { id: number; run_id: number; name: string; display_name: string; color: string; created_at: number; member_count: number; detections: ReidDetection[]; }
-interface ReidResult { run: ReidRun; individuals: ReidIndividual[]; pagination: { total_individuals: number; total_detections: number; page: number; page_size: number; has_more: boolean; }; }
+
+// Skeleton Card for loading state
+const SkeletonCard: React.FC = () => {
+    const theme = useTheme();
+    return (
+        <Box sx={{ borderRadius: 2, overflow: 'hidden', border: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.mode === 'light' ? '#F9F9F9' : theme.palette.background.paper }}>
+            <Skeleton variant="rectangular" width="100%" height={130} animation="wave" />
+            <Box sx={{ p: 1.25 }}>
+                <Skeleton variant="text" width="70%" height={20} animation="wave" />
+                <Skeleton variant="text" width="50%" height={16} animation="wave" />
+            </Box>
+        </Box>
+    );
+};
 
 const IndividualCard: React.FC<{ individual: ReidIndividual; onClick: () => void; imageUrls: Map<string, string> }> = ({ individual, onClick, imageUrls }) => {
     const theme = useTheme();
@@ -38,10 +51,40 @@ const IndividualCard: React.FC<{ individual: ReidIndividual; onClick: () => void
     );
 };
 
-const RunGroup: React.FC<{ run: ReidRun; individuals: ReidIndividual[]; imageUrls: Map<string, string>; onIndividualClick: (ind: ReidIndividual) => void; onMenuOpen: (e: React.MouseEvent<HTMLElement>, runId: number) => void }> = ({ run, individuals, imageUrls, onIndividualClick, onMenuOpen }) => {
+interface RunGroupProps {
+    run: ReidRun;
+    individuals: ReidIndividual[];
+    imageUrls: Map<string, string>;
+    onIndividualClick: (ind: ReidIndividual) => void;
+    onMenuOpen: (e: React.MouseEvent<HTMLElement>, runId: number) => void;
+    hasMore: boolean;
+    loadingMore: boolean;
+    onLoadMore: () => void;
+}
+
+const RunGroup: React.FC<RunGroupProps> = ({ run, individuals, imageUrls, onIndividualClick, onMenuOpen, hasMore, loadingMore, onLoadMore }) => {
     const theme = useTheme();
     const [expanded, setExpanded] = useState(true);
+    const loadMoreRef = useRef<HTMLDivElement>(null);
     const formatDate = (ts: number) => new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    // Intersection observer for infinite scroll
+    useEffect(() => {
+        if (!expanded || !hasMore || loadingMore) return;
+        
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMore && !loadingMore) {
+                    onLoadMore();
+                }
+            },
+            { threshold: 0.1 }
+        );
+        
+        if (loadMoreRef.current) observer.observe(loadMoreRef.current);
+        return () => observer.disconnect();
+    }, [expanded, hasMore, loadingMore, onLoadMore]);
+
     return (
         <Box sx={{ mb: 3 }}>
             <Box onClick={() => setExpanded(!expanded)} sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.text.primary, 0.03), mb: expanded ? 2 : 0, cursor: 'pointer', '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.05) } }}>
@@ -57,7 +100,9 @@ const RunGroup: React.FC<{ run: ReidRun; individuals: ReidIndividual[]; imageUrl
             <Collapse in={expanded}>
                 <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 2, pl: 4 }}>
                     {individuals.map((ind) => <IndividualCard key={ind.id} individual={ind} onClick={() => onIndividualClick(ind)} imageUrls={imageUrls} />)}
+                    {loadingMore && Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={`skeleton-${i}`} />)}
                 </Box>
+                {hasMore && <Box ref={loadMoreRef} sx={{ height: 20, mt: 2 }} />}
             </Collapse>
         </Box>
     );
@@ -196,12 +241,16 @@ const IndividualModal: React.FC<{ open: boolean; onClose: () => void; individual
     );
 };
 
+const PAGE_SIZE = 12;
+
 const ReIDPage: React.FC = () => {
     const theme = useTheme();
     useOutletContext<{ leftSidebarOpen: boolean; rightSidebarOpen: boolean }>();
     const [loading, setLoading] = useState(true);
     const [runs, setRuns] = useState<ReidRun[]>([]);
-    const [results, setResults] = useState<Map<number, ReidResult>>(new Map());
+    const [individuals, setIndividuals] = useState<Map<number, ReidIndividual[]>>(new Map()); // runId -> individuals
+    const [pagination, setPagination] = useState<Map<number, { page: number; hasMore: boolean }>>(new Map());
+    const [loadingMore, setLoadingMore] = useState<Map<number, boolean>>(new Map());
     const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
     const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
     const [renameDialogOpen, setRenameDialogOpen] = useState(false);
@@ -223,6 +272,16 @@ const ReIDPage: React.FC = () => {
         } catch (e) { console.error('Failed to load image:', path, e); }
     };
 
+    const loadImagesForIndividuals = (inds: ReidIndividual[]) => {
+        for (const ind of inds) {
+            for (const det of ind.detections) {
+                const path = det.image_preview_path || det.image_path;
+                if (path && !imageUrls.has(path)) loadImageByPath(path, setImageUrls);
+            }
+        }
+    };
+
+    // Initial load - fetch runs and first page of each
     useEffect(() => {
         const loadData = async () => {
             setLoading(true);
@@ -230,31 +289,50 @@ const ReIDPage: React.FC = () => {
                 const runsRes = await window.api.getReidRuns();
                 if (runsRes.ok && runsRes.runs) {
                     setRuns(runsRes.runs);
-                    const newResults = new Map<number, ReidResult>();
+                    const newIndividuals = new Map<number, ReidIndividual[]>();
+                    const newPagination = new Map<number, { page: number; hasMore: boolean }>();
+                    
                     for (const run of runsRes.runs) {
-                        const res = await window.api.getReidResults({ runId: run.id, pageSize: 100 });
+                        const res = await window.api.getReidResults({ runId: run.id, page: 1, pageSize: PAGE_SIZE });
                         if (res.ok && res.result) {
-                            // Merge run stats into result
-                            const resultWithStats: ReidResult = {
-                                ...res.result,
-                                run: { ...res.result.run, individual_count: run.individual_count, detection_count: run.detection_count }
-                            };
-                            newResults.set(run.id, resultWithStats);
-                            for (const ind of res.result.individuals) {
-                                for (const det of ind.detections) {
-                                    const path = det.image_preview_path || det.image_path;
-                                    if (path) loadImageByPath(path, setImageUrls);
-                                }
-                            }
+                            newIndividuals.set(run.id, res.result.individuals);
+                            newPagination.set(run.id, { page: 1, hasMore: res.result.pagination.has_more });
+                            loadImagesForIndividuals(res.result.individuals);
                         }
                     }
-                    setResults(newResults);
+                    setIndividuals(newIndividuals);
+                    setPagination(newPagination);
                 }
             } catch (e) { console.error('Failed to load ReID data:', e); }
             setLoading(false);
         };
         loadData();
     }, [refreshTrigger]);
+
+    // Load more individuals for a specific run
+    const loadMoreForRun = async (runId: number) => {
+        const currentPagination = pagination.get(runId);
+        if (!currentPagination || !currentPagination.hasMore || loadingMore.get(runId)) return;
+
+        setLoadingMore(prev => new Map(prev).set(runId, true));
+        
+        try {
+            const nextPage = currentPagination.page + 1;
+            const res = await window.api.getReidResults({ runId, page: nextPage, pageSize: PAGE_SIZE });
+            
+            if (res.ok && res.result) {
+                const result = res.result;
+                setIndividuals(prev => {
+                    const existing = prev.get(runId) || [];
+                    return new Map(prev).set(runId, [...existing, ...result.individuals]);
+                });
+                setPagination(prev => new Map(prev).set(runId, { page: nextPage, hasMore: result.pagination.has_more }));
+                loadImagesForIndividuals(res.result.individuals);
+            }
+        } catch (e) { console.error('Failed to load more:', e); }
+        
+        setLoadingMore(prev => new Map(prev).set(runId, false));
+    };
 
     const loadFullImage = (path: string) => {
         if (!fullImageUrls.has(path)) {
@@ -289,8 +367,22 @@ const ReIDPage: React.FC = () => {
             ) : (
                 <Box>
                     {runs.map(run => {
-                        const result = results.get(run.id);
-                        return <RunGroup key={run.id} run={run} individuals={result?.individuals || []} imageUrls={imageUrls} onIndividualClick={handleIndividualClick} onMenuOpen={handleMenuOpen} />;
+                        const runIndividuals = individuals.get(run.id) || [];
+                        const runPagination = pagination.get(run.id);
+                        const isLoadingMore = loadingMore.get(run.id) || false;
+                        return (
+                            <RunGroup 
+                                key={run.id} 
+                                run={run} 
+                                individuals={runIndividuals} 
+                                imageUrls={imageUrls} 
+                                onIndividualClick={handleIndividualClick} 
+                                onMenuOpen={handleMenuOpen}
+                                hasMore={runPagination?.hasMore || false}
+                                loadingMore={isLoadingMore}
+                                onLoadMore={() => loadMoreForRun(run.id)}
+                            />
+                        );
                     })}
                 </Box>
             )}
