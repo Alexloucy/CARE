@@ -86,6 +86,9 @@ const LibraryPage: React.FC = () => {
         handleConfirmUpload 
     } = useLibraryUpload();
 
+    // 5.1 Drag & Drop State
+    const [isDragging, setIsDragging] = useState(false);
+
     // 6. Group Actions
     const {
         anchorEl,
@@ -222,6 +225,7 @@ const LibraryPage: React.FC = () => {
     // Drag Drop Handlers
     const handleDrop = async (e: React.DragEvent) => {
         e.preventDefault();
+        setIsDragging(false);
         const files = Array.from(e.dataTransfer.files);
         if (files.length === 0) return;
         const paths = files.map(file => window.api.getPathForFile(file));
@@ -263,6 +267,8 @@ const LibraryPage: React.FC = () => {
                 onReID={handleGroupReID}
                 onDeleteImage={handleDeleteImage}
                 onDrop={handleDrop}
+                isDragging={isDragging}
+                setIsDragging={setIsDragging}
                 leftSidebarOpen={leftSidebarOpen}
                 rightSidebarOpen={rightSidebarOpen}
                 headerActions={

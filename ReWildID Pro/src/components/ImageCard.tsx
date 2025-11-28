@@ -39,39 +39,16 @@ const ImageCard: React.FC<ImageCardProps> = ({
     isPlaceholder = false
 }) => {
     const theme = useTheme();
-    const [showImage, setShowImage] = useState(false);
     const [isLoaded, setIsLoaded] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
     const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
+    // Load image immediately on mount - Virtuoso already handles virtualization
     useEffect(() => {
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                setShowImage(entry.isIntersecting);
-                if (!entry.isIntersecting) {
-                    setIsLoaded(false);
-                }
-            },
-            {
-                rootMargin: '600px',
-                threshold: 0
-            }
-        );
-
-        if (cardRef.current) {
-            observer.observe(cardRef.current);
-        }
-
-        return () => {
-            observer.disconnect();
-        };
-    }, []);
-
-    useEffect(() => {
-        if (showImage && (!imageUrl || isPlaceholder)) {
+        if (!imageUrl || isPlaceholder) {
             loadImage(date, file.path);
         }
-    }, [showImage, imageUrl, date, file.path, loadImage, isPlaceholder]);
+    }, [imageUrl, date, file.path, loadImage, isPlaceholder]);
 
     // Long Press Logic
     const handlePointerDown = (e: React.PointerEvent) => {
@@ -162,7 +139,7 @@ const ImageCard: React.FC<ImageCardProps> = ({
                 minHeight: '35px'
             }}
         >
-            {imageUrl && showImage && (
+            {imageUrl && (
                 <Fade in={isLoaded} timeout={800}>
                     <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
                         <CardMedia
