@@ -16,13 +16,15 @@ import { DBImage } from '../../types/electron';
 import { useGroupActions } from '../../hooks/useGroupActions';
 import { useImageLoader } from '../../hooks/useImageLoader';
 import { useLibraryData } from '../../hooks/useLibraryData';
-import { useLibraryUpload } from '../../hooks/useLibraryUpload';
 import { useSelection } from '../../hooks/useSelection';
 
 // Components
 import { GroupNameDialog } from '../../components/GroupNameDialog';
 import { LibraryFilter } from '../../components/library/LibraryFilterDialog';
 import { MediaExplorer } from '../../components/library/MediaExplorer';
+
+// Utils
+import { triggerUpload } from '../../utils/uploadTrigger';
 
 const LibraryPage: React.FC = () => {
     const theme = useTheme();
@@ -76,20 +78,7 @@ const LibraryPage: React.FC = () => {
         setSelection
     } = useSelection<number>();
 
-    // 5. Upload Logic
-    const { 
-        groupNameDialogOpen, 
-        setGroupNameDialogOpen, 
-        setPendingUploadFiles, 
-        handleUploadClick, 
-        processUploadPaths, 
-        handleConfirmUpload 
-    } = useLibraryUpload();
-
-    // 5.1 Drag & Drop State
-    const [isDragging, setIsDragging] = useState(false);
-
-    // 6. Group Actions
+    // 5. Group Actions
     const {
         anchorEl,
         renameDialogOpen,
@@ -222,16 +211,6 @@ const LibraryPage: React.FC = () => {
         }
     };
 
-    // Drag Drop Handlers
-    const handleDrop = async (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(false);
-        const files = Array.from(e.dataTransfer.files);
-        if (files.length === 0) return;
-        const paths = files.map(file => window.api.getPathForFile(file));
-        processUploadPaths(paths);
-    };
-
     return (
         <>
             <MediaExplorer
@@ -266,14 +245,11 @@ const LibraryPage: React.FC = () => {
                 onClassify={handleGroupClassify}
                 onReID={handleGroupReID}
                 onDeleteImage={handleDeleteImage}
-                onDrop={handleDrop}
-                isDragging={isDragging}
-                setIsDragging={setIsDragging}
                 leftSidebarOpen={leftSidebarOpen}
                 rightSidebarOpen={rightSidebarOpen}
-                onUpload={handleUploadClick}
+                onUpload={triggerUpload}
                 headerActions={
-                    <Button variant="contained" startIcon={<Plus />} onClick={handleUploadClick} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>
+                    <Button variant="contained" startIcon={<Plus />} onClick={triggerUpload} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>
                         Upload
                     </Button>
                 }
@@ -309,14 +285,7 @@ const LibraryPage: React.FC = () => {
                 }
             />
 
-            {/* Dialogs - Kept in Page because they are business logic specific (Renaming Group) */}
-            <GroupNameDialog
-                open={groupNameDialogOpen}
-                onClose={() => { setGroupNameDialogOpen(false); setPendingUploadFiles([]); }}
-                onConfirm={handleConfirmUpload}
-                title="Create New Group"
-            />
-
+            {/* Dialog for renaming groups */}
             <GroupNameDialog
                 open={renameDialogOpen}
                 onClose={() => { setRenameDialogOpen(false); setGroupToRename(null); }}

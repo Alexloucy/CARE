@@ -61,6 +61,22 @@ export default function Layout() {
         setUploadDialogOpen(true);
     }, []);
 
+    // Global upload button handler - opens file dialog then shows upload dialog
+    const handleGlobalUploadClick = useCallback(async () => {
+        const result = await window.api.openFileDialog();
+        if (!result.canceled && result.filePaths.length > 0) {
+            setPendingFiles(result.filePaths);
+            setUploadDialogOpen(true);
+        }
+    }, []);
+
+    // Listen for global upload trigger events
+    useEffect(() => {
+        const handleUploadEvent = () => handleGlobalUploadClick();
+        window.addEventListener('trigger-upload', handleUploadEvent);
+        return () => window.removeEventListener('trigger-upload', handleUploadEvent);
+    }, [handleGlobalUploadClick]);
+
     // Handle upload confirmation from dialog
     const handleUploadConfirm = useCallback(async (
         action: 'library' | 'classify' | 'reid', 
