@@ -24,7 +24,7 @@ import { LibraryFilter } from '../../components/library/LibraryFilterDialog';
 import { MediaExplorer } from '../../components/library/MediaExplorer';
 
 // Utils
-import { triggerUpload } from '../../utils/uploadTrigger';
+import { triggerUpload } from '../../utils/navigationEvents';
 
 const LibraryPage: React.FC = () => {
     const theme = useTheme();
@@ -63,6 +63,17 @@ const LibraryPage: React.FC = () => {
     const refreshLibrary = async () => {
         await Promise.all([refreshFullLibrary(), refreshFilteredLibrary()]);
     };
+
+    // Listen for refresh events from TaskPanel
+    useEffect(() => {
+        const handleRefresh = (e: CustomEvent<{ page: string }>) => {
+            if (e.detail.page === 'library') {
+                refreshLibrary();
+            }
+        };
+        window.addEventListener('trigger-refresh', handleRefresh as EventListener);
+        return () => window.removeEventListener('trigger-refresh', handleRefresh as EventListener);
+    }, [refreshFullLibrary, refreshFilteredLibrary]);
     
     // 3. Image Loading
     const { imageUrls, fullImageUrls, loadImage, loadFullImage } = useImageLoader();

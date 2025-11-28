@@ -1,11 +1,43 @@
 import React from 'react';
-import { Box, Typography, LinearProgress, IconButton, List, Paper, useTheme, Chip } from '@mui/material';
-import { XCircle, DownloadIcon, ScanIcon, IdentificationCardIcon, ImageIcon } from '@phosphor-icons/react';
+import { Box, Typography, LinearProgress, IconButton, List, Paper, useTheme, Chip, Button } from '@mui/material';
+import { XCircle, DownloadIcon, ScanIcon, IdentificationCardIcon, ImageIcon, ArrowRight } from '@phosphor-icons/react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useJobs, Job } from '../hooks/useJobs';
+import { triggerRefresh } from '../utils/navigationEvents';
 
 const TaskPanel: React.FC = () => {
     const { jobs, cancelJob } = useJobs();
     const theme = useTheme();
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    // Map job type to target page
+    const getTargetPage = (type: Job['type']): { path: string; name: 'library' | 'classification' | 'reid' } | null => {
+        switch (type) {
+            case 'import':
+            case 'thumbnail':
+                return { path: '/library', name: 'library' };
+            case 'detect':
+                return { path: '/classification', name: 'classification' };
+            case 'reid':
+                return { path: '/reid', name: 'reid' };
+            default:
+                return null;
+        }
+    };
+
+    const handleViewResults = (job: Job) => {
+        const target = getTargetPage(job.type);
+        if (!target) return;
+
+        if (location.pathname === target.path) {
+            // Already on the page - just trigger refresh
+            triggerRefresh(target.name);
+        } else {
+            // Navigate to the page (it will load fresh data)
+            navigate(target.path);
+        }
+    };
 
     if (jobs.length === 0) {
         return (
@@ -128,10 +160,31 @@ const TaskPanel: React.FC = () => {
                                     </Box>
                                 </Box>
                             ) : (
-                                <Box sx={{ mt: 0.5 }}>
+                                <Box sx={{ mt: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                                         {new Date(job.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                                     </Typography>
+                                    {job.status === 'completed' && getTargetPage(job.type) && (
+                                        <Button
+                                            size="small"
+                                            onClick={() => handleViewResults(job)}
+                                            endIcon={<ArrowRight size={14} />}
+                                            sx={{
+                                                fontSize: '0.7rem',
+                                                textTransform: 'none',
+                                                py: 0,
+                                                px: 1,
+                                                minHeight: 'auto',
+                                                color: theme.palette.primary.main,
+                                                '&:hover': {
+                                                    bgcolor: 'transparent',
+                                                    textDecoration: 'underline'
+                                                }
+                                            }}
+                                        >
+                                            View
+                                        </Button>
+                                    )}
                                 </Box>
                             )}
                         </Box>

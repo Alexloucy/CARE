@@ -16,7 +16,7 @@ import { GroupNameDialog } from '../../components/GroupNameDialog';
 import { DateSection, GroupData } from '../../types/library';
 
 // Utils
-import { triggerUpload } from '../../utils/uploadTrigger';
+import { triggerUpload } from '../../utils/navigationEvents';
 
 const ClassificationPage: React.FC = () => {
     const theme = useTheme();
@@ -43,6 +43,17 @@ const ClassificationPage: React.FC = () => {
     const refreshLibrary = async () => {
         setRefreshTrigger(prev => prev + 1);
     };
+
+    // Listen for refresh events from TaskPanel
+    useEffect(() => {
+        const handleRefresh = (e: CustomEvent<{ page: string }>) => {
+            if (e.detail.page === 'classification') {
+                refreshLibrary();
+            }
+        };
+        window.addEventListener('trigger-refresh', handleRefresh as EventListener);
+        return () => window.removeEventListener('trigger-refresh', handleRefresh as EventListener);
+    }, []);
 
     // Data Loading Effect
     useEffect(() => {

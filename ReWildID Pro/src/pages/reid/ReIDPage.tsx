@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
     Box, Typography, CircularProgress, IconButton, Menu, MenuItem,
@@ -262,6 +262,21 @@ const ReIDPage: React.FC = () => {
     const [fullImageUrls, setFullImageUrls] = useState<Map<string, string>>(new Map());
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+    const refreshData = useCallback(() => {
+        setRefreshTrigger(prev => prev + 1);
+    }, []);
+
+    // Listen for refresh events from TaskPanel
+    useEffect(() => {
+        const handleRefresh = (e: CustomEvent<{ page: string }>) => {
+            if (e.detail.page === 'reid') {
+                refreshData();
+            }
+        };
+        window.addEventListener('trigger-refresh', handleRefresh as EventListener);
+        return () => window.removeEventListener('trigger-refresh', handleRefresh as EventListener);
+    }, [refreshData]);
+
     const loadImageByPath = async (path: string, setFn: React.Dispatch<React.SetStateAction<Map<string, string>>>) => {
         try {
             const response = await window.api.viewImage(path);
@@ -352,13 +367,6 @@ const ReIDPage: React.FC = () => {
 
     return (
         <Box sx={{ pt: '64px', px: 3, pb: 3, minHeight: '100vh' }}>
-            {/* Header */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 2 }}>
-                <Fingerprint size={28} weight="duotone" />
-                <Typography variant="h5" fontWeight={600}>Re-identification</Typography>
-                <Typography variant="body2" color="text.secondary">{runs.length} run{runs.length !== 1 ? 's' : ''}</Typography>
-            </Box>
-            
             {runs.length === 0 ? (
                 <Box sx={{ height: 'calc(100vh - 180px)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 2, opacity: 0.6 }}>
                     <Fingerprint size={64} weight="thin" color={theme.palette.text.primary} />
@@ -384,6 +392,12 @@ const ReIDPage: React.FC = () => {
                 </Box>
             ) : (
                 <Box>
+                    {/* Header - only shown when there's data */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 2 }}>
+                        <Fingerprint size={28} weight="duotone" />
+                        <Typography variant="h5" fontWeight={600}>Re-identification</Typography>
+                        <Typography variant="body2" color="text.secondary">{runs.length} run{runs.length !== 1 ? 's' : ''}</Typography>
+                    </Box>
                     {runs.map(run => {
                         const runIndividuals = individuals.get(run.id) || [];
                         const runPagination = pagination.get(run.id);
