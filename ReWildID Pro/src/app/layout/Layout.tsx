@@ -1,22 +1,87 @@
 import { Box, useMediaQuery, useTheme } from '@mui/material';
-import { useEffect, useState, useRef } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import LeftSidebar from './navbar/LeftSidebar';
 import Navbar from './navbar/Navbar';
 import { RightSidebar } from './navbar/RightSidebar';
 import TaskPanel from '../../components/TaskPanel';
+import { DragDropOverlay } from '../../components/library/DragDropOverlay';
+import { UploadActionDialog } from '../../components/UploadActionDialog';
 
 export default function Layout() {
     const location = useLocation();
+    const navigate = useNavigate();
     const theme = useTheme();
     const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
 
     const [leftSidebarOpen, setLeftSidebarOpen] = useState(isDesktop);
     const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
 
+    // Global Drag & Drop State
+    const [isDragging, setIsDragging] = useState(false);
+    const [pendingFiles, setPendingFiles] = useState<string[]>([]);
+    const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+    const dragCounter = useRef(0);
+
     const getPageMargin = (): number => {
         return 0
     };
+
+    // Global Drag & Drop Handlers
+    const handleDragEnter = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        dragCounter.current++;
+        if (e.dataTransfer.types.includes('Files')) {
+            setIsDragging(true);
+        }
+    }, []);
+
+    const handleDragLeave = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        dragCounter.current--;
+        if (dragCounter.current === 0) {
+            setIsDragging(false);
+        }
+    }, []);
+
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+    }, []);
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        dragCounter.current = 0;
+        setIsDragging(false);
+        
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length === 0) return;
+        
+        const paths = files.map(file => window.api.getPathForFile(file));
+        setPendingFiles(paths);
+        setUploadDialogOpen(true);
+    }, []);
+
+    // Handle upload confirmation from dialog
+    const handleUploadConfirm = useCallback(async (
+        action: 'library' | 'classify' | 'reid', 
+        groupName?: string, 
+        _species?: string
+    ) => {
+        try {
+            await window.api.uploadPaths(pendingFiles, groupName);
+            setPendingFiles([]);
+            // Navigate to appropriate page based on action
+            if (action === 'classify') {
+                navigate('/classification');
+            } else if (action === 'reid') {
+                navigate('/reid');
+            } else {
+                navigate('/library');
+            }
+        } catch (error) {
+            console.error('Upload failed:', error);
+        }
+    }, [pendingFiles, navigate]);
 
     useEffect(() => {
         setLeftSidebarOpen(isDesktop);
@@ -42,7 +107,13 @@ export default function Layout() {
     }, []);
 
     return (
-        <Box sx={{ display: 'flex', height: '100vh'}}>
+        <Box 
+            sx={{ display: 'flex', height: '100vh'}}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+        >
             <LeftSidebar open={leftSidebarOpen} onClose={() => setLeftSidebarOpen(false)} />
 
             <Box sx={{
@@ -115,6 +186,20 @@ export default function Layout() {
             >
                 <TaskPanel />
             </RightSidebar>
+
+            {/* Global Drag & Drop Overlay */}
+            <DragDropOverlay isDragging={isDragging} />
+
+            {/* Upload Action Dialog - handles both action selection and group naming */}
+            <UploadActionDialog
+                open={uploadDialogOpen}
+                onClose={() => {
+                    setUploadDialogOpen(false);
+                    setPendingFiles([]);
+                }}
+                filePaths={pendingFiles}
+                onConfirm={handleUploadConfirm}
+            />
         </Box>
     );
 }
