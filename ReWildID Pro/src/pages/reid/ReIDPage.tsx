@@ -359,10 +359,10 @@ const ReIDPage: React.FC = () => {
             </Box>
             
             {runs.length === 0 ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 2, py: 10 }}>
-                    <Fingerprint size={64} weight="thin" color={theme.palette.text.disabled} />
-                    <Typography color="text.secondary">No ReID runs yet</Typography>
-                    <Typography variant="body2" color="text.secondary">Run Re-identification from the Library or Classification page</Typography>
+                <Box sx={{ height: 'calc(100vh - 180px)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 2, opacity: 0.6 }}>
+                    <Fingerprint size={64} weight="thin" color={theme.palette.text.primary} />
+                    <Typography variant="h5" fontWeight="500" color="text.primary">No ReID runs yet</Typography>
+                    <Typography variant="body1" color="text.secondary">Run Re-identification from the Library or Classification page</Typography>
                 </Box>
             ) : (
                 <Box>

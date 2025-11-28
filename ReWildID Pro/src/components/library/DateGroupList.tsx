@@ -515,7 +515,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
 
     if (dateSections.length === 0) {
         return (
-            <Box sx={{ height: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
+            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
                 <UploadSimple size={64} color={theme.palette.text.primary} weight="thin" />
                 <Typography variant="h5" fontWeight="500" sx={{ mt: 3, color: 'text.primary' }}>No images yet</Typography>
                 <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>Drag and drop or click Upload to start</Typography>
@@ -536,7 +536,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                 style={{ height: '100%' }}
                 data={flatItems}
                 itemContent={itemContent}
-                overscan={1000}
+                overscan={500}
                 context={{ headerContent }}
                 rangeChanged={({ startIndex }) => {
                     if (!onActiveItemChange) return;

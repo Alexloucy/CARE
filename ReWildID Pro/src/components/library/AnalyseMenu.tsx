@@ -14,13 +14,14 @@ import {
     TextField
 } from '@mui/material';
 import { X, Sparkle, Fingerprint } from '@phosphor-icons/react';
+import { ACTIVE_SPECIES, FUTURE_SPECIES, DEFAULT_SPECIES } from '../../constants/species';
 
 interface AnalyseMenuProps {
     open: boolean;
     onClose: () => void;
     onClassify?: () => void;
     onReID: (species: string) => void;
-    availableSpecies: string[];
+    availableSpecies?: string[]; // Optional - will use static list if not provided
     selectedCount: number;
     reidOnly?: boolean; // If true, skip to species selection directly
     title?: string; // Custom title
@@ -37,8 +38,14 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
     title = 'Analyse'
 }) => {
     const theme = useTheme();
-    const [selectedSpecies, setSelectedSpecies] = useState<string>('');
+    const [selectedSpecies, setSelectedSpecies] = useState<string>(DEFAULT_SPECIES);
     const [showReIDOptions, setShowReIDOptions] = useState(reidOnly);
+    
+    // Group species: active ones first, then future ones (greyed out)
+    const speciesOptions = [
+        ...ACTIVE_SPECIES.map(s => ({ species: s, group: 'Available', disabled: false })),
+        ...FUTURE_SPECIES.map(s => ({ species: s, group: 'Coming Soon', disabled: true }))
+    ];
 
     const handleClassify = () => {
         if (onClassify) onClassify();
@@ -50,14 +57,14 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
             onReID(selectedSpecies);
             onClose();
             setShowReIDOptions(false);
-            setSelectedSpecies('');
+            setSelectedSpecies(DEFAULT_SPECIES);
         }
     };
 
     const handleClose = () => {
         onClose();
         setShowReIDOptions(reidOnly); // Reset to initial state
-        setSelectedSpecies('');
+        setSelectedSpecies(DEFAULT_SPECIES);
     };
 
     return (
@@ -215,11 +222,14 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
                         <Autocomplete
                             fullWidth
                             size="small"
-                            options={availableSpecies}
-                            value={selectedSpecies || null}
-                            onChange={(_, newValue) => setSelectedSpecies(newValue || '')}
-                            getOptionLabel={(option) => option.charAt(0).toUpperCase() + option.slice(1)}
-                            noOptionsText="No species detected yet"
+                            options={speciesOptions}
+                            groupBy={(option) => option.group}
+                            getOptionLabel={(option) => option.species.charAt(0).toUpperCase() + option.species.slice(1)}
+                            getOptionDisabled={(option) => option.disabled}
+                            value={speciesOptions.find(o => o.species === selectedSpecies) || null}
+                            onChange={(_, newValue) => setSelectedSpecies(newValue?.species || '')}
+                            isOptionEqualToValue={(option, value) => option.species === value.species}
+                            noOptionsText="No species available"
                             renderInput={(params) => (
                                 <TextField
                                     {...params}
@@ -237,6 +247,23 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
                                         }
                                     }}
                                 />
+                            )}
+                            renderGroup={(params) => (
+                                <li key={params.key}>
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            display: 'block',
+                                            px: 1.5,
+                                            pt: 1.5,
+                                            pb: 0.5,
+                                            color: 'text.secondary',
+                                        }}
+                                    >
+                                        {params.group}
+                                    </Typography>
+                                    <ul style={{ padding: 0 }}>{params.children}</ul>
+                                </li>
                             )}
                             slotProps={{
                                 paper: {
@@ -269,6 +296,10 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
                                                         ? alpha('#000000', 0.10) 
                                                         : alpha('#FFFFFF', 0.15)
                                                 }
+                                            },
+                                            '&.Mui-disabled': {
+                                                opacity: 1,
+                                                color: theme.palette.text.disabled
                                             }
                                         }
                                     }
