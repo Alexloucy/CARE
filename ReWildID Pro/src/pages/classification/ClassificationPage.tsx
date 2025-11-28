@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { Menu, MenuItem, useTheme } from '@mui/material';
 import { PencilSimple, Trash } from '@phosphor-icons/react';
 import { DBImage } from '../../types/electron';
@@ -17,6 +17,7 @@ import { DateSection, GroupData } from '../../types/library';
 
 const ClassificationPage: React.FC = () => {
     const theme = useTheme();
+    const navigate = useNavigate();
     const { leftSidebarOpen, rightSidebarOpen } = useOutletContext<{ leftSidebarOpen: boolean; rightSidebarOpen: boolean }>();
 
     // 1. Filter & Search State
@@ -395,6 +396,7 @@ const ClassificationPage: React.FC = () => {
             onGroupMenuOpen={handleMenuOpen}
             aiButtonMode="reid"
             onReID={handleReID}
+            onUpload={() => navigate('/library')}
             groupMenu={
                 <Menu
                     anchorEl={anchorEl}

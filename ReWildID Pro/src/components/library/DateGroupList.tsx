@@ -1,6 +1,6 @@
-import { Box, IconButton, Tooltip, Typography, useTheme, Chip } from '@mui/material';
+import { Box, IconButton, Tooltip, Typography, useTheme, Chip, Button } from '@mui/material';
 import { AnalyseMenu } from './AnalyseMenu';
-import { CaretDown, CaretRight, Check as CheckIcon, DotsThreeVertical, UploadSimple } from '@phosphor-icons/react';
+import { CaretDown, CaretRight, Check as CheckIcon, DotsThreeVertical, UploadSimple, Images } from '@phosphor-icons/react';
 import React, { useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { DBImage } from '../../types/electron';
@@ -39,6 +39,8 @@ interface DateGroupListProps {
     onReID?: (images: DBImage[], species: string) => void;
     onClassify?: (images: DBImage[]) => void;
     availableSpecies?: string[];
+    // Empty state action
+    onUpload?: () => void;
 }
 
 type FlatItem =
@@ -70,7 +72,8 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
         aiButtonMode = 'detect',
         onReID,
         onClassify,
-        availableSpecies = []
+        availableSpecies = [],
+        onUpload
     } = props;
 
     const theme = useTheme();
@@ -516,9 +519,28 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
     if (dateSections.length === 0) {
         return (
             <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
-                <UploadSimple size={64} color={theme.palette.text.primary} weight="thin" />
+                <Images size={64} color={theme.palette.text.primary} weight="thin" />
                 <Typography variant="h5" fontWeight="500" sx={{ mt: 3, color: 'text.primary' }}>No images yet</Typography>
                 <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>Drag and drop or click Upload to start</Typography>
+                {onUpload && (
+                    <Button
+                        variant="contained"
+                        startIcon={<UploadSimple size={18} />}
+                        onClick={onUpload}
+                        sx={{
+                            mt: 3,
+                            borderRadius: 2,
+                            textTransform: 'none',
+                            bgcolor: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000',
+                            color: theme.palette.mode === 'dark' ? '#000000' : '#FFFFFF',
+                            '&:hover': {
+                                bgcolor: theme.palette.mode === 'dark' ? '#E0E0E0' : '#333333'
+                            }
+                        }}
+                    >
+                        Upload
+                    </Button>
+                )}
             </Box>
         );
     }

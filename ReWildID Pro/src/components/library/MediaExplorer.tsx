@@ -97,6 +97,9 @@ interface MediaExplorerProps {
     aiButtonMode?: 'detect' | 'reid' | 'analyse';
     onReID?: (images: DBImage[], species: string) => void;
     onClassify?: (images: DBImage[]) => void;
+    
+    // Empty state action
+    onUpload?: () => void;
 }
 
 export const MediaExplorer: React.FC<MediaExplorerProps> = ({
@@ -138,7 +141,8 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     availableSpecies,
     aiButtonMode = 'detect',
     onReID,
-    onClassify
+    onClassify,
+    onUpload
 }) => {
     const theme = useTheme();
 
@@ -361,6 +365,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         onReID={onReID}
                         onClassify={onClassify}
                         availableSpecies={availableSpecies}
+                        onUpload={onUpload}
                         headerContent={
                             <>
                                 <Box sx={{ height: `${NAVBAR_HEIGHT}px` }} />

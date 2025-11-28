@@ -271,6 +271,7 @@ const LibraryPage: React.FC = () => {
                 setIsDragging={setIsDragging}
                 leftSidebarOpen={leftSidebarOpen}
                 rightSidebarOpen={rightSidebarOpen}
+                onUpload={handleUploadClick}
                 headerActions={
                     <Button variant="contained" startIcon={<Plus />} onClick={handleUploadClick} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>
                         Upload

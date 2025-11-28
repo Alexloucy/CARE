@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
     Box, Typography, CircularProgress, IconButton, Menu, MenuItem,
-    Chip, alpha, useTheme, Collapse, Modal, Backdrop, Fade, Skeleton
+    Chip, alpha, useTheme, Collapse, Modal, Backdrop, Fade, Skeleton, Button
 } from '@mui/material';
 import {
     Fingerprint, DotsThreeVertical, PencilSimple, Trash, CaretDown, CaretRight,
-    Images as ImagesIcon, X, CaretLeft, MagnifyingGlassPlus, MagnifyingGlassMinus
+    Images as ImagesIcon, X, CaretLeft, MagnifyingGlassPlus, MagnifyingGlassMinus, Sparkle
 } from '@phosphor-icons/react';
 import { GroupNameDialog } from '../../components/GroupNameDialog';
 import { DetectionBox } from '../../components/ImageModal';
@@ -245,6 +245,7 @@ const PAGE_SIZE = 12;
 
 const ReIDPage: React.FC = () => {
     const theme = useTheme();
+    const navigate = useNavigate();
     useOutletContext<{ leftSidebarOpen: boolean; rightSidebarOpen: boolean }>();
     const [loading, setLoading] = useState(true);
     const [runs, setRuns] = useState<ReidRun[]>([]);
@@ -363,6 +364,23 @@ const ReIDPage: React.FC = () => {
                     <Fingerprint size={64} weight="thin" color={theme.palette.text.primary} />
                     <Typography variant="h5" fontWeight="500" color="text.primary">No ReID runs yet</Typography>
                     <Typography variant="body1" color="text.secondary">Run Re-identification from the Library or Classification page</Typography>
+                    <Button
+                        variant="contained"
+                        startIcon={<Sparkle size={18} />}
+                        onClick={() => navigate('/classification')}
+                        sx={{
+                            mt: 2,
+                            borderRadius: 2,
+                            textTransform: 'none',
+                            bgcolor: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000',
+                            color: theme.palette.mode === 'dark' ? '#000000' : '#FFFFFF',
+                            '&:hover': {
+                                bgcolor: theme.palette.mode === 'dark' ? '#E0E0E0' : '#333333'
+                            }
+                        }}
+                    >
+                        Go to Classification
+                    </Button>
                 </Box>
             ) : (
                 <Box>
