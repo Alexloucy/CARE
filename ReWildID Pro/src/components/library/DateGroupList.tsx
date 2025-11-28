@@ -1,7 +1,7 @@
 import { Box, IconButton, Tooltip, Typography, useTheme, Chip, Button } from '@mui/material';
 import { AnalyseMenu } from './AnalyseMenu';
 import { CaretDown, CaretRight, Check as CheckIcon, DotsThreeVertical, UploadSimple, Images } from '@phosphor-icons/react';
-import React, { useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { DBImage } from '../../types/electron';
 import { DateSection, GroupData } from '../../types/library';
@@ -312,11 +312,17 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
         return date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     };
 
-    // Render Item
+    // Calculate row height for consistent sizing (prevents scroll jumps)
+    const getRowHeight = useCallback(() => {
+        const [w, h] = aspectRatio.split('/').map(Number);
+        return gridItemSize * (h / w) + (showNames ? 40 : 16);
+    }, [aspectRatio, gridItemSize, showNames]);
+
+    // Render Item - fixed heights prevent Virtuoso scroll jumps
     const itemContent = (_: number, item: FlatItem) => {
         if (item.type === 'date-header') {
             return (
-                <Box id={item.id} sx={{ mt: 4, mb: 2, px: 4 }}>
+                <Box id={item.id} sx={{ height: 56, display: 'flex', alignItems: 'flex-end', px: 4, pb: 1 }}>
                     <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.text.secondary, textTransform: 'uppercase', letterSpacing: '0.5px', fontSize: '0.875rem' }}>
                         {formatDate(item.date)}
                     </Typography>
@@ -329,7 +335,8 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
 
             return (
                 <Box id={`group-${group.id}`} sx={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, mt: 1, px: 4,
+                    height: 48, // Fixed height prevents scroll jumps
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 4,
                     '&:hover .collapse-arrow': { opacity: 1, transform: 'translateX(0)' },
                     '&:hover .group-menu-button': { opacity: 1 },
                     '&:hover .group-select-button': { opacity: 1 },
@@ -462,9 +469,10 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                 </Box>
             );
         } else {
-            // Image Row
+            // Image Row - fixed height prevents scroll jumps
+            const rowHeight = getRowHeight() + 16; // +16 for bottom padding
             return (
-                <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 2, mb: 2, px: 4 }}>
+                <Box sx={{ height: rowHeight, display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 2, pb: 2, px: 4, overflow: 'hidden' }}>
                     {item.images.map(img => {
                         const fileDetails = {
                             name: img.original_path.split(/[\\/]/).pop() || 'image.jpg',
@@ -545,11 +553,16 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
         );
     }
 
-    const components = useMemo(() => ({
-        Header: ({ context }: { context?: { headerContent: React.ReactNode } }) => (
-            <Box>{context?.headerContent}</Box>
-        )
-    }), []);
+    // Memoized components and context for Virtuoso (prevents unnecessary recalculations)
+    const virtuosoComponents = useMemo(() => ({
+        Header: () => <Box>{headerContent}</Box>
+    }), [headerContent]);
+
+    // Average item height for better Virtuoso estimation
+    const avgItemHeight = useMemo(() => {
+        const rowHeight = getRowHeight() + 16;
+        return Math.round((56 + 48 + rowHeight * 3) / 5);
+    }, [getRowHeight]);
 
     return (
         <Box ref={containerRef} sx={{ height: '100%', width: '100%' }}>
@@ -558,12 +571,11 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                 style={{ height: '100%' }}
                 data={flatItems}
                 itemContent={itemContent}
-                overscan={500}
-                context={{ headerContent }}
+                overscan={400}
+                defaultItemHeight={avgItemHeight}
+                computeItemKey={(_, item) => item.id}
                 rangeChanged={({ startIndex }) => {
                     if (!onActiveItemChange) return;
-
-                    // Search backward from startIndex to find the most recent header that "owns" this content
                     for (let i = startIndex; i >= 0; i--) {
                         const item = flatItems[i];
                         if (item.type === 'date-header' || item.type === 'group-header') {
@@ -572,7 +584,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                         }
                     }
                 }}
-                components={components}
+                components={virtuosoComponents}
             />
         </Box>
     );
