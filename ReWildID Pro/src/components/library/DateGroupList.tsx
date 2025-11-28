@@ -524,36 +524,8 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
         }
     };
 
-    if (dateSections.length === 0) {
-        return (
-            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
-                <Images size={64} color={theme.palette.text.primary} weight="thin" />
-                <Typography variant="h5" fontWeight="500" sx={{ mt: 3, color: 'text.primary' }}>No images yet</Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>Drag and drop or click Upload to start</Typography>
-                {onUpload && (
-                    <Button
-                        variant="contained"
-                        startIcon={<UploadSimple size={18} />}
-                        onClick={onUpload}
-                        sx={{
-                            mt: 3,
-                            borderRadius: 2,
-                            textTransform: 'none',
-                            bgcolor: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000',
-                            color: theme.palette.mode === 'dark' ? '#000000' : '#FFFFFF',
-                            '&:hover': {
-                                bgcolor: theme.palette.mode === 'dark' ? '#E0E0E0' : '#333333'
-                            }
-                        }}
-                    >
-                        Upload
-                    </Button>
-                )}
-            </Box>
-        );
-    }
-
     // Memoized components and context for Virtuoso (prevents unnecessary recalculations)
+    // NOTE: These hooks MUST be before any early returns to satisfy React's rules of hooks
     const virtuosoComponents = useMemo(() => ({
         Header: () => <Box>{headerContent}</Box>
     }), [headerContent]);
@@ -563,6 +535,39 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
         const rowHeight = getRowHeight() + 16;
         return Math.round((56 + 48 + rowHeight * 3) / 5);
     }, [getRowHeight]);
+
+    // Empty state - show header content so filter/search controls remain accessible
+    if (dateSections.length === 0) {
+        return (
+            <Box ref={containerRef} sx={{ height: '100%', width: '100%', overflow: 'auto' }}>
+                {headerContent}
+                <Box sx={{ height: 'calc(100% - 140px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
+                    <Images size={64} color={theme.palette.text.primary} weight="thin" />
+                    <Typography variant="h5" fontWeight="500" sx={{ mt: 3, color: 'text.primary' }}>No images found</Typography>
+                    <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>Try adjusting your filters or search query</Typography>
+                    {onUpload && (
+                        <Button
+                            variant="contained"
+                            startIcon={<UploadSimple size={18} />}
+                            onClick={onUpload}
+                            sx={{
+                                mt: 3,
+                                borderRadius: 2,
+                                textTransform: 'none',
+                                bgcolor: theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000',
+                                color: theme.palette.mode === 'dark' ? '#000000' : '#FFFFFF',
+                                '&:hover': {
+                                    bgcolor: theme.palette.mode === 'dark' ? '#E0E0E0' : '#333333'
+                                }
+                            }}
+                        >
+                            Upload
+                        </Button>
+                    )}
+                </Box>
+            </Box>
+        );
+    }
 
     return (
         <Box ref={containerRef} sx={{ height: '100%', width: '100%' }}>
