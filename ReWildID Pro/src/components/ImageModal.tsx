@@ -2,6 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Box, Typography, Modal, IconButton, Fade, Backdrop, Paper, useTheme } from '@mui/material';
 import { X, MagnifyingGlassPlus, MagnifyingGlassMinus, CaretLeft, CaretRight, Trash, Sparkle } from '@phosphor-icons/react';
 import { FileDetails, Detection } from '../types/electron';
+import { LiquidGlassOverlay } from './LiquidGlassOverlay';
+
+// Toggle for ray-traced liquid glass (will be moved to settings later)
+const USE_RAY_TRACED_GLASS = true;
 
 // DetectionBox Component with fluid animations (1:1 copy of AiModeButton behavior)
 interface DetectionBoxProps {
@@ -22,7 +26,7 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
     detection, 
     containerWidth, 
     containerHeight, 
-    useLiquidGlass = true, 
+    useLiquidGlass = true,
     onDelete,
     customPopupContent,
     popupTitle = "Detection Details",
@@ -574,36 +578,63 @@ const ImageModal: React.FC<ImageModalProps> = ({
 
                         {/* Bounding Box Overlay */}
                         {detections && detections.length > 0 && imageDimensions.natural.width > 0 && (
-                            <Box
-                                sx={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    width: '100%',
-                                    height: '100%',
-                                    pointerEvents: 'none',
-                                    transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
-                                    transition: isDragging ? 'none' : 'transform 0.1s ease-out'
-                                }}
-                            >
-                                {detections.map((det, idx) => {
-                                    const bbox = transformBbox(det);
-                                    if (!bbox) return null;
-                                    
-                                    return (
-                                        <DetectionBox 
-                                            key={idx} 
-                                            bbox={bbox} 
-                                            detection={det} 
-                                            zoom={zoom} 
-                                            containerWidth={imageDimensions.displayed.width}
-                                            containerHeight={imageDimensions.displayed.height}
-                                            useLiquidGlass={useLiquidGlass}
-                                            onDelete={onDeleteDetection}
-                                        />
-                                    );
-                                })}
-                            </Box>
+                            USE_RAY_TRACED_GLASS && imageUrl ? (
+                                /* Ray-traced liquid glass - single WebGL canvas */
+                                <Box
+                                    sx={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        width: '100%',
+                                        height: '100%',
+                                        pointerEvents: 'none',
+                                        transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+                                        transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+                                    }}
+                                >
+                                    <LiquidGlassOverlay
+                                        imageUrl={imageUrl}
+                                        bboxes={detections.map(det => {
+                                            const bbox = transformBbox(det);
+                                            return bbox ? { bbox, label: det.label } : null;
+                                        }).filter(Boolean) as { bbox: { x: number; y: number; width: number; height: number }; label?: string }[]}
+                                        containerWidth={imageDimensions.displayed.width}
+                                        containerHeight={imageDimensions.displayed.height}
+                                    />
+                                </Box>
+                            ) : (
+                                /* CSS-based liquid glass - per detection */
+                                <Box
+                                    sx={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        width: '100%',
+                                        height: '100%',
+                                        pointerEvents: 'none',
+                                        transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+                                        transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+                                    }}
+                                >
+                                    {detections.map((det, idx) => {
+                                        const bbox = transformBbox(det);
+                                        if (!bbox) return null;
+                                        
+                                        return (
+                                            <DetectionBox 
+                                                key={idx} 
+                                                bbox={bbox} 
+                                                detection={det} 
+                                                zoom={zoom} 
+                                                containerWidth={imageDimensions.displayed.width}
+                                                containerHeight={imageDimensions.displayed.height}
+                                                useLiquidGlass={useLiquidGlass}
+                                                onDelete={onDeleteDetection}
+                                            />
+                                        );
+                                    })}
+                                </Box>
+                            )
                         )}
 
                         {/* Navigation Buttons (Overlay) */}
