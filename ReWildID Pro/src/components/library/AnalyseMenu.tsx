@@ -32,7 +32,7 @@ export const AnalyseMenu: React.FC<AnalyseMenuProps> = ({
     onClose,
     onClassify,
     onReID,
-    availableSpecies,
+    availableSpecies: _availableSpecies, // Reserved for future dynamic species list
     selectedCount,
     reidOnly = false,
     title = 'Analyse'

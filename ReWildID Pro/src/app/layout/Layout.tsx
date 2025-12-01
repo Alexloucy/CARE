@@ -143,7 +143,7 @@ export default function Layout() {
                 },
                 height: '100vh',
                 ml: { xs: 0, md: leftSidebarOpen ? 0 : 0 },
-                transition: theme => theme.transitions.create(['width', 'margin'], {
+                transition: (theme: import('@mui/material').Theme) => theme.transitions.create(['width', 'margin'], {
                     easing: theme.transitions.easing.sharp,
                     duration: theme.transitions.duration.enteringScreen,
                 })

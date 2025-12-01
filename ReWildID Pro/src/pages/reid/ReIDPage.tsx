@@ -95,7 +95,7 @@ const RunGroup: React.FC<RunGroupProps> = ({ run, individuals, imageUrls, onIndi
                     <Chip size="small" label={run.species} sx={{ height: 22, fontSize: '0.75rem' }} />
                 </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>{run.individual_count} individual{run.individual_count !== 1 ? 's' : ''} • {run.detection_count} detection{run.detection_count !== 1 ? 's' : ''} • {formatDate(run.created_at)}</Typography>
-                <IconButton size="small" onClick={(e) => { e.stopPropagation(); onMenuOpen(e, run.id); }}><DotsThreeVertical size={18} /></IconButton>
+                <IconButton size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); onMenuOpen(e, run.id); }}><DotsThreeVertical size={18} /></IconButton>
             </Box>
             <Collapse in={expanded}>
                 <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 2, pl: 4 }}>
@@ -149,7 +149,7 @@ const IndividualModal: React.FC<{ open: boolean; onClose: () => void; individual
     return (
         <Modal open={open} onClose={onClose} closeAfterTransition slots={{ backdrop: Backdrop }} slotProps={{ backdrop: { timeout: 500, sx: { backgroundColor: 'rgba(0,0,0,0.85)' } } }}>
             <Fade in={open}>
-                <Box onClick={(e) => e.stopPropagation()} sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '90vw', height: '90vh', bgcolor: 'background.paper', borderRadius: 4, overflow: 'hidden', boxShadow: 24, display: 'flex', outline: 'none' }}>
+                <Box onClick={(e: React.MouseEvent) => e.stopPropagation()} sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '90vw', height: '90vh', bgcolor: 'background.paper', borderRadius: 4, overflow: 'hidden', boxShadow: 24, display: 'flex', outline: 'none' }}>
                     {/* SVG Filter for Liquid Glass Effect */}
                     <svg style={{ display: 'none' }}>
                         <filter id="container-glass" x="0%" y="0%" width="100%" height="100%">
@@ -160,9 +160,9 @@ const IndividualModal: React.FC<{ open: boolean; onClose: () => void; individual
                     </svg>
                     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
                         <Box ref={containerRef} sx={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'black', cursor: isDragging ? 'grabbing' : 'grab' }}
-                            onWheel={(e) => { e.stopPropagation(); setZoom(z => e.deltaY < 0 ? Math.min(z + 0.1, 5) : Math.max(z - 0.1, 0.5)); }}
-                            onMouseDown={(e) => { setIsDragging(true); dragStart.current = { x: e.clientX - position.x, y: e.clientY - position.y }; }}
-                            onMouseMove={(e) => { if (isDragging) { e.preventDefault(); setPosition({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y }); } }}
+                            onWheel={(e: React.WheelEvent) => { e.stopPropagation(); setZoom(z => e.deltaY < 0 ? Math.min(z + 0.1, 5) : Math.max(z - 0.1, 0.5)); }}
+                            onMouseDown={(e: React.MouseEvent) => { setIsDragging(true); dragStart.current = { x: e.clientX - position.x, y: e.clientY - position.y }; }}
+                            onMouseMove={(e: React.MouseEvent) => { if (isDragging) { e.preventDefault(); setPosition({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y }); } }}
                             onMouseUp={() => setIsDragging(false)} onMouseLeave={() => setIsDragging(false)}>
                             {currentUrl ? (
                                 <>
