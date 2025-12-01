@@ -238,9 +238,7 @@ export default function Navbar({
                     </Tooltip>
 
                     {isMdUp && (
-                        <Box sx={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                            <Breadcrumb customItems={customBreadcrumbItems} />
-                        </Box>
+                        <Breadcrumb customItems={customBreadcrumbItems} />
                     )}
 
                     {inElectron && (
