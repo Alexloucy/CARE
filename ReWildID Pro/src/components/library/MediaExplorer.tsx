@@ -389,7 +389,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
 
                                         <Tooltip title="View Settings">
                                             <IconButton
-                                                onClick={(e) => setSettingsAnchorEl(e.currentTarget)}
+                                                onClick={(e: React.MouseEvent<HTMLButtonElement>) => setSettingsAnchorEl(e.currentTarget)}
                                                 sx={{ '&:hover': { bgcolor: theme.palette.action.hover } }}
                                             >
                                                 <Gear weight="regular" />
@@ -490,9 +490,9 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         value={gridItemSize}
                         min={100}
                         max={715}
-                        onChange={(_, value) => setGridItemSize(value as number)}
+                        onChange={(_: Event, value: number | number[]) => setGridItemSize(value as number)}
                         valueLabelDisplay="auto"
-                        valueLabelFormat={(value) => `${value}px`}
+                        valueLabelFormat={(value: number) => `${value}px`}
                     />
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
                         <Typography variant="caption" color="text.secondary">Small</Typography>

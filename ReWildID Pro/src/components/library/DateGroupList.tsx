@@ -360,7 +360,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                             <IconButton
                                 className="group-select-button"
                                 size="small"
-                                onClick={(e) => { e.stopPropagation(); handleSelectGroup(group.images); }}
+                                onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSelectGroup(group.images); }}
                                 sx={{ opacity: isAllSelected ? 1 : 0, transition: 'opacity 0.2s ease', color: isAllSelected ? 'primary.main' : 'text.secondary' }}
                             >
                                 <CheckIcon size={20} weight={isAllSelected ? "bold" : "regular"} />
@@ -369,7 +369,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                         <IconButton
                             className="group-menu-button"
                             size="small"
-                            onClick={(e) => onMenuOpen(e, group.id)}
+                            onClick={(e: React.MouseEvent<HTMLButtonElement>) => onMenuOpen(e, group.id)}
                             sx={{ opacity: 0, transition: 'opacity 0.2s ease' }}
                         >
                             <DotsThreeVertical size={20} />
@@ -533,7 +533,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
     // Average item height for better Virtuoso estimation
     const avgItemHeight = useMemo(() => {
         const rowHeight = getRowHeight() + 16;
-        return Math.round((56 + 72 + rowHeight * 3) / 5); // 56=date-header, 72=group-header
+        return Math.round((56 + 78 + rowHeight * 3) / 5); // 56=date-header, 78=group-header
     }, [getRowHeight]);
 
     // Empty state - show header content so filter/search controls remain accessible
