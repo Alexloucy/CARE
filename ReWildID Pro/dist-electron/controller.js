@@ -41,6 +41,9 @@ exports.getReidRun = getReidRun;
 exports.deleteReidRunById = deleteReidRunById;
 exports.updateReidRunName = updateReidRunName;
 exports.getReidResults = getReidResults;
+exports.getReidResultsForImage = getReidResultsForImage;
+exports.getReidResultsForImages = getReidResultsForImages;
+exports.getLatestDetectionsForImages = getLatestDetectionsForImages;
 exports.updateReidIndividualName = updateReidIndividualName;
 exports.updateReidIndividualColor = updateReidIndividualColor;
 exports.mergeReidIndividuals = mergeReidIndividuals;
@@ -113,14 +116,19 @@ const userProfileDir = getAppDataDir();
 async function uploadImage(relativePath, originalPath) {
     return { ok: false, error: 'Use uploadPaths instead.' };
 }
-async function uploadPaths(filePaths, groupName) {
+async function uploadPaths(filePaths, groupName, afterAction, species) {
     try {
         // Check for immediate errors (empty, etc)
         if (filePaths.length === 0) {
             return { ok: false, error: 'No files selected' };
         }
-        // Add to Job Queue
-        jobs_1.JobManager.getInstance().addJob('import', { filePaths, groupName });
+        // Add to Job Queue with optional chained action
+        jobs_1.JobManager.getInstance().addJob('import', {
+            filePaths,
+            groupName,
+            afterAction,
+            species
+        });
         return { ok: true, count: 0, errors: [] }; // Count 0 indicates async start
     }
     catch (error) {
@@ -1164,6 +1172,36 @@ async function getReidResults(filter) {
     }
     catch (error) {
         return { ok: false, error: 'getReidResults failed: ' + error };
+    }
+}
+// Get ReID results for a single image (all runs/individuals that include this image)
+async function getReidResultsForImage(imageId) {
+    try {
+        const results = database_1.DatabaseService.getReidResultsForImage(imageId);
+        return { ok: true, results };
+    }
+    catch (error) {
+        return { ok: false, error: 'getReidResultsForImage failed: ' + error };
+    }
+}
+// Get ReID results for multiple images
+async function getReidResultsForImages(imageIds) {
+    try {
+        const results = database_1.DatabaseService.getReidResultsForImages(imageIds);
+        return { ok: true, results };
+    }
+    catch (error) {
+        return { ok: false, error: 'getReidResultsForImages failed: ' + error };
+    }
+}
+// Get latest detections for images (only from most recent batch per image)
+async function getLatestDetectionsForImages(imageIds) {
+    try {
+        const detections = database_1.DatabaseService.getLatestDetectionsForImages(imageIds);
+        return { ok: true, detections };
+    }
+    catch (error) {
+        return { ok: false, error: 'getLatestDetectionsForImages failed: ' + error };
     }
 }
 // --- ReID Individual Management ---

@@ -75,15 +75,25 @@ export async function uploadImage(relativePath: string, originalPath: string) {
     return { ok: false, error: 'Use uploadPaths instead.' };
 }
 
-export async function uploadPaths(filePaths: string[], groupName?: string) {
+export async function uploadPaths(
+    filePaths: string[], 
+    groupName?: string, 
+    afterAction?: 'classify' | 'reid',
+    species?: string
+) {
     try {
         // Check for immediate errors (empty, etc)
         if (filePaths.length === 0) {
             return { ok: false, error: 'No files selected' };
         }
 
-        // Add to Job Queue
-        JobManager.getInstance().addJob('import', { filePaths, groupName });
+        // Add to Job Queue with optional chained action
+        JobManager.getInstance().addJob('import', { 
+            filePaths, 
+            groupName,
+            afterAction,
+            species
+        });
 
         return { ok: true, count: 0, errors: [] }; // Count 0 indicates async start
     } catch (error: unknown) {
@@ -1304,6 +1314,36 @@ export async function getReidResults(filter: {
         return { ok: true, result };
     } catch (error) {
         return { ok: false, error: 'getReidResults failed: ' + error };
+    }
+}
+
+// Get ReID results for a single image (all runs/individuals that include this image)
+export async function getReidResultsForImage(imageId: number) {
+    try {
+        const results = DatabaseService.getReidResultsForImage(imageId);
+        return { ok: true, results };
+    } catch (error) {
+        return { ok: false, error: 'getReidResultsForImage failed: ' + error };
+    }
+}
+
+// Get ReID results for multiple images
+export async function getReidResultsForImages(imageIds: number[]) {
+    try {
+        const results = DatabaseService.getReidResultsForImages(imageIds);
+        return { ok: true, results };
+    } catch (error) {
+        return { ok: false, error: 'getReidResultsForImages failed: ' + error };
+    }
+}
+
+// Get latest detections for images (only from most recent batch per image)
+export async function getLatestDetectionsForImages(imageIds: number[]) {
+    try {
+        const detections = DatabaseService.getLatestDetectionsForImages(imageIds);
+        return { ok: true, detections };
+    } catch (error) {
+        return { ok: false, error: 'getLatestDetectionsForImages failed: ' + error };
     }
 }
 

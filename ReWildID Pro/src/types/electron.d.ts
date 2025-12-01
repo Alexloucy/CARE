@@ -122,7 +122,7 @@ export interface ElectronApi {
     getImages: (filter?: { date?: string, groupIds?: number[], searchQuery?: string }) => Promise<{ ok: boolean; images?: DBImage[]; error?: string }>;
     downloadSelectedGalleryImages: (selectedPaths: string[]) => Promise<{ ok: boolean; error?: string }>;
     uploadImage: (relativePath: string, originalPath: string) => Promise<{ ok: boolean; error?: string }>;
-    uploadPaths: (filePaths: string[], groupName?: string) => Promise<{ ok: boolean; count?: number; errors?: string[]; error?: string }>;
+    uploadPaths: (filePaths: string[], groupName?: string, afterAction?: 'classify' | 'reid', species?: string) => Promise<{ ok: boolean; count?: number; errors?: string[]; error?: string }>;
     deleteGroup: (id: number) => Promise<{ ok: boolean; error?: string }>;
     deleteImage: (id: number) => Promise<{ ok: boolean; error?: string }>;
     updateGroupName: (id: number, name: string) => Promise<{ ok: boolean; error?: string }>;
@@ -154,6 +154,47 @@ export interface ElectronApi {
     
     // ReID Results (Paginated)
     getReidResults: (filter: ReidResultsFilter) => Promise<{ ok: boolean; result?: ReidQueryResult; error?: string }>;
+    
+    // ReID Results for Image (get all runs/individuals that include a specific image)
+    getReidResultsForImage: (imageId: number) => Promise<{ 
+        ok: boolean; 
+        results?: {
+            runId: number;
+            runName: string;
+            species: string;
+            runCreatedAt: number;
+            individualId: number;
+            individualName: string;
+            individualDisplayName: string;
+            individualColor: string;
+            detectionId: number;
+        }[];
+        error?: string;
+    }>;
+    
+    getReidResultsForImages: (imageIds: number[]) => Promise<{ 
+        ok: boolean; 
+        results?: {
+            imageId: number;
+            runId: number;
+            runName: string;
+            species: string;
+            runCreatedAt: number;
+            individualId: number;
+            individualName: string;
+            individualDisplayName: string;
+            individualColor: string;
+            detectionId: number;
+        }[];
+        error?: string;
+    }>;
+    
+    // Get latest detections for images (only from most recent batch per image)
+    getLatestDetectionsForImages: (imageIds: number[]) => Promise<{
+        ok: boolean;
+        detections?: (Detection & { image_path: string })[];
+        error?: string;
+    }>;
     
     // ReID Individual Management
     updateReidIndividualName: (id: number, displayName: string) => Promise<{ ok: boolean; error?: string }>;

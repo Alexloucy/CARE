@@ -199,6 +199,24 @@ const IndividualModal: React.FC<{ open: boolean; onClose: () => void; individual
                                                     }]}
                                                     containerWidth={imgDims.displayed.width}
                                                     containerHeight={imgDims.displayed.height}
+                                                    customPopupContent={
+                                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                                                <Fingerprint size={18} weight="fill" color={individual.color} />
+                                                                <Typography variant="subtitle2" fontWeight="700">Individual Details</Typography>
+                                                            </Box>
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                <Typography variant="caption" color="text.secondary">Individual</Typography>
+                                                                <Box sx={{ bgcolor: alpha(individual.color, 0.15), color: individual.color, px: 1, py: 0.2, borderRadius: 1, fontSize: '0.75rem', fontWeight: 600 }}>
+                                                                    {individual.display_name}
+                                                                </Box>
+                                                            </Box>
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                <Typography variant="caption" color="text.secondary">Sightings</Typography>
+                                                                <Typography variant="caption" fontWeight="600">{individual.member_count}</Typography>
+                                                            </Box>
+                                                        </Box>
+                                                    }
                                                 />
                                             </Box>
                                         ) : (

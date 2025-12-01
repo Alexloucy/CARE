@@ -273,13 +273,15 @@ export interface LiquidGlassOverlayProps {
   bboxes: { bbox: BBox; label?: string; detection?: Detection }[];
   containerWidth: number;
   containerHeight: number;
+  customPopupContent?: React.ReactNode;
 }
 
 export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
   imageUrl,
   bboxes,
   containerWidth,
-  containerHeight
+  containerHeight,
+  customPopupContent
 }) => {
   const theme = useTheme();
   const [labelPosition, setLabelPosition] = useState({ x: containerWidth / 2, y: containerHeight / 2 });
@@ -372,7 +374,7 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
       )}
 
       {/* Info popup on hover */}
-      {detection && (
+      {(detection || customPopupContent) && (
         <Fade in={isHovered}>
           <Paper
             sx={{
@@ -392,33 +394,35 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
           >
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="caption" color="text.secondary">Species</Typography>
-                <Box sx={{ 
-                  bgcolor: 'rgba(66, 133, 244, 0.1)', 
-                  color: '#4285F4', 
-                  px: 1, py: 0.2, 
-                  borderRadius: 1,
-                  fontSize: '0.75rem',
-                  fontWeight: 600
-                }}>
-                  {detection.label}
+            {customPopupContent ? customPopupContent : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="caption" color="text.secondary">Species</Typography>
+                  <Box sx={{ 
+                    bgcolor: 'rgba(66, 133, 244, 0.1)', 
+                    color: '#4285F4', 
+                    px: 1, py: 0.2, 
+                    borderRadius: 1,
+                    fontSize: '0.75rem',
+                    fontWeight: 600
+                  }}>
+                    {detection?.label}
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="caption" color="text.secondary">Confidence</Typography>
+                  <Typography variant="caption" fontWeight="600" sx={{ fontFamily: 'monospace' }}>
+                    {((detection?.confidence ?? 0) * 100).toFixed(1)}%
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="caption" color="text.secondary">Detection Score</Typography>
+                  <Typography variant="caption" fontWeight="600" sx={{ fontFamily: 'monospace' }}>
+                    {((detection?.detection_confidence ?? 0) * 100).toFixed(1)}%
+                  </Typography>
                 </Box>
               </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="caption" color="text.secondary">Confidence</Typography>
-                <Typography variant="caption" fontWeight="600" sx={{ fontFamily: 'monospace' }}>
-                  {(detection.confidence * 100).toFixed(1)}%
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="caption" color="text.secondary">Detection Score</Typography>
-                <Typography variant="caption" fontWeight="600" sx={{ fontFamily: 'monospace' }}>
-                  {(detection.detection_confidence * 100).toFixed(1)}%
-                </Typography>
-              </Box>
-            </Box>
+            )}
           </Paper>
         </Fade>
       )}

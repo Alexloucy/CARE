@@ -84,11 +84,11 @@ const AiModeButton: React.FC<AiModeButtonProps> = ({
         
         const animate = () => {
             setRenderPosition(prev => ({
-                x: prev.x + (targetPosition.current.x - prev.x) * 0.05,
-                y: prev.y + (targetPosition.current.y - prev.y) * 0.05
+                x: prev.x + (targetPosition.current.x - prev.x) * 0.01,
+                y: prev.y + (targetPosition.current.y - prev.y) * 0.01
             }));
             // Smooth rotation animation
-            setGradientRotation(prev => prev + (targetRotation.current - prev) * 0.08);
+            setGradientRotation(prev => prev + (targetRotation.current - prev) * 0.01);
             animationFrameId = requestAnimationFrame(animate);
         };
         
@@ -111,7 +111,7 @@ const AiModeButton: React.FC<AiModeButtonProps> = ({
             };
             
             // Calculate rotation: 0deg at top, 180deg at bottom
-            targetRotation.current = (relativeY / height) * 180;
+            targetRotation.current = (relativeY / height) * 270;
             
             // If first entry, snap to position instantly to avoid "flying in" from 0,0
             if (!isHovered) {

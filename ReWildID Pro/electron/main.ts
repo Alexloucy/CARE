@@ -40,6 +40,9 @@ import {
     deleteReidRunById,
     updateReidRunName,
     getReidResults,
+    getReidResultsForImage,
+    getReidResultsForImages,
+    getLatestDetectionsForImages,
     updateReidIndividualName,
     updateReidIndividualColor,
     mergeReidIndividuals,
@@ -174,7 +177,7 @@ ipcMain.handle('getImagePaths', (_, currentFolder) => getImagePaths(currentFolde
 ipcMain.handle('getImages', (_, filter) => getImages(filter));
 ipcMain.handle('downloadSelectedGalleryImages', (_, selectedPaths) => downloadSelectedGalleryImages(selectedPaths));
 ipcMain.handle('uploadImage', (_, relativePath, originalPath) => uploadImage(relativePath, originalPath));
-ipcMain.handle('uploadPaths', (_, filePaths, groupName) => uploadPaths(filePaths, groupName));
+ipcMain.handle('uploadPaths', (_, filePaths, groupName, afterAction, species) => uploadPaths(filePaths, groupName, afterAction, species));
 ipcMain.handle('deleteGroup', (_, id) => deleteGroup(id));
 ipcMain.handle('deleteImage', (_, id) => deleteImage(id));
 ipcMain.handle('updateGroupName', (_, id, name) => updateGroupName(id, name));
@@ -220,6 +223,9 @@ ipcMain.handle('getReidRun', (_, id) => getReidRun(id));
 ipcMain.handle('deleteReidRun', (_, id) => deleteReidRunById(id));
 ipcMain.handle('updateReidRunName', (_, id, name) => updateReidRunName(id, name));
 ipcMain.handle('getReidResults', (_, filter) => getReidResults(filter));
+ipcMain.handle('getReidResultsForImage', (_, imageId) => getReidResultsForImage(imageId));
+ipcMain.handle('getReidResultsForImages', (_, imageIds) => getReidResultsForImages(imageIds));
+ipcMain.handle('getLatestDetectionsForImages', (_, imageIds) => getLatestDetectionsForImages(imageIds));
 ipcMain.handle('updateReidIndividualName', (_, id, displayName) => updateReidIndividualName(id, displayName));
 ipcMain.handle('updateReidIndividualColor', (_, id, color) => updateReidIndividualColor(id, color));
 ipcMain.handle('mergeReidIndividuals', (_, targetId, sourceIds) => mergeReidIndividuals(targetId, sourceIds));

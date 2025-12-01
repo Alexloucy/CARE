@@ -180,7 +180,7 @@ const ImageCard: React.FC<ImageCardProps> = ({
                                 zIndex: 2,
                                 cursor: 'pointer'
                             }}
-                            onClick={(e) => {
+                            onClick={(e: React.MouseEvent) => {
                                 e.stopPropagation();
                                 onToggleSelection && onToggleSelection();
                             }}

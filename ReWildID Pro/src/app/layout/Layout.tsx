@@ -81,11 +81,14 @@ export default function Layout() {
     const handleUploadConfirm = useCallback(async (
         action: 'library' | 'classify' | 'reid', 
         groupName?: string, 
-        _species?: string
+        species?: string
     ) => {
         try {
-            await window.api.uploadPaths(pendingFiles, groupName);
+            // Pass action and species to backend for chained processing
+            const afterAction = action === 'library' ? undefined : action;
+            await window.api.uploadPaths(pendingFiles, groupName, afterAction, species);
             setPendingFiles([]);
+            
             // Navigate to appropriate page based on action
             if (action === 'classify') {
                 navigate('/classification');

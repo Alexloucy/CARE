@@ -531,7 +531,7 @@ const LibraryPage: React.FC = () => {
                                                     </Box>
                                                     <IconButton
                                                         size="small"
-                                                        onClick={(e) => handleMenuOpen(e, group.id)}
+                                                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleMenuOpen(e, group.id)}
                                                         sx={{ opacity: 0.6, '&:hover': { opacity: 1 } }}
                                                     >
                                                         <DotsThreeVertical size={20} />

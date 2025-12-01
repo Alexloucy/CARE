@@ -210,7 +210,9 @@ class JobManager {
         return count;
     }
     async handleImportJob(job) {
-        const { filePaths, groupName } = job.payload;
+        const { filePaths, groupName, afterAction, species } = job.payload;
+        // Track imported image IDs for chained actions
+        const importedImageIds = [];
         job.message = 'Scanning files...';
         this.emitUpdate();
         // Count total for progress
@@ -242,6 +244,7 @@ class JobManager {
                 try {
                     // Add to DB
                     const imageId = database_1.DatabaseService.addImage(groupId, filePath);
+                    importedImageIds.push(imageId);
                     // Generate Thumbnail Synchronously (or await it) to keep it in one job
                     await this.generateThumbnail(imageId, filePath);
                 }
@@ -311,6 +314,24 @@ class JobManager {
         }
         job.message = `Imported ${processedCount} images.`;
         job.progress = 100;
+        // Handle chained actions
+        if (afterAction && importedImageIds.length > 0 && job.status !== 'cancelled') {
+            if (afterAction === 'classify') {
+                // Get paths for the imported images
+                const images = database_1.DatabaseService.getImagesByIds(importedImageIds);
+                const selectedPaths = images.map(img => img.original_path);
+                job.message = `Imported ${processedCount} images. Starting classification...`;
+                this.emitUpdate();
+                // Queue a detect job
+                this.addJob('detect', { selectedPaths });
+            }
+            else if (afterAction === 'reid' && species) {
+                job.message = `Imported ${processedCount} images. Starting ReID...`;
+                this.emitUpdate();
+                // Queue a reid job with the imported image IDs
+                this.addJob('reid', { imageIds: importedImageIds, species });
+            }
+        }
     }
     async handleThumbnailJob(job) {
         const { imageId, originalPath } = job.payload;
@@ -457,10 +478,10 @@ class JobManager {
                 job.message = 'Classification complete. Starting ReID...';
                 this.emitUpdate();
             }
-            // Step 3: Get all detections for selected images (now should have all)
-            const allDetections = database_1.DatabaseService.getDetectionsForImages(imageIds);
+            // Step 3: Get LATEST detections for selected images (only from most recent batch per image)
+            const allDetections = database_1.DatabaseService.getLatestDetectionsForImages(imageIds);
             console.log(`[ReID Debug] imageIds: ${JSON.stringify(imageIds)}`);
-            console.log(`[ReID Debug] allDetections count: ${allDetections.length}`);
+            console.log(`[ReID Debug] allDetections count (latest batch only): ${allDetections.length}`);
             console.log(`[ReID Debug] allDetections labels: ${JSON.stringify(allDetections.map((d) => d.label))}`);
             // Step 4: Filter by species
             const speciesLower = species.toLowerCase();

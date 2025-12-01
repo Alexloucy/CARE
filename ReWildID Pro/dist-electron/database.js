@@ -571,6 +571,76 @@ exports.DatabaseService = {
         const stmt = db.prepare(`SELECT * FROM images WHERE id IN (${placeholders})`);
         return stmt.all(...imageIds);
     },
+    // Get detections from the LATEST batch only for each image
+    getLatestDetectionsForImages: (imageIds) => {
+        if (imageIds.length === 0)
+            return [];
+        const placeholders = imageIds.map(() => '?').join(',');
+        // Use a subquery to find the latest batch_id for each image
+        const stmt = db.prepare(`
+            SELECT d.*, i.original_path as image_path
+            FROM detections d
+            JOIN images i ON d.image_id = i.id
+            WHERE d.image_id IN (${placeholders})
+            AND d.batch_id = (
+                SELECT d2.batch_id 
+                FROM detections d2 
+                WHERE d2.image_id = d.image_id 
+                ORDER BY d2.created_at DESC 
+                LIMIT 1
+            )
+            ORDER BY d.image_id
+        `);
+        return stmt.all(...imageIds);
+    },
+    // Get all ReID results for a single image
+    getReidResultsForImage: (imageId) => {
+        const stmt = db.prepare(`
+            SELECT 
+                rr.id as runId,
+                rr.name as runName,
+                rr.species as species,
+                rr.created_at as runCreatedAt,
+                ri.id as individualId,
+                ri.name as individualName,
+                ri.display_name as individualDisplayName,
+                ri.color as individualColor,
+                rm.detection_id as detectionId
+            FROM reid_members rm
+            JOIN reid_individuals ri ON rm.individual_id = ri.id
+            JOIN reid_runs rr ON ri.run_id = rr.id
+            JOIN detections d ON rm.detection_id = d.id
+            WHERE d.image_id = ?
+            ORDER BY rr.created_at DESC, ri.name
+        `);
+        return stmt.all(imageId);
+    },
+    // Get all ReID results for multiple images
+    getReidResultsForImages: (imageIds) => {
+        if (imageIds.length === 0)
+            return [];
+        const placeholders = imageIds.map(() => '?').join(',');
+        const stmt = db.prepare(`
+            SELECT 
+                d.image_id as imageId,
+                rr.id as runId,
+                rr.name as runName,
+                rr.species as species,
+                rr.created_at as runCreatedAt,
+                ri.id as individualId,
+                ri.name as individualName,
+                ri.display_name as individualDisplayName,
+                ri.color as individualColor,
+                rm.detection_id as detectionId
+            FROM reid_members rm
+            JOIN reid_individuals ri ON rm.individual_id = ri.id
+            JOIN reid_runs rr ON ri.run_id = rr.id
+            JOIN detections d ON rm.detection_id = d.id
+            WHERE d.image_id IN (${placeholders})
+            ORDER BY rr.created_at DESC, ri.name
+        `);
+        return stmt.all(...imageIds);
+    },
     // Dashboard Stats
     getDashboardStats: () => {
         const totalImages = db.prepare('SELECT COUNT(*) as count FROM images').get().count;
