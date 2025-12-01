@@ -110,6 +110,11 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
         ? Math.max(1, Math.floor((availableWidth + gap) / (minItemWidth + gap)))
         : 0;
 
+    // Calculate actual item width (1fr tracks expand to fill available space)
+    const actualItemWidth = columns > 0
+        ? (availableWidth - (gap * (columns - 1))) / columns
+        : gridItemSize;
+
     // Flatten Data
     const flatItems = useMemo(() => {
         const items: FlatItem[] = [];
@@ -313,10 +318,11 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
     };
 
     // Calculate row height for consistent sizing (prevents scroll jumps)
+    // Use actualItemWidth (not gridItemSize) since 1fr tracks expand to fill container
     const getRowHeight = useCallback(() => {
         const [w, h] = aspectRatio.split('/').map(Number);
-        return gridItemSize * (h / w) + (showNames ? 40 : 16);
-    }, [aspectRatio, gridItemSize, showNames]);
+        return actualItemWidth * (h / w) + (showNames ? 40 : 16);
+    }, [aspectRatio, actualItemWidth, showNames]);
 
     // Render Item - fixed heights prevent Virtuoso scroll jumps
     const itemContent = (_: number, item: FlatItem) => {
@@ -470,9 +476,9 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
             );
         } else {
             // Image Row - fixed height prevents scroll jumps
-            const rowHeight = getRowHeight() + 48; // +24 for bottom margin (row gap)
+            const rowHeight = getRowHeight() + 24; // +24 for bottom margin (row gap)
             return (
-                <Box sx={{ height: rowHeight, display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 2, pb: 3, px: 4, overflow: 'hidden' }}>
+                <Box sx={{ height: rowHeight, display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 2, pb: 3, px: 4, overflow: 'hidden', alignItems: 'start' }}>
                     {item.images.map(img => {
                         const fileDetails = {
                             name: img.original_path.split(/[\\/]/).pop() || 'image.jpg',
@@ -491,7 +497,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                         }
 
                         return (
-                            <Box key={img.id} sx={{ minWidth: 0 }}>
+                            <Box key={img.id} sx={{ minWidth: 0, height: 'fit-content' }}>
                                 <ImageCard
                                     file={fileDetails}
                                     date={item.id} // Just needs a string
