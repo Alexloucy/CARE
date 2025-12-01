@@ -336,7 +336,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
             return (
                 <Box id={`group-${group.id}`} sx={{
                     height: 78, // Fixed height prevents scroll jumps (+24 for bottom margin)
-                    display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', px: 4, pt: 2.5,
+                    display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', px: 4, pt: 2,
                     '&:hover .collapse-arrow': { opacity: 1, transform: 'translateX(0)' },
                     '&:hover .group-menu-button': { opacity: 1 },
                     '&:hover .group-select-button': { opacity: 1 },
@@ -470,9 +470,9 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
             );
         } else {
             // Image Row - fixed height prevents scroll jumps
-            const rowHeight = getRowHeight() + 16; // +16 for bottom padding
+            const rowHeight = getRowHeight() + 48; // +24 for bottom margin (row gap)
             return (
-                <Box sx={{ height: rowHeight, display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 2, pb: 2, px: 4, overflow: 'hidden' }}>
+                <Box sx={{ height: rowHeight, display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 2, pb: 3, px: 4, overflow: 'hidden' }}>
                     {item.images.map(img => {
                         const fileDetails = {
                             name: img.original_path.split(/[\\/]/).pop() || 'image.jpg',
@@ -532,7 +532,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
 
     // Average item height for better Virtuoso estimation
     const avgItemHeight = useMemo(() => {
-        const rowHeight = getRowHeight() + 16;
+        const rowHeight = getRowHeight() + 24;
         return Math.round((56 + 78 + rowHeight * 3) / 5); // 56=date-header, 78=group-header
     }, [getRowHeight]);
 
