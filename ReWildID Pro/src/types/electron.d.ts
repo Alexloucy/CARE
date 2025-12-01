@@ -18,6 +18,16 @@ export interface ViewImageResponse {
     error?: string;
 }
 
+export interface ReidInfoForImage {
+    individualId: number;
+    individualName: string;
+    individualDisplayName: string;
+    individualColor: string;
+    runId: number;
+    runName: string;
+    species: string;
+}
+
 export interface DBImage {
     id: number;
     group_id: number;
@@ -27,6 +37,7 @@ export interface DBImage {
     group_name: string;
     group_created_at: number;
     detections?: Detection[];
+    reidResults?: ReidInfoForImage[];
 }
 
 export interface DetectionBatch {

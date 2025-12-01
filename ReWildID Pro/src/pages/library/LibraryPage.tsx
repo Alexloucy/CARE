@@ -1,9 +1,12 @@
 import {
     Button,
+    IconButton,
     Menu, MenuItem,
+    Tooltip,
     useTheme
 } from '@mui/material';
 import {
+    ArrowsDownUp,
     PencilSimple,
     Plus,
     Trash
@@ -15,6 +18,7 @@ import { DBImage } from '../../types/electron';
 // Hooks
 import { useGroupActions } from '../../hooks/useGroupActions';
 import { useImageLoader } from '../../hooks/useImageLoader';
+import { useImageMetadata } from '../../hooks/useImageMetadata';
 import { useLibraryData } from '../../hooks/useLibraryData';
 import { useSelection } from '../../hooks/useSelection';
 
@@ -26,6 +30,8 @@ import { MediaExplorer } from '../../components/library/MediaExplorer';
 // Utils
 import { triggerUpload } from '../../utils/navigationEvents';
 
+type SortOption = 'default' | 'species' | 'individual' | 'name';
+
 const LibraryPage: React.FC = () => {
     const theme = useTheme();
     const { leftSidebarOpen, rightSidebarOpen } = useOutletContext<{ leftSidebarOpen: boolean; rightSidebarOpen: boolean }>();
@@ -34,6 +40,10 @@ const LibraryPage: React.FC = () => {
     const [filterDialogOpen, setFilterDialogOpen] = useState(false);
     const [activeFilter, setActiveFilter] = useState<LibraryFilter | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    
+    // Sort State
+    const [sortBy, setSortBy] = useState<SortOption>('default');
+    const [sortMenuPos, setSortMenuPos] = useState<{ top: number; left: number } | null>(null);
 
     // Construct DB Filter
     const dbFilter = useMemo(() => ({
@@ -104,9 +114,64 @@ const LibraryPage: React.FC = () => {
     } = useGroupActions(refreshLibrary, fullDateSections);
 
     // Derived State
-    const allImages = useMemo(() => {
+    const rawImages = useMemo(() => {
         return filteredDateSections.flatMap(section => section.groups.flatMap(group => group.images));
     }, [filteredDateSections]);
+    
+    // Fetch metadata (detections + ReID) for all images
+    const imageIds = useMemo(() => rawImages.map(img => img.id), [rawImages]);
+    const { metadata: imageMetadata } = useImageMetadata(imageIds);
+    
+    // Merge metadata into images
+    const imagesWithMetadata = useMemo(() => {
+        return rawImages.map(img => ({
+            ...img,
+            detections: imageMetadata[img.id]?.detections || img.detections || [],
+            reidResults: imageMetadata[img.id]?.reidResults || []
+        }));
+    }, [rawImages, imageMetadata]);
+    
+    // Sort images
+    const allImages = useMemo(() => {
+        if (sortBy === 'default') return imagesWithMetadata;
+        
+        return [...imagesWithMetadata].sort((a, b) => {
+            switch (sortBy) {
+                case 'species': {
+                    const aSpecies = a.detections?.find(d => d.label && d.label !== 'blank')?.label || '';
+                    const bSpecies = b.detections?.find(d => d.label && d.label !== 'blank')?.label || '';
+                    return aSpecies.localeCompare(bSpecies);
+                }
+                case 'individual': {
+                    const aIndividual = a.reidResults?.[0]?.individualDisplayName || '';
+                    const bIndividual = b.reidResults?.[0]?.individualDisplayName || '';
+                    return aIndividual.localeCompare(bIndividual);
+                }
+                case 'name': {
+                    const aName = a.original_path.split(/[\\/]/).pop() || '';
+                    const bName = b.original_path.split(/[\\/]/).pop() || '';
+                    return aName.localeCompare(bName);
+                }
+                default:
+                    return 0;
+            }
+        });
+    }, [imagesWithMetadata, sortBy]);
+    
+    // Update dateSections with enriched images (keep original structure)
+    const enrichedDateSections = useMemo(() => {
+        return filteredDateSections.map(section => ({
+            ...section,
+            groups: section.groups.map(group => ({
+                ...group,
+                images: group.images.map(img => ({
+                    ...img,
+                    detections: imageMetadata[img.id]?.detections || img.detections || [],
+                    reidResults: imageMetadata[img.id]?.reidResults || []
+                }))
+            }))
+        }));
+    }, [filteredDateSections, imageMetadata]);
 
     // Effect: Prune selection when filter hides items
     useEffect(() => {
@@ -227,7 +292,8 @@ const LibraryPage: React.FC = () => {
             <MediaExplorer
                 title="Library"
                 loading={loading}
-                dateSections={filteredDateSections}
+                dateSections={enrichedDateSections}
+                sortBy={sortBy}
                 fullDateSections={fullDateSections}
                 imageUrls={imageUrls}
                 fullImageUrls={fullImageUrls}
@@ -260,9 +326,76 @@ const LibraryPage: React.FC = () => {
                 rightSidebarOpen={rightSidebarOpen}
                 onUpload={triggerUpload}
                 headerActions={
-                    <Button variant="contained" startIcon={<Plus />} onClick={triggerUpload} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>
-                        Upload
-                    </Button>
+                    <>
+                        <Tooltip title="Sort">
+                            <IconButton
+                                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    setSortMenuPos({ top: rect.bottom, left: rect.right });
+                                }}
+                                sx={{
+                                    bgcolor: sortBy !== 'default' ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
+                                    '&:hover': { bgcolor: sortBy !== 'default' ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.20)') : theme.palette.action.hover }
+                                }}
+                            >
+                                <ArrowsDownUp weight={sortBy !== 'default' ? 'fill' : 'regular'} />
+                            </IconButton>
+                        </Tooltip>
+                        <Menu
+                            open={Boolean(sortMenuPos)}
+                            onClose={() => setSortMenuPos(null)}
+                            anchorReference="anchorPosition"
+                            anchorPosition={sortMenuPos ? { top: sortMenuPos.top, left: sortMenuPos.left } : undefined}
+                            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                            slotProps={{
+                                paper: {
+                                    elevation: 0,
+                                    sx: {
+                                        backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(45, 45, 45, 0.95)',
+                                        backdropFilter: 'blur(8px)',
+                                        borderRadius: '12px',
+                                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                                        border: `1px solid ${theme.palette.divider}`,
+                                        minWidth: '180px',
+                                        p: 1,
+                                        mt: 1
+                                    }
+                                }
+                            }}
+                        >
+                            <MenuItem 
+                                onClick={() => { setSortBy('default'); setSortMenuPos(null); }} 
+                                selected={sortBy === 'default'}
+                                sx={{ borderRadius: '8px', py: 1 }}
+                            >
+                                Default
+                            </MenuItem>
+                            <MenuItem 
+                                onClick={() => { setSortBy('species'); setSortMenuPos(null); }} 
+                                selected={sortBy === 'species'}
+                                sx={{ borderRadius: '8px', py: 1 }}
+                            >
+                                By Species
+                            </MenuItem>
+                            <MenuItem 
+                                onClick={() => { setSortBy('individual'); setSortMenuPos(null); }} 
+                                selected={sortBy === 'individual'}
+                                sx={{ borderRadius: '8px', py: 1 }}
+                            >
+                                By Individual
+                            </MenuItem>
+                            <MenuItem 
+                                onClick={() => { setSortBy('name'); setSortMenuPos(null); }} 
+                                selected={sortBy === 'name'}
+                                sx={{ borderRadius: '8px', py: 1 }}
+                            >
+                                By Name
+                            </MenuItem>
+                        </Menu>
+                        <Button variant="contained" startIcon={<Plus />} onClick={triggerUpload} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>
+                            Upload
+                        </Button>
+                    </>
                 }
                 onGroupMenuOpen={handleMenuOpen}
                 groupMenu={

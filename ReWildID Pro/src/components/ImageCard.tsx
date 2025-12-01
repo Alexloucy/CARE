@@ -17,6 +17,7 @@ interface ImageCardProps {
     onPointerEnter?: () => void;
     onPointerDown?: (e: React.PointerEvent) => void;
     badge?: React.ReactNode;
+    badgeBottomLeft?: React.ReactNode;
     aspectRatio?: string;
     isPlaceholder?: boolean;
 }
@@ -35,6 +36,7 @@ const ImageCard: React.FC<ImageCardProps> = ({
     onPointerEnter,
     onPointerDown,
     badge,
+    badgeBottomLeft,
     aspectRatio = '1.618/1',
     isPlaceholder = false
 }) => {
@@ -189,7 +191,7 @@ const ImageCard: React.FC<ImageCardProps> = ({
                             </Box>
                         )}
 
-                        {/* Badge (Species Label) */}
+                        {/* Badge (Species Label) - Top Right */}
                         {badge && (
                             <Box sx={{
                                 position: 'absolute',
@@ -199,6 +201,20 @@ const ImageCard: React.FC<ImageCardProps> = ({
                                 pointerEvents: 'none'
                             }}>
                                 {badge}
+                            </Box>
+                        )}
+
+                        {/* Badge Top Left (ReID Name) - offset when selection icon is visible */}
+                        {badgeBottomLeft && (
+                            <Box sx={{
+                                position: 'absolute',
+                                top: 8,
+                                left: (selectable || selected) ? 36 : 8,
+                                zIndex: 2,
+                                pointerEvents: 'none',
+                                transition: 'left 0.15s ease'
+                            }}>
+                                {badgeBottomLeft}
                             </Box>
                         )}
 

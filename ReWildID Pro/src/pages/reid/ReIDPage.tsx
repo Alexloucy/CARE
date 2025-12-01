@@ -294,7 +294,7 @@ const IndividualModal: React.FC<{ open: boolean; onClose: () => void; individual
                                         </Box>
                                         <Box sx={{ flex: 1, minWidth: 0 }}>
                                             <Typography variant="caption" noWrap sx={{ display: 'block' }}>{det.image_path.split(/[/\\]/).pop()}</Typography>
-                                            <Typography variant="caption" color="text.secondary">{(det.confidence * 100).toFixed(0)}% confidence</Typography>
+                                            <Typography variant="caption" color="text.secondary">{det.label}</Typography>
                                         </Box>
                                     </Box>
                                 ))}

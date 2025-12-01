@@ -36,6 +36,8 @@ import { LibrarySearchBar } from './LibrarySearchBar';
 import { LibrarySelectionBar } from './LibrarySelectionBar';
 import { Timeline } from './Timeline';
 
+type SortOption = 'default' | 'species' | 'individual' | 'name';
+
 interface MediaExplorerProps {
     title: string;
     loading: boolean;
@@ -43,6 +45,7 @@ interface MediaExplorerProps {
     // Data
     dateSections: DateSection[];
     fullDateSections: DateSection[];
+    sortBy?: SortOption;
     imageUrls: Record<number, string>;
     fullImageUrls: Record<number, string>;
     allImages: DBImage[];
@@ -107,6 +110,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     loading,
     dateSections,
     fullDateSections,
+    sortBy = 'default',
     imageUrls,
     fullImageUrls,
     allImages,
@@ -167,6 +171,14 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
         const saved = localStorage.getItem('mediaExplorer_useRayTracedGlass');
         return saved === null ? true : saved === 'true';
     });
+    const [showSpeciesTags, setShowSpeciesTags] = useState(() => {
+        const saved = localStorage.getItem('mediaExplorer_showSpeciesTags');
+        return saved === null ? true : saved === 'true';
+    });
+    const [showReidTags, setShowReidTags] = useState(() => {
+        const saved = localStorage.getItem('mediaExplorer_showReidTags');
+        return saved === null ? true : saved === 'true';
+    });
     
     const [settingsMenuPos, setSettingsMenuPos] = useState<{ top: number; left: number } | null>(null);
     const [selectedImage, setSelectedImage] = useState<{ image: DBImage, url: string } | null>(null);
@@ -190,7 +202,9 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
         localStorage.setItem('mediaExplorer_aspectRatio', aspectRatio);
         localStorage.setItem('mediaExplorer_useLiquidGlass', useLiquidGlass.toString());
         localStorage.setItem('mediaExplorer_useRayTracedGlass', useRayTracedGlass.toString());
-    }, [gridItemSize, showFileNames, aspectRatio, useLiquidGlass, useRayTracedGlass]);
+        localStorage.setItem('mediaExplorer_showSpeciesTags', showSpeciesTags.toString());
+        localStorage.setItem('mediaExplorer_showReidTags', showReidTags.toString());
+    }, [gridItemSize, showFileNames, aspectRatio, useLiquidGlass, useRayTracedGlass, showSpeciesTags, showReidTags]);
 
     // Hotkey: ESC to exit selection mode
     useEffect(() => {
@@ -416,6 +430,9 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         onClassify={onClassify}
                         availableSpecies={availableSpecies}
                         onUpload={onUpload}
+                        sortBy={sortBy}
+                        showSpeciesTags={showSpeciesTags}
+                        showReidTags={showReidTags}
                         headerContent={
                             <>
                                 <Box sx={{ height: `${NAVBAR_HEIGHT}px` }} />
@@ -587,6 +604,29 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         />
                     </Box>
                 )}
+
+                <Divider sx={{ my: 1 }} />
+
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                    <Typography variant="subtitle2" fontWeight="600">
+                        Show Species Tags
+                    </Typography>
+                    <Switch
+                        size="small"
+                        checked={showSpeciesTags}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowSpeciesTags(e.target.checked)}
+                    />
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                    <Typography variant="subtitle2" fontWeight="600">
+                        Show Individual Tags
+                    </Typography>
+                    <Switch
+                        size="small"
+                        checked={showReidTags}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowReidTags(e.target.checked)}
+                    />
+                </Box>
             </Menu>
 
             <ImageModal

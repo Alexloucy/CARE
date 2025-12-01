@@ -14,6 +14,8 @@ export interface DateGroupListHandle {
     scrollToGroup: (groupId: number) => void;
 }
 
+type SortOption = 'default' | 'species' | 'individual' | 'name';
+
 interface DateGroupListProps {
     dateSections: DateSection[];
     imageUrls: Record<number, string>;
@@ -41,12 +43,19 @@ interface DateGroupListProps {
     availableSpecies?: string[];
     // Empty state action
     onUpload?: () => void;
+    // Sort mode
+    sortBy?: SortOption;
+    // Tag visibility
+    showSpeciesTags?: boolean;
+    showReidTags?: boolean;
 }
 
 type FlatItem =
     | { type: 'date-header'; date: string; id: string }
     | { type: 'group-header'; group: GroupData; id: string }
-    | { type: 'image-row'; images: DBImage[]; groupId: number; id: string };
+    | { type: 'image-row'; images: DBImage[]; groupId: number; id: string }
+    | { type: 'sub-header'; label: string; color?: string; count: number; id: string }
+    | { type: 'horizontal-row'; images: DBImage[]; groupId: number; id: string };
 
 export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>((props, ref) => {
     const {
@@ -73,7 +82,10 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
         onReID,
         onClassify,
         availableSpecies = [],
-        onUpload
+        onUpload,
+        sortBy = 'default',
+        showSpeciesTags = true,
+        showReidTags = true
     } = props;
 
     const theme = useTheme();
@@ -127,21 +139,98 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                 items.push({ type: 'group-header', group, id: `group-${group.id}` });
 
                 if (!collapsedGroups.has(group.id)) {
-                    // Chunk images into rows
-                    for (let i = 0; i < group.images.length; i += columns) {
-                        const rowImages = group.images.slice(i, i + columns);
-                        items.push({
-                            type: 'image-row',
-                            images: rowImages,
-                            groupId: group.id,
-                            id: `group-${group.id}-row-${i}`
+                    // Check if we need to group by species or individual
+                    if (sortBy === 'species' || sortBy === 'individual') {
+                        // Group images by species or individual
+                        const subGroups = new Map<string, { images: DBImage[]; color?: string }>();
+                        
+                        group.images.forEach(img => {
+                            let key: string;
+                            let color: string | undefined;
+                            
+                            if (sortBy === 'species') {
+                                // Use most recent detection batch
+                                if (img.detections && img.detections.length > 0) {
+                                    const sortedDets = [...img.detections].sort((a, b) => (b.batch_id || 0) - (a.batch_id || 0));
+                                    const latestBatchId = sortedDets[0]?.batch_id;
+                                    const latestDets = sortedDets.filter(d => d.batch_id === latestBatchId);
+                                    const species = latestDets.find(d => d.label && d.label !== 'blank')?.label;
+                                    key = species || 'Unclassified';
+                                } else {
+                                    key = 'Unclassified';
+                                }
+                            } else {
+                                // Use most recent ReID run
+                                if (img.reidResults && img.reidResults.length > 0) {
+                                    const sortedReid = [...img.reidResults].sort((a, b) => (b.runId || 0) - (a.runId || 0));
+                                    const latestRunId = sortedReid[0]?.runId;
+                                    const latestReid = sortedReid.filter(r => r.runId === latestRunId);
+                                    const reid = latestReid[0];
+                                    key = reid?.individualDisplayName || 'Unidentified';
+                                    color = reid?.individualColor;
+                                } else {
+                                    key = 'Unidentified';
+                                }
+                            }
+                            
+                            if (!subGroups.has(key)) {
+                                subGroups.set(key, { images: [], color });
+                            }
+                            subGroups.get(key)!.images.push(img);
                         });
+                        
+                        // Sort subGroups: known items first, then unknown
+                        const sortedKeys = Array.from(subGroups.keys()).sort((a, b) => {
+                            if (a === 'Unclassified' || a === 'Unidentified') return 1;
+                            if (b === 'Unclassified' || b === 'Unidentified') return -1;
+                            return a.localeCompare(b);
+                        });
+                        
+                        sortedKeys.forEach(key => {
+                            const subGroup = subGroups.get(key)!;
+                            items.push({
+                                type: 'sub-header',
+                                label: key,
+                                color: subGroup.color,
+                                count: subGroup.images.length,
+                                id: `group-${group.id}-sub-${key}`
+                            });
+                            // Chunk images into rows (same as default view)
+                            for (let i = 0; i < subGroup.images.length; i += columns) {
+                                const rowImages = subGroup.images.slice(i, i + columns);
+                                items.push({
+                                    type: 'horizontal-row',
+                                    images: rowImages,
+                                    groupId: group.id,
+                                    id: `group-${group.id}-hrow-${key}-${i}`
+                                });
+                            }
+                        });
+                    } else {
+                        // Default or name sort: chunk images into grid rows
+                        const sortedImages = sortBy === 'name' 
+                            ? [...group.images].sort((a, b) => {
+                                const aName = a.original_path.split(/[\\/]/).pop() || '';
+                                const bName = b.original_path.split(/[\\/]/).pop() || '';
+                                return aName.localeCompare(bName);
+                            })
+                            : group.images;
+                        
+                        for (let i = 0; i < sortedImages.length; i += columns) {
+                            const rowImages = sortedImages.slice(i, i + columns);
+                            items.push({
+                                type: 'image-row',
+                                images: rowImages,
+                                groupId: group.id,
+                                id: `group-${group.id}-row-${i}`
+                            });
+                        }
                     }
                 }
             });
         });
         return items;
-    }, [dateSections, collapsedGroups, columns]);
+    }, [dateSections, collapsedGroups, columns, sortBy]);
 
     // Expose scrollToIndex to parent via ref
     useImperativeHandle(ref, () => ({
@@ -474,27 +563,199 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                     )}
                 </Box>
             );
-        } else {
-            // Image Row - fixed height prevents scroll jumps
-            const rowHeight = getRowHeight() + 24; // +24 for bottom margin (row gap)
+        } else if (item.type === 'sub-header') {
+            // Sub-header for species/individual grouping
             return (
-                <Box sx={{ height: rowHeight, display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 2, pb: 3, px: 4, overflow: 'hidden', alignItems: 'start' }}>
-                    {item.images.map(img => {
+                <Box sx={{ 
+                    height: 40, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 1.5, 
+                    px: 4, 
+                    pt: 2,
+                    pb: 0.5
+                }}>
+                    {item.color && (
+                        <Box sx={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            bgcolor: item.color,
+                            flexShrink: 0
+                        }} />
+                    )}
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: theme.palette.text.primary }}>
+                        {item.label}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        {item.count}
+                    </Typography>
+                </Box>
+            );
+        } else if (item.type === 'horizontal-row') {
+            // Grid row for grouped images - same as default view
+            const rowHeight = getRowHeight() + 24;
+            return (
+                <Box sx={{ 
+                    height: rowHeight, 
+                    display: 'grid', 
+                    gridTemplateColumns: `repeat(${columns}, 1fr)`, 
+                    gap: 2, 
+                    pb: 3, 
+                    px: 4, 
+                    overflow: 'hidden', 
+                    alignItems: 'start' 
+                }}>
+                    {item.images.map((img: DBImage) => {
                         const fileDetails = {
                             name: img.original_path.split(/[\\/]/).pop() || 'image.jpg',
                             path: img.original_path,
                             isDirectory: false
                         };
-                        let badge = null;
-                        if (img.detections && img.detections.length > 0) {
-                            const labels = Array.from(new Set(img.detections.map(d => d.label).filter(l => l && l !== 'blank')));
+                        
+                        // Build species badge (top-right) - use most recent detection run
+                        let speciesBadge: React.ReactNode = null;
+                        if (showSpeciesTags && img.detections && img.detections.length > 0) {
+                            // Sort by batch_id descending to get most recent run
+                            const sortedDetections = [...img.detections].sort((a, b) => (b.batch_id || 0) - (a.batch_id || 0));
+                            const latestBatchId = sortedDetections[0]?.batch_id;
+                            const latestDetections = sortedDetections.filter(d => d.batch_id === latestBatchId);
+                            const labels = Array.from(new Set(latestDetections.map((d: { label: string }) => d.label).filter((l: string) => l && l !== 'blank')));
                             if (labels.length === 0) {
-                                badge = <Chip label="Empty" size="small" sx={{ bgcolor: 'rgba(0,0,0,0.6)', color: 'white', height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
+                                speciesBadge = <Chip label="Empty" size="small" sx={{ bgcolor: 'rgba(0,0,0,0.5)', color: 'white', height: 20, fontSize: '0.65rem', fontWeight: 600, backdropFilter: 'blur(4px)' }} />;
                             } else {
                                 const text = labels.length > 1 ? `${labels[0]} +${labels.length - 1}` : labels[0];
-                                badge = <Chip label={text} size="small" sx={{ bgcolor: '#ffffff', color: '#000000', height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
+                                speciesBadge = <Chip label={text} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.9)', color: '#000', height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
                             }
                         }
+                        
+                        // Build ReID badge (top-left) - use most recent run
+                        let reidBadge: React.ReactNode = null;
+                        if (showReidTags && img.reidResults && img.reidResults.length > 0) {
+                            // Sort by runId descending to get most recent run
+                            const sortedReid = [...img.reidResults].sort((a, b) => (b.runId || 0) - (a.runId || 0));
+                            const latestRunId = sortedReid[0]?.runId;
+                            const latestReid = sortedReid.filter(r => r.runId === latestRunId);
+                            const firstReid = latestReid[0];
+                            const moreCount = latestReid.length - 1;
+                            const reidLabel = moreCount > 0 
+                                ? `${firstReid.individualDisplayName} +${moreCount}`
+                                : firstReid.individualDisplayName;
+                            
+                            reidBadge = (
+                                <Box sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0.5,
+                                    bgcolor: firstReid.individualColor,
+                                    color: '#fff',
+                                    px: 0.75,
+                                    py: 0.25,
+                                    borderRadius: 1,
+                                    fontSize: '0.65rem',
+                                    fontWeight: 600,
+                                    textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                                }}>
+                                    {reidLabel}
+                                </Box>
+                            );
+                        }
+                        
+                        return (
+                            <Box key={img.id} sx={{ minWidth: 0, height: 'fit-content' }}>
+                                <ImageCard
+                                    file={fileDetails}
+                                    date={item.id}
+                                    // @ts-ignore
+                                    loadImage={() => {
+                                        if (gridItemSize > 500 && loadFullImage) {
+                                            loadFullImage(img);
+                                        } else {
+                                            loadImage(img);
+                                        }
+                                    }}
+                                    imageUrl={(gridItemSize > 500 && fullImageUrls[img.id]) ? fullImageUrls[img.id] : imageUrls[img.id]}
+                                    onClick={() => onImageClick(img)}
+                                    selectable={isSelectionMode}
+                                    selected={selectedImageIds.has(img.id)}
+                                    onToggleSelection={() => onToggleSelection(img.id)}
+                                    showNames={showNames}
+                                    onLongPress={() => handleLongPress(img.id)}
+                                    onPointerDown={(e) => handlePointerDown(e, img.id)}
+                                    onPointerEnter={() => handlePointerEnter(img.id)}
+                                    badge={speciesBadge}
+                                    badgeBottomLeft={reidBadge}
+                                    aspectRatio={aspectRatio}
+                                    isPlaceholder={gridItemSize > 500 && !fullImageUrls[img.id]}
+                                />
+                            </Box>
+                        );
+                    })}
+                </Box>
+            );
+        } else {
+            // Default: Image Row (grid) - fixed height prevents scroll jumps
+            const rowHeight = getRowHeight() + 24; // +24 for bottom margin (row gap)
+            return (
+                <Box sx={{ height: rowHeight, display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 2, pb: 3, px: 4, overflow: 'hidden', alignItems: 'start' }}>
+                    {item.images.map((img: DBImage) => {
+                        const fileDetails = {
+                            name: img.original_path.split(/[\\/]/).pop() || 'image.jpg',
+                            path: img.original_path,
+                            isDirectory: false
+                        };
+                        
+                        // Build species badge (top-right) - use most recent detection run
+                        let speciesBadge: React.ReactNode = null;
+                        if (showSpeciesTags && img.detections && img.detections.length > 0) {
+                            // Sort by batch_id descending to get most recent run
+                            const sortedDetections = [...img.detections].sort((a, b) => (b.batch_id || 0) - (a.batch_id || 0));
+                            const latestBatchId = sortedDetections[0]?.batch_id;
+                            const latestDetections = sortedDetections.filter(d => d.batch_id === latestBatchId);
+                            const labels = Array.from(new Set(latestDetections.map((d: { label: string }) => d.label).filter((l: string) => l && l !== 'blank')));
+                            if (labels.length === 0) {
+                                speciesBadge = <Chip label="Empty" size="small" sx={{ bgcolor: 'rgba(0,0,0,0.5)', color: 'white', height: 20, fontSize: '0.65rem', fontWeight: 600, backdropFilter: 'blur(4px)' }} />;
+                            } else {
+                                const text = labels.length > 1 ? `${labels[0]} +${labels.length - 1}` : labels[0];
+                                speciesBadge = <Chip label={text} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.9)', color: '#000', height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
+                            }
+                        }
+                        
+                        // Build ReID badge (top-left) - use most recent run
+                        let reidBadge: React.ReactNode = null;
+                        if (showReidTags && img.reidResults && img.reidResults.length > 0) {
+                            // Sort by runId descending to get most recent run
+                            const sortedReid = [...img.reidResults].sort((a, b) => (b.runId || 0) - (a.runId || 0));
+                            const latestRunId = sortedReid[0]?.runId;
+                            const latestReid = sortedReid.filter(r => r.runId === latestRunId);
+                            const firstReid = latestReid[0];
+                            const moreCount = latestReid.length - 1;
+                            const reidLabel = moreCount > 0 
+                                ? `${firstReid.individualDisplayName} +${moreCount}`
+                                : firstReid.individualDisplayName;
+                            
+                            reidBadge = (
+                                <Box sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0.5,
+                                    bgcolor: firstReid.individualColor,
+                                    color: '#fff',
+                                    px: 0.75,
+                                    py: 0.25,
+                                    borderRadius: 1,
+                                    fontSize: '0.65rem',
+                                    fontWeight: 600,
+                                    textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                                }}>
+                                    {reidLabel}
+                                </Box>
+                            );
+                        }
+                        
+                        const badge = speciesBadge;
 
                         return (
                             <Box key={img.id} sx={{ minWidth: 0, height: 'fit-content' }}>
@@ -519,6 +780,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                                     onPointerDown={(e) => handlePointerDown(e, img.id)}
                                     onPointerEnter={() => handlePointerEnter(img.id)}
                                     badge={badge}
+                                    badgeBottomLeft={reidBadge}
                                     aspectRatio={aspectRatio}
                                     isPlaceholder={gridItemSize > 500 && !fullImageUrls[img.id]}
                                 />
