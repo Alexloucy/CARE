@@ -224,7 +224,7 @@ function GlassRenderer({ imageUrl, targetBbox, containerWidth, containerHeight, 
     // Only animate when we have a valid target (width/height > 0)
     // This freezes position during image loading when bboxes is empty
     if (targetBbox.width > 0 && targetBbox.height > 0) {
-      const lerp = 0.02; // Slower, smoother sliding
+      const lerp = 0.05; // Slower, smoother sliding
       persistentAnimatedBbox.x += (targetBbox.x - persistentAnimatedBbox.x) * lerp;
       persistentAnimatedBbox.y += (targetBbox.y - persistentAnimatedBbox.y) * lerp;
       persistentAnimatedBbox.width += (targetBbox.width - persistentAnimatedBbox.width) * lerp;

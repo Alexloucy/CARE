@@ -163,6 +163,10 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
         const saved = localStorage.getItem('mediaExplorer_useLiquidGlass');
         return saved === null ? true : saved === 'true';
     });
+    const [useRayTracedGlass, setUseRayTracedGlass] = useState(() => {
+        const saved = localStorage.getItem('mediaExplorer_useRayTracedGlass');
+        return saved === null ? true : saved === 'true';
+    });
     
     const [settingsMenuPos, setSettingsMenuPos] = useState<{ top: number; left: number } | null>(null);
     const [selectedImage, setSelectedImage] = useState<{ image: DBImage, url: string } | null>(null);
@@ -185,7 +189,8 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
         localStorage.setItem('mediaExplorer_showNames', showFileNames.toString());
         localStorage.setItem('mediaExplorer_aspectRatio', aspectRatio);
         localStorage.setItem('mediaExplorer_useLiquidGlass', useLiquidGlass.toString());
-    }, [gridItemSize, showFileNames, aspectRatio, useLiquidGlass]);
+        localStorage.setItem('mediaExplorer_useRayTracedGlass', useRayTracedGlass.toString());
+    }, [gridItemSize, showFileNames, aspectRatio, useLiquidGlass, useRayTracedGlass]);
 
     // Hotkey: ESC to exit selection mode
     useEffect(() => {
@@ -399,102 +404,6 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                                             </IconButton>
                                         </Tooltip>
 
-                                        <Menu
-                                            open={Boolean(settingsMenuPos)}
-                                            onClose={() => setSettingsMenuPos(null)}
-                                            anchorReference="anchorPosition"
-                                            anchorPosition={settingsMenuPos ? { top: settingsMenuPos.top, left: settingsMenuPos.left } : undefined}
-                                            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                                            slotProps={{
-                                                paper: {
-                                                    elevation: 0,
-                                                    sx: {
-                                                        backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(45, 45, 45, 0.95)',
-                                                        backdropFilter: 'blur(8px)',
-                                                        borderRadius: '12px',
-                                                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-                                                        border: `1px solid ${theme.palette.divider}`,
-                                                        minWidth: '250px',
-                                                        p: 2,
-                                                        mt: 1
-                                                    }
-                                                }
-                                            }}
-                                        >
-                                            <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                Grid Size
-                                                <Tooltip title="Reset to Default">
-                                                    <IconButton size="small" onClick={handleResetView}>
-                                                        <ArrowCounterClockwise size={14} />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </Typography>
-                                            <Box sx={{ px: 1, mb: 2 }}>
-                                                <Slider
-                                                    size="small"
-                                                    value={gridItemSize}
-                                                    min={100}
-                                                    max={715}
-                                                    onChange={(_: Event, value: number | number[]) => setGridItemSize(value as number)}
-                                                    valueLabelDisplay="auto"
-                                                    valueLabelFormat={(value: number) => `${value}px`}
-                                                />
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                                                    <Typography variant="caption" color="text.secondary">Small</Typography>
-                                                    <Typography variant="caption" color="text.secondary">Large</Typography>
-                                                </Box>
-                                            </Box>
-
-                                            <Divider sx={{ my: 1 }} />
-
-                                            <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                Aspect Ratio
-                                                <Tooltip title="Reset to Default">
-                                                    <IconButton size="small" onClick={() => setAspectRatio('1.618/1')}>
-                                                        <ArrowCounterClockwise size={14} />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </Typography>
-                                            <ToggleButtonGroup
-                                                value={aspectRatio}
-                                                exclusive
-                                                onChange={(_: React.MouseEvent<HTMLElement>, value: string | null) => value && setAspectRatio(value)}
-                                                size="small"
-                                                fullWidth
-                                                sx={{ mb: 2, display: 'flex' }}
-                                            >
-                                                <ToggleButton value="1/1" sx={{ flexGrow: 1, py: 0.5 }}>1:1</ToggleButton>
-                                                <ToggleButton value="4/3" sx={{ flexGrow: 1, py: 0.5 }}>4:3</ToggleButton>
-                                                <ToggleButton value="16/9" sx={{ flexGrow: 1, py: 0.5 }}>16:9</ToggleButton>
-                                                <ToggleButton value="9/16" sx={{ flexGrow: 1, py: 0.5 }}>9:16</ToggleButton>
-                                                <ToggleButton value="1.618/1" sx={{ flexGrow: 1, py: 0.5 }}>Φ</ToggleButton>
-                                                <ToggleButton value="1/1.618" sx={{ flexGrow: 1, py: 0.5 }}>Φ</ToggleButton>
-                                            </ToggleButtonGroup>
-
-                                            <Divider sx={{ my: 1 }} />
-
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
-                                                <Typography variant="subtitle2" fontWeight="600">
-                                                    Show File Names
-                                                </Typography>
-                                                <Switch
-                                                    size="small"
-                                                    checked={showFileNames}
-                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowFileNames(e.target.checked)}
-                                                />
-                                            </Box>
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
-                                                <Typography variant="subtitle2" fontWeight="600">
-                                                    Liquid Glass BBox
-                                                </Typography>
-                                                <Switch
-                                                    size="small"
-                                                    checked={useLiquidGlass}
-                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUseLiquidGlass(e.target.checked)}
-                                                />
-                                            </Box>
-                                        </Menu>
-
                                         <Tooltip title={isSelectionMode ? "Cancel Selection" : "Select Items"}>
                                             <IconButton
                                                 onClick={toggleSelectionMode}
@@ -526,6 +435,115 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                 availableSpecies={availableSpecies}
             />
 
+            {/* Settings Menu - rendered at root level to avoid re-renders */}
+            <Menu
+                open={Boolean(settingsMenuPos)}
+                onClose={() => setSettingsMenuPos(null)}
+                anchorReference="anchorPosition"
+                anchorPosition={settingsMenuPos ? { top: settingsMenuPos.top, left: settingsMenuPos.left } : undefined}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                slotProps={{
+                    paper: {
+                        elevation: 0,
+                        sx: {
+                            backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(45, 45, 45, 0.95)',
+                            backdropFilter: 'blur(8px)',
+                            borderRadius: '12px',
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                            border: `1px solid ${theme.palette.divider}`,
+                            minWidth: '250px',
+                            p: 2,
+                            mt: 1
+                        }
+                    }
+                }}
+            >
+                <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    Grid Size
+                    <Tooltip title="Reset to Default">
+                        <IconButton size="small" onClick={handleResetView}>
+                            <ArrowCounterClockwise size={14} />
+                        </IconButton>
+                    </Tooltip>
+                </Typography>
+                <Box sx={{ px: 1, mb: 2 }}>
+                    <Slider
+                        size="small"
+                        value={gridItemSize}
+                        min={100}
+                        max={715}
+                        onChange={(_: Event, value: number | number[]) => setGridItemSize(value as number)}
+                        valueLabelDisplay="auto"
+                        valueLabelFormat={(value: number) => `${value}px`}
+                    />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                        <Typography variant="caption" color="text.secondary">Small</Typography>
+                        <Typography variant="caption" color="text.secondary">Large</Typography>
+                    </Box>
+                </Box>
+
+                <Divider sx={{ my: 1 }} />
+
+                <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    Aspect Ratio
+                    <Tooltip title="Reset to Default">
+                        <IconButton size="small" onClick={() => setAspectRatio('1.618/1')}>
+                            <ArrowCounterClockwise size={14} />
+                        </IconButton>
+                    </Tooltip>
+                </Typography>
+                <ToggleButtonGroup
+                    value={aspectRatio}
+                    exclusive
+                    onChange={(_: React.MouseEvent<HTMLElement>, value: string | null) => value && setAspectRatio(value)}
+                    size="small"
+                    fullWidth
+                    sx={{ mb: 2, display: 'flex' }}
+                >
+                    <ToggleButton value="1/1" sx={{ flexGrow: 1, py: 0.5 }}>1:1</ToggleButton>
+                    <ToggleButton value="4/3" sx={{ flexGrow: 1, py: 0.5 }}>4:3</ToggleButton>
+                    <ToggleButton value="16/9" sx={{ flexGrow: 1, py: 0.5 }}>16:9</ToggleButton>
+                    <ToggleButton value="9/16" sx={{ flexGrow: 1, py: 0.5 }}>9:16</ToggleButton>
+                    <ToggleButton value="1.618/1" sx={{ flexGrow: 1, py: 0.5 }}>Φ</ToggleButton>
+                    <ToggleButton value="1/1.618" sx={{ flexGrow: 1, py: 0.5 }}>Φ</ToggleButton>
+                </ToggleButtonGroup>
+
+                <Divider sx={{ my: 1 }} />
+
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                    <Typography variant="subtitle2" fontWeight="600">
+                        Show File Names
+                    </Typography>
+                    <Switch
+                        size="small"
+                        checked={showFileNames}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowFileNames(e.target.checked)}
+                    />
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                    <Typography variant="subtitle2" fontWeight="600">
+                        Liquid Glass BBox
+                    </Typography>
+                    <Switch
+                        size="small"
+                        checked={useLiquidGlass}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUseLiquidGlass(e.target.checked)}
+                    />
+                </Box>
+                {useLiquidGlass && (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, pl: 2 }}>
+                        <Typography variant="caption" color="text.secondary">
+                            Ray-traced Glass
+                        </Typography>
+                        <Switch
+                            size="small"
+                            checked={useRayTracedGlass}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUseRayTracedGlass(e.target.checked)}
+                        />
+                    </Box>
+                )}
+            </Menu>
+
             <ImageModal
                 open={!!selectedImage}
                 onClose={() => setSelectedImage(null)}
@@ -547,6 +565,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                 }}
                 detections={selectedImage?.image.detections}
                 useLiquidGlass={useLiquidGlass}
+                useRayTracedGlass={useRayTracedGlass}
                 onDeleteDetection={onDeleteDetection}
             />
 

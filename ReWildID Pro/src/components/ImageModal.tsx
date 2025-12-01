@@ -4,8 +4,6 @@ import { X, MagnifyingGlassPlus, MagnifyingGlassMinus, CaretLeft, CaretRight, Tr
 import { FileDetails, Detection } from '../types/electron';
 import { LiquidGlassOverlay } from './LiquidGlassOverlay';
 
-// Toggle for ray-traced liquid glass (will be moved to settings later)
-const USE_RAY_TRACED_GLASS = true;
 
 // DetectionBox Component with fluid animations (1:1 copy of AiModeButton behavior)
 interface DetectionBoxProps {
@@ -125,26 +123,52 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                         top: '100%',
                         left: 0,
                         mt: 1,
-                        p: 1.5,
+                        p: 2,
                         zIndex: 101,
-                        width: 200,
-                        bgcolor: 'background.paper',
-                        boxShadow: 3
+                        width: 240,
+                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(30, 30, 30, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+                        backdropFilter: 'blur(12px)',
+                        borderRadius: 3,
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+                        border: `1px solid ${theme.palette.divider}`,
                     }}>
-                        <Typography variant="subtitle2" fontWeight="bold">{detection.label}</Typography>
-                        <Typography variant="caption" display="block" color="text.secondary">
-                            Confidence: {(detection.confidence * 100).toFixed(1)}%
-                        </Typography>
-                        {onDelete && (
-                            <IconButton
-                                size="small"
-                                onClick={(e: React.MouseEvent) => { e.stopPropagation(); onDelete(detection.id); }}
-                                sx={{ mt: 1, color: '#ff4444', '&:hover': { bgcolor: 'rgba(255,68,68,0.1)' } }}
-                            >
-                                <Trash size={16} />
-                                <Typography variant="caption" sx={{ ml: 0.5 }}>Delete Detection</Typography>
-                            </IconButton>
-                        )}
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="caption" color="text.secondary">Species</Typography>
+                                <Box sx={{ 
+                                    bgcolor: 'rgba(66, 133, 244, 0.1)', 
+                                    color: '#4285F4', 
+                                    px: 1, py: 0.2, 
+                                    borderRadius: 1,
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600
+                                }}>
+                                    {detection.label}
+                                </Box>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="caption" color="text.secondary">Confidence</Typography>
+                                <Typography variant="caption" fontWeight="600" sx={{ fontFamily: 'monospace' }}>
+                                    {(detection.confidence * 100).toFixed(1)}%
+                                </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <Typography variant="caption" color="text.secondary">Detection Score</Typography>
+                                <Typography variant="caption" fontWeight="600" sx={{ fontFamily: 'monospace' }}>
+                                    {(detection.detection_confidence * 100).toFixed(1)}%
+                                </Typography>
+                            </Box>
+                            {onDelete && (
+                                <IconButton
+                                    size="small"
+                                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); onDelete(detection.id); }}
+                                    sx={{ mt: 1, color: '#ff4444', width: '100%', borderRadius: 1, '&:hover': { bgcolor: 'rgba(255,68,68,0.1)' } }}
+                                >
+                                    <Trash size={16} />
+                                    <Typography variant="caption" sx={{ ml: 0.5 }}>Delete Detection</Typography>
+                                </IconButton>
+                            )}
+                        </Box>
                     </Paper>
                 </Fade>
             </Box>
@@ -359,6 +383,7 @@ interface ImageModalProps {
     onDelete?: () => void;
     detections?: Detection[];
     useLiquidGlass?: boolean;
+    useRayTracedGlass?: boolean;
     onDeleteDetection?: (id: number) => void;
 }
 
@@ -374,6 +399,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
     onDelete,
     detections,
     useLiquidGlass = true,
+    useRayTracedGlass = true,
     onDeleteDetection
 }) => {
     const [zoom, setZoom] = useState(1);
@@ -585,7 +611,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
 
                         {/* Bounding Box Overlay */}
                         {detections && detections.length > 0 && imageDimensions.natural.width > 0 && (
-                            USE_RAY_TRACED_GLASS && imageUrl ? (
+                            useLiquidGlass && useRayTracedGlass && imageUrl ? (
                                 /* Ray-traced liquid glass - single WebGL canvas */
                                 <Box
                                     sx={{
@@ -610,7 +636,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
                                     />
                                 </Box>
                             ) : (
-                                /* CSS-based liquid glass - per detection */
+                                /* CSS-based detection boxes (liquid glass or classic based on useLiquidGlass prop) */
                                 <Box
                                     sx={{
                                         position: 'absolute',
