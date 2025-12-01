@@ -2,13 +2,16 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
     Box, Typography, CircularProgress, IconButton, Menu, MenuItem,
-    Chip, alpha, useTheme, Collapse, Modal, Backdrop, Fade, Skeleton, Button
+    Chip, alpha, useTheme, Collapse, Modal, Backdrop, Fade, Skeleton, Button,
+    Switch, Tooltip
 } from '@mui/material';
 import {
     Fingerprint, DotsThreeVertical, PencilSimple, Trash, CaretDown, CaretRight,
-    Images as ImagesIcon, X, CaretLeft, MagnifyingGlassPlus, MagnifyingGlassMinus, Sparkle
+    Images as ImagesIcon, X, CaretLeft, MagnifyingGlassPlus, MagnifyingGlassMinus, Sparkle,
+    Gear
 } from '@phosphor-icons/react';
 import { GroupNameDialog } from '../../components/GroupNameDialog';
+import { LibrarySearchBar } from '../../components/library/LibrarySearchBar';
 import { DetectionBox } from '../../components/ImageModal';
 import { LiquidGlassOverlay } from '../../components/LiquidGlassOverlay';
 import { Detection } from '../../types/electron';
@@ -296,14 +299,18 @@ const ReIDPage: React.FC = () => {
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     
     // Read liquid glass settings from localStorage (shared with MediaExplorer)
-    const [useLiquidGlass] = useState(() => {
+    const [useLiquidGlass, setUseLiquidGlass] = useState(() => {
         const saved = localStorage.getItem('mediaExplorer_useLiquidGlass');
         return saved === null ? true : saved === 'true';
     });
-    const [useRayTracedGlass] = useState(() => {
+    const [useRayTracedGlass, setUseRayTracedGlass] = useState(() => {
         const saved = localStorage.getItem('mediaExplorer_useRayTracedGlass');
         return saved === null ? true : saved === 'true';
     });
+    
+    // Search and settings
+    const [searchQuery, setSearchQuery] = useState('');
+    const [settingsMenuPos, setSettingsMenuPos] = useState<{ top: number; left: number } | null>(null);
 
     const refreshData = useCallback(() => {
         setRefreshTrigger(prev => prev + 1);
@@ -436,12 +443,36 @@ const ReIDPage: React.FC = () => {
             ) : (
                 <Box>
                     {/* Header - only shown when there's data */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 2 }}>
-                        <Fingerprint size={28} weight="duotone" />
-                        <Typography variant="h5" fontWeight={600}>Re-identification</Typography>
-                        <Typography variant="body2" color="text.secondary">{runs.length} run{runs.length !== 1 ? 's' : ''}</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Fingerprint size={28} weight="duotone" />
+                            <Typography variant="h5" fontWeight={600}>Re-identification</Typography>
+                            <Typography variant="body2" color="text.secondary">{runs.length} run{runs.length !== 1 ? 's' : ''}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                            <LibrarySearchBar onSearch={setSearchQuery} />
+                            
+                            <Tooltip title="View Settings">
+                                <IconButton
+                                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        setSettingsMenuPos({ top: rect.bottom, left: rect.right });
+                                    }}
+                                    sx={{ '&:hover': { bgcolor: theme.palette.action.hover } }}
+                                >
+                                    <Gear weight="regular" />
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
                     </Box>
-                    {runs.map(run => {
+                    {runs.filter(run => {
+                        if (!searchQuery) return true;
+                        const q = searchQuery.toLowerCase();
+                        const runIndividuals = individuals.get(run.id) || [];
+                        return run.name.toLowerCase().includes(q) ||
+                               run.species.toLowerCase().includes(q) ||
+                               runIndividuals.some(ind => ind.display_name.toLowerCase().includes(q));
+                    }).map(run => {
                         const runIndividuals = individuals.get(run.id) || [];
                         const runPagination = pagination.get(run.id);
                         const isLoadingMore = loadingMore.get(run.id) || false;
@@ -466,6 +497,64 @@ const ReIDPage: React.FC = () => {
                 <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}><Trash size={18} style={{ marginRight: 8 }} /> Delete</MenuItem>
             </Menu>
             <GroupNameDialog open={renameDialogOpen} onClose={() => { setRenameDialogOpen(false); setRunToRename(null); }} onConfirm={handleConfirmRename} title="Rename ReID Run" initialValue={runToRename?.name || ''} />
+            
+            {/* Settings Menu */}
+            <Menu
+                open={Boolean(settingsMenuPos)}
+                onClose={() => setSettingsMenuPos(null)}
+                anchorReference="anchorPosition"
+                anchorPosition={settingsMenuPos ? { top: settingsMenuPos.top, left: settingsMenuPos.left } : undefined}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                slotProps={{
+                    paper: {
+                        elevation: 0,
+                        sx: {
+                            backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(45, 45, 45, 0.95)',
+                            backdropFilter: 'blur(8px)',
+                            borderRadius: '12px',
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                            border: `1px solid ${theme.palette.divider}`,
+                            minWidth: '220px',
+                            p: 2,
+                            mt: 1
+                        }
+                    }
+                }}
+            >
+                <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1.5 }}>
+                    Display Settings
+                </Typography>
+                
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                    <Typography variant="body2">
+                        Liquid Glass BBox
+                    </Typography>
+                    <Switch
+                        size="small"
+                        checked={useLiquidGlass}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            setUseLiquidGlass(e.target.checked);
+                            localStorage.setItem('mediaExplorer_useLiquidGlass', e.target.checked.toString());
+                        }}
+                    />
+                </Box>
+                {useLiquidGlass && (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, pl: 2 }}>
+                        <Typography variant="caption" color="text.secondary">
+                            Ray-traced Glass
+                        </Typography>
+                        <Switch
+                            size="small"
+                            checked={useRayTracedGlass}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                setUseRayTracedGlass(e.target.checked);
+                                localStorage.setItem('mediaExplorer_useRayTracedGlass', e.target.checked.toString());
+                            }}
+                        />
+                    </Box>
+                )}
+            </Menu>
+            
             <IndividualModal open={modalOpen} onClose={() => setModalOpen(false)} individual={selectedIndividual} imageUrls={imageUrls} fullImageUrls={fullImageUrls} loadFullImage={loadFullImage} useLiquidGlass={useLiquidGlass} useRayTracedGlass={useRayTracedGlass} />
         </Box>
     );
