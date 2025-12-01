@@ -328,18 +328,38 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                 }}
             >
                 {loading ? (
-                    <Box sx={{ p: 4 }}> {/* Add padding back for loading state */}
-                        <Skeleton variant="text" sx={{ fontSize: '0.875rem', width: 200, mb: 2 }} />
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                            <Skeleton variant="text" sx={{ fontSize: '1.25rem', width: 150 }} />
-                            <Skeleton variant="rounded" width={40} height={24} />
+                    <Box sx={{ height: '100%', overflow: 'hidden' }}>
+                        {/* Header skeleton */}
+                        <Box sx={{ height: `${NAVBAR_HEIGHT}px` }} />
+                        <Box sx={{ p: 3, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Skeleton variant="text" sx={{ fontSize: '2rem', width: 180 }} />
+                            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                                <Skeleton variant="rounded" width={36} height={36} sx={{ borderRadius: 2 }} />
+                                <Skeleton variant="circular" width={36} height={36} />
+                                <Skeleton variant="circular" width={36} height={36} />
+                                <Skeleton variant="circular" width={36} height={36} />
+                            </Box>
                         </Box>
-                        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 2 }}>
-                            {[...Array(12)].map((_, i) => (
-                                <Card key={i} sx={{ aspectRatio: '1/1', width: '100%', borderRadius: 3, boxShadow: 'none' }}>
-                                    <Skeleton variant="rectangular" width="100%" height="100%" animation="wave" />
-                                </Card>
-                            ))}
+                        
+                        {/* Content skeleton */}
+                        <Box sx={{ px: 4, pt: 2 }}>
+                            {/* Date header skeleton */}
+                            <Skeleton variant="text" sx={{ fontSize: '0.875rem', width: 140, mb: 2 }} />
+                            
+                            {/* Group header skeleton */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                                <Skeleton variant="text" sx={{ fontSize: '1.25rem', width: 200 }} />
+                                <Skeleton variant="rounded" width={40} height={24} sx={{ borderRadius: 1 }} />
+                            </Box>
+                            
+                            {/* Grid skeleton */}
+                            <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${gridItemSize}px, 1fr))`, gap: 2 }}>
+                                {[...Array(12)].map((_, i) => (
+                                    <Card key={i} sx={{ aspectRatio: aspectRatio, width: '100%', borderRadius: 3, boxShadow: 'none', overflow: 'hidden' }}>
+                                        <Skeleton variant="rectangular" width="100%" height="100%" animation="wave" />
+                                    </Card>
+                                ))}
+                            </Box>
                         </Box>
                     </Box>
                 ) : (

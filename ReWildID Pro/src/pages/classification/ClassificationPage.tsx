@@ -28,7 +28,7 @@ const ClassificationPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
 
     // 2. Data & Loading
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true); // Start true to show skeleton initially
     const [filteredDateSections, setFilteredDateSections] = useState<DateSection[]>([]);
     const [fullDateSections, setFullDateSections] = useState<DateSection[]>([]); // Needed for timeline?
     const [refreshTrigger, setRefreshTrigger] = useState(0);

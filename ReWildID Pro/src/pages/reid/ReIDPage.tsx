@@ -413,7 +413,48 @@ const ReIDPage: React.FC = () => {
     const handleDelete = async () => { if (selectedRunId && window.confirm('Delete this ReID run?')) { await window.api.deleteReidRun(selectedRunId); setRefreshTrigger(t => t + 1); } handleMenuClose(); };
     const handleIndividualClick = (ind: ReidIndividual) => { setSelectedIndividual(ind); setModalOpen(true); };
 
-    if (loading) return <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', pt: 8 }}><CircularProgress /></Box>;
+    if (loading) return (
+        <Box sx={{ pt: '64px', px: 3, pb: 3, minHeight: '100vh' }}>
+            {/* Header skeleton */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Skeleton variant="circular" width={28} height={28} />
+                    <Skeleton variant="text" sx={{ fontSize: '1.5rem', width: 180 }} />
+                    <Skeleton variant="text" sx={{ fontSize: '0.875rem', width: 60 }} />
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                    <Skeleton variant="rounded" width={36} height={36} sx={{ borderRadius: 2 }} />
+                    <Skeleton variant="circular" width={36} height={36} />
+                </Box>
+            </Box>
+            
+            {/* Run group skeleton */}
+            {[1, 2].map((groupIdx) => (
+                <Box key={groupIdx} sx={{ mb: 3 }}>
+                    {/* Run header skeleton */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, pl: 1 }}>
+                        <Skeleton variant="circular" width={20} height={20} />
+                        <Skeleton variant="text" sx={{ fontSize: '1.1rem', width: 200 }} />
+                        <Skeleton variant="rounded" width={80} height={24} sx={{ borderRadius: 1 }} />
+                        <Skeleton variant="rounded" width={100} height={24} sx={{ borderRadius: 1 }} />
+                    </Box>
+                    
+                    {/* Individual cards skeleton */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 2, pl: 4 }}>
+                        {[...Array(6)].map((_, i) => (
+                            <Box key={i} sx={{ borderRadius: 2, overflow: 'hidden', border: `1px solid ${theme.palette.divider}` }}>
+                                <Skeleton variant="rectangular" width="100%" height={130} animation="wave" />
+                                <Box sx={{ p: 1.25 }}>
+                                    <Skeleton variant="text" width="70%" height={20} animation="wave" />
+                                    <Skeleton variant="text" width="50%" height={16} animation="wave" />
+                                </Box>
+                            </Box>
+                        ))}
+                    </Box>
+                </Box>
+            ))}
+        </Box>
+    );
 
     return (
         <Box sx={{ pt: '64px', px: 3, pb: 3, minHeight: '100vh' }}>
