@@ -127,7 +127,19 @@ const IndividualModal: React.FC<{ open: boolean; onClose: () => void; individual
     const currentDet = detections[currentIndex];
     const currentUrl = currentDet ? (fullImageUrls.get(currentDet.image_path) || imageUrls.get(currentDet.image_path)) : undefined;
 
-    useEffect(() => { if (open && currentDet) { setZoom(1); setPosition({ x: 0, y: 0 }); loadFullImage(currentDet.image_path); } }, [open, currentIndex, currentDet]);
+    // Preload all images for this individual when modal opens
+    useEffect(() => {
+        if (open && individual && detections.length > 0) {
+            // Preload all images for smoother navigation
+            detections.forEach(det => {
+                if (!fullImageUrls.has(det.image_path)) {
+                    loadFullImage(det.image_path);
+                }
+            });
+        }
+    }, [open, individual?.id]);
+
+    useEffect(() => { if (open && currentDet) { setZoom(1); setPosition({ x: 0, y: 0 }); } }, [open, currentIndex, currentDet]);
     useEffect(() => { setCurrentIndex(0); }, [individual?.id]);
 
     const handleImageLoad = () => {

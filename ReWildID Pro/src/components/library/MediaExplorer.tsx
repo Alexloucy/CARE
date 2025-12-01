@@ -246,12 +246,37 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
 
     // Active item detection is now handled by DateGroupList's rangeChanged callback
 
-    // Image Modal Logic
+    // Image Modal Logic - Sliding window preloading
+    const PRELOAD_WINDOW = 3; // Preload 3 images before and after current
+    
     useEffect(() => {
         if (selectedImage) {
+            // Load current image
             loadFullImage(selectedImage.image);
+            
+            // Sliding window preload: load nearby images
+            const currentIndex = allImages.findIndex(img => img.id === selectedImage.image.id);
+            if (currentIndex !== -1) {
+                // Preload images in window around current
+                for (let offset = 1; offset <= PRELOAD_WINDOW; offset++) {
+                    // Preload next images
+                    if (currentIndex + offset < allImages.length) {
+                        const nextImg = allImages[currentIndex + offset];
+                        if (!fullImageUrls[nextImg.id]) {
+                            loadFullImage(nextImg);
+                        }
+                    }
+                    // Preload previous images
+                    if (currentIndex - offset >= 0) {
+                        const prevImg = allImages[currentIndex - offset];
+                        if (!fullImageUrls[prevImg.id]) {
+                            loadFullImage(prevImg);
+                        }
+                    }
+                }
+            }
         }
-    }, [selectedImage?.image.id, loadFullImage]);
+    }, [selectedImage?.image.id, loadFullImage, allImages, fullImageUrls]);
 
     useEffect(() => {
         if (selectedImage && fullImageUrls[selectedImage.image.id]) {
