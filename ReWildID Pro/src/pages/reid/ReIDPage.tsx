@@ -10,6 +10,7 @@ import {
 } from '@phosphor-icons/react';
 import { GroupNameDialog } from '../../components/GroupNameDialog';
 import { DetectionBox } from '../../components/ImageModal';
+import { LiquidGlassOverlay } from '../../components/LiquidGlassOverlay';
 import { Detection } from '../../types/electron';
 
 interface ReidRun { id: number; name: string; species: string; created_at: number; individual_count: number; detection_count: number; }
@@ -108,7 +109,7 @@ const RunGroup: React.FC<RunGroupProps> = ({ run, individuals, imageUrls, onIndi
     );
 };
 
-const IndividualModal: React.FC<{ open: boolean; onClose: () => void; individual: ReidIndividual | null; imageUrls: Map<string, string>; fullImageUrls: Map<string, string>; loadFullImage: (path: string) => void }> = ({ open, onClose, individual, imageUrls, fullImageUrls, loadFullImage }) => {
+const IndividualModal: React.FC<{ open: boolean; onClose: () => void; individual: ReidIndividual | null; imageUrls: Map<string, string>; fullImageUrls: Map<string, string>; loadFullImage: (path: string) => void; useLiquidGlass?: boolean; useRayTracedGlass?: boolean }> = ({ open, onClose, individual, imageUrls, fullImageUrls, loadFullImage, useLiquidGlass = true, useRayTracedGlass = true }) => {
     const theme = useTheme();
     const [currentIndex, setCurrentIndex] = useState(0);
     const [zoom, setZoom] = useState(1);
@@ -117,7 +118,7 @@ const IndividualModal: React.FC<{ open: boolean; onClose: () => void; individual
     const dragStart = useRef({ x: 0, y: 0 });
     const imageRef = useRef<HTMLImageElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [imgDims, setImgDims] = useState({ natural: { width: 0, height: 0 }, displayed: { width: 0, height: 0 } });
+    const [imgDims, setImgDims] = useState({ natural: { width: 0, height: 0 }, displayed: { width: 0, height: 0 }, container: { width: 0, height: 0 } });
 
     const detections = individual?.detections || [];
     const currentDet = detections[currentIndex];
@@ -131,7 +132,7 @@ const IndividualModal: React.FC<{ open: boolean; onClose: () => void; individual
             const img = imageRef.current, rect = containerRef.current.getBoundingClientRect();
             const aspect = img.naturalWidth / img.naturalHeight, cAspect = rect.width / rect.height;
             const [dw, dh] = aspect > cAspect ? [rect.width, rect.width / aspect] : [rect.height * aspect, rect.height];
-            setImgDims({ natural: { width: img.naturalWidth, height: img.naturalHeight }, displayed: { width: dw, height: dh } });
+            setImgDims({ natural: { width: img.naturalWidth, height: img.naturalHeight }, displayed: { width: dw, height: dh }, container: { width: rect.width, height: rect.height } });
         }
     };
 
@@ -168,38 +169,70 @@ const IndividualModal: React.FC<{ open: boolean; onClose: () => void; individual
                                 <>
                                     <img ref={imageRef} src={currentUrl} alt={individual.display_name} onLoad={handleImageLoad} style={{ width: '100%', height: '100%', objectFit: 'contain', transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`, transition: isDragging ? 'none' : 'transform 0.1s', userSelect: 'none' }} draggable={false} />
                                     {bbox && imgDims.displayed.width > 0 && (
-                                        <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`, transition: isDragging ? 'none' : 'transform 0.1s' }}>
-                                            <DetectionBox
-                                                bbox={bbox}
-                                                detection={{ ...currentDet, label: individual.display_name } as Detection}
-                                                zoom={zoom}
-                                                containerWidth={imgDims.displayed.width}
-                                                containerHeight={imgDims.displayed.height}
-                                                useLiquidGlass={true}
-                                                popupTitle="Individual Details"
-                                                popupIcon={<Fingerprint size={18} weight="fill" color={individual.color} />}
-                                                customPopupContent={
-                                                    <>
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                                                            <Fingerprint size={18} weight="fill" color={individual.color} />
-                                                            <Typography variant="subtitle2" fontWeight="700">Individual Details</Typography>
-                                                        </Box>
-                                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                                <Typography variant="caption" color="text.secondary">Individual</Typography>
-                                                                <Box sx={{ bgcolor: alpha(individual.color, 0.15), color: individual.color, px: 1, py: 0.2, borderRadius: 1, fontSize: '0.75rem', fontWeight: 600 }}>
-                                                                    {individual.display_name}
+                                        useLiquidGlass && useRayTracedGlass && imgDims.container.width > 0 ? (
+                                            /* Ray-traced liquid glass - positioned over displayed image area */
+                                            <Box sx={{ 
+                                                position: 'absolute', 
+                                                top: (imgDims.container.height - imgDims.displayed.height) / 2,
+                                                left: (imgDims.container.width - imgDims.displayed.width) / 2,
+                                                width: imgDims.displayed.width, 
+                                                height: imgDims.displayed.height, 
+                                                pointerEvents: 'none', 
+                                                transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`, 
+                                                transition: isDragging ? 'none' : 'transform 0.1s' 
+                                            }}>
+                                                <LiquidGlassOverlay
+                                                    imageUrl={currentUrl}
+                                                    bboxes={[{ 
+                                                        bbox: {
+                                                            // Adjust bbox coordinates relative to displayed image (remove offset)
+                                                            x: bbox.x - (imgDims.container.width - imgDims.displayed.width) / 2,
+                                                            y: bbox.y - (imgDims.container.height - imgDims.displayed.height) / 2,
+                                                            width: bbox.width,
+                                                            height: bbox.height
+                                                        }, 
+                                                        label: individual.display_name, 
+                                                        detection: { ...currentDet, label: individual.display_name } as Detection 
+                                                    }]}
+                                                    containerWidth={imgDims.displayed.width}
+                                                    containerHeight={imgDims.displayed.height}
+                                                />
+                                            </Box>
+                                        ) : (
+                                            /* CSS-based detection box (liquid glass or classic) */
+                                            <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`, transition: isDragging ? 'none' : 'transform 0.1s' }}>
+                                                <DetectionBox
+                                                    bbox={bbox}
+                                                    detection={{ ...currentDet, label: individual.display_name } as Detection}
+                                                    zoom={zoom}
+                                                    containerWidth={imgDims.displayed.width}
+                                                    containerHeight={imgDims.displayed.height}
+                                                    useLiquidGlass={useLiquidGlass}
+                                                    popupTitle="Individual Details"
+                                                    popupIcon={<Fingerprint size={18} weight="fill" color={individual.color} />}
+                                                    customPopupContent={
+                                                        <>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                                                                <Fingerprint size={18} weight="fill" color={individual.color} />
+                                                                <Typography variant="subtitle2" fontWeight="700">Individual Details</Typography>
+                                                            </Box>
+                                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                    <Typography variant="caption" color="text.secondary">Individual</Typography>
+                                                                    <Box sx={{ bgcolor: alpha(individual.color, 0.15), color: individual.color, px: 1, py: 0.2, borderRadius: 1, fontSize: '0.75rem', fontWeight: 600 }}>
+                                                                        {individual.display_name}
+                                                                    </Box>
+                                                                </Box>
+                                                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                    <Typography variant="caption" color="text.secondary">Sightings</Typography>
+                                                                    <Typography variant="caption" fontWeight="600">{individual.member_count}</Typography>
                                                                 </Box>
                                                             </Box>
-                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                                <Typography variant="caption" color="text.secondary">Sightings</Typography>
-                                                                <Typography variant="caption" fontWeight="600">{individual.member_count}</Typography>
-                                                            </Box>
-                                                        </Box>
-                                                    </>
-                                                }
-                                            />
-                                        </Box>
+                                                        </>
+                                                    }
+                                                />
+                                            </Box>
+                                        )
                                     )}
                                 </>
                             ) : <CircularProgress />}
@@ -261,6 +294,16 @@ const ReIDPage: React.FC = () => {
     const [imageUrls, setImageUrls] = useState<Map<string, string>>(new Map());
     const [fullImageUrls, setFullImageUrls] = useState<Map<string, string>>(new Map());
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    
+    // Read liquid glass settings from localStorage (shared with MediaExplorer)
+    const [useLiquidGlass] = useState(() => {
+        const saved = localStorage.getItem('mediaExplorer_useLiquidGlass');
+        return saved === null ? true : saved === 'true';
+    });
+    const [useRayTracedGlass] = useState(() => {
+        const saved = localStorage.getItem('mediaExplorer_useRayTracedGlass');
+        return saved === null ? true : saved === 'true';
+    });
 
     const refreshData = useCallback(() => {
         setRefreshTrigger(prev => prev + 1);
@@ -423,7 +466,7 @@ const ReIDPage: React.FC = () => {
                 <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}><Trash size={18} style={{ marginRight: 8 }} /> Delete</MenuItem>
             </Menu>
             <GroupNameDialog open={renameDialogOpen} onClose={() => { setRenameDialogOpen(false); setRunToRename(null); }} onConfirm={handleConfirmRename} title="Rename ReID Run" initialValue={runToRename?.name || ''} />
-            <IndividualModal open={modalOpen} onClose={() => setModalOpen(false)} individual={selectedIndividual} imageUrls={imageUrls} fullImageUrls={fullImageUrls} loadFullImage={loadFullImage} />
+            <IndividualModal open={modalOpen} onClose={() => setModalOpen(false)} individual={selectedIndividual} imageUrls={imageUrls} fullImageUrls={fullImageUrls} loadFullImage={loadFullImage} useLiquidGlass={useLiquidGlass} useRayTracedGlass={useRayTracedGlass} />
         </Box>
     );
 };
