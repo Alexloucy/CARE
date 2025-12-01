@@ -44,6 +44,7 @@ exports.getReidResults = getReidResults;
 exports.updateReidIndividualName = updateReidIndividualName;
 exports.updateReidIndividualColor = updateReidIndividualColor;
 exports.mergeReidIndividuals = mergeReidIndividuals;
+exports.getDashboardStats = getDashboardStats;
 const fs_extra_1 = __importDefault(require("fs-extra"));
 const path_1 = __importDefault(require("path"));
 const archiver_1 = __importDefault(require("archiver"));
@@ -1191,5 +1192,14 @@ async function mergeReidIndividuals(targetId, sourceIds) {
     }
     catch (error) {
         return { ok: false, error: 'mergeReidIndividuals failed: ' + error };
+    }
+}
+async function getDashboardStats() {
+    try {
+        const stats = database_1.DatabaseService.getDashboardStats();
+        return { ok: true, stats };
+    }
+    catch (error) {
+        return { ok: false, error: 'getDashboardStats failed: ' + error };
     }
 }

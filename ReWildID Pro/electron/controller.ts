@@ -1335,3 +1335,12 @@ export async function mergeReidIndividuals(targetId: number, sourceIds: number[]
         return { ok: false, error: 'mergeReidIndividuals failed: ' + error };
     }
 }
+
+export async function getDashboardStats() {
+    try {
+        const stats = DatabaseService.getDashboardStats();
+        return { ok: true, stats };
+    } catch (error) {
+        return { ok: false, error: 'getDashboardStats failed: ' + error };
+    }
+}

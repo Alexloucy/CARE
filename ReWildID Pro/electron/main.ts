@@ -42,7 +42,8 @@ import {
     getReidResults,
     updateReidIndividualName,
     updateReidIndividualColor,
-    mergeReidIndividuals
+    mergeReidIndividuals,
+    getDashboardStats
 } from './controller';
 import { JobManager } from './jobs';
 
@@ -222,6 +223,7 @@ ipcMain.handle('getReidResults', (_, filter) => getReidResults(filter));
 ipcMain.handle('updateReidIndividualName', (_, id, displayName) => updateReidIndividualName(id, displayName));
 ipcMain.handle('updateReidIndividualColor', (_, id, color) => updateReidIndividualColor(id, color));
 ipcMain.handle('mergeReidIndividuals', (_, targetId, sourceIds) => mergeReidIndividuals(targetId, sourceIds));
+ipcMain.handle('getDashboardStats', () => getDashboardStats());
 
 
 app.on('ready', () => {

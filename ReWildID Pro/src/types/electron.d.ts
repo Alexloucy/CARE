@@ -159,6 +159,22 @@ export interface ElectronApi {
     updateReidIndividualName: (id: number, displayName: string) => Promise<{ ok: boolean; error?: string }>;
     updateReidIndividualColor: (id: number, color: string) => Promise<{ ok: boolean; error?: string }>;
     mergeReidIndividuals: (targetId: number, sourceIds: number[]) => Promise<{ ok: boolean; error?: string }>;
+    
+    // Dashboard Stats
+    getDashboardStats: () => Promise<{ 
+        ok: boolean; 
+        stats?: {
+            totalImages: number;
+            totalGroups: number;
+            totalDetections: number;
+            totalSpecies: number;
+            totalReidRuns: number;
+            totalIndividuals: number;
+            recentActivity: { type: string; name: string; count: number; date: number }[];
+        };
+        error?: string;
+    }>;
+    
     getPathForFile: (file: File) => string;
     getJobs: () => Promise<any[]>;
     cancelJob: (id: string) => Promise<void>;

@@ -785,5 +785,53 @@ export const DatabaseService = {
         const placeholders = imageIds.map(() => '?').join(',');
         const stmt = db.prepare(`SELECT * FROM images WHERE id IN (${placeholders})`);
         return stmt.all(...imageIds) as Image[];
+    },
+
+    // Dashboard Stats
+    getDashboardStats: (): {
+        totalImages: number;
+        totalGroups: number;
+        totalDetections: number;
+        totalSpecies: number;
+        totalReidRuns: number;
+        totalIndividuals: number;
+        recentActivity: { type: string; name: string; count: number; date: number }[];
+    } => {
+        const totalImages = (db.prepare('SELECT COUNT(*) as count FROM images').get() as { count: number }).count;
+        const totalGroups = (db.prepare('SELECT COUNT(*) as count FROM groups').get() as { count: number }).count;
+        const totalDetections = (db.prepare('SELECT COUNT(*) as count FROM detections').get() as { count: number }).count;
+        const totalSpecies = (db.prepare("SELECT COUNT(DISTINCT label) as count FROM detections WHERE label IS NOT NULL AND label != '' AND LOWER(label) != 'blank'").get() as { count: number }).count;
+        const totalReidRuns = (db.prepare('SELECT COUNT(*) as count FROM reid_runs').get() as { count: number }).count;
+        const totalIndividuals = (db.prepare('SELECT COUNT(*) as count FROM reid_individuals').get() as { count: number }).count;
+
+        // Recent activity - last 5 items from various tables
+        const recentGroups = db.prepare(`
+            SELECT 'group' as type, name, (SELECT COUNT(*) FROM images WHERE group_id = groups.id) as count, created_at as date 
+            FROM groups ORDER BY created_at DESC LIMIT 3
+        `).all() as { type: string; name: string; count: number; date: number }[];
+        
+        const recentBatches = db.prepare(`
+            SELECT 'classification' as type, name, (SELECT COUNT(*) FROM detections WHERE batch_id = detection_batches.id) as count, created_at as date 
+            FROM detection_batches ORDER BY created_at DESC LIMIT 3
+        `).all() as { type: string; name: string; count: number; date: number }[];
+        
+        const recentReid = db.prepare(`
+            SELECT 'reid' as type, name, (SELECT COUNT(*) FROM reid_individuals WHERE run_id = reid_runs.id) as count, created_at as date 
+            FROM reid_runs ORDER BY created_at DESC LIMIT 3
+        `).all() as { type: string; name: string; count: number; date: number }[];
+
+        const recentActivity = [...recentGroups, ...recentBatches, ...recentReid]
+            .sort((a, b) => b.date - a.date)
+            .slice(0, 5);
+
+        return {
+            totalImages,
+            totalGroups,
+            totalDetections,
+            totalSpecies,
+            totalReidRuns,
+            totalIndividuals,
+            recentActivity
+        };
     }
 };

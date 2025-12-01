@@ -570,5 +570,39 @@ exports.DatabaseService = {
         const placeholders = imageIds.map(() => '?').join(',');
         const stmt = db.prepare(`SELECT * FROM images WHERE id IN (${placeholders})`);
         return stmt.all(...imageIds);
+    },
+    // Dashboard Stats
+    getDashboardStats: () => {
+        const totalImages = db.prepare('SELECT COUNT(*) as count FROM images').get().count;
+        const totalGroups = db.prepare('SELECT COUNT(*) as count FROM groups').get().count;
+        const totalDetections = db.prepare('SELECT COUNT(*) as count FROM detections').get().count;
+        const totalSpecies = db.prepare("SELECT COUNT(DISTINCT label) as count FROM detections WHERE label IS NOT NULL AND label != '' AND LOWER(label) != 'blank'").get().count;
+        const totalReidRuns = db.prepare('SELECT COUNT(*) as count FROM reid_runs').get().count;
+        const totalIndividuals = db.prepare('SELECT COUNT(*) as count FROM reid_individuals').get().count;
+        // Recent activity - last 5 items from various tables
+        const recentGroups = db.prepare(`
+            SELECT 'group' as type, name, (SELECT COUNT(*) FROM images WHERE group_id = groups.id) as count, created_at as date 
+            FROM groups ORDER BY created_at DESC LIMIT 3
+        `).all();
+        const recentBatches = db.prepare(`
+            SELECT 'classification' as type, name, (SELECT COUNT(*) FROM detections WHERE batch_id = detection_batches.id) as count, created_at as date 
+            FROM detection_batches ORDER BY created_at DESC LIMIT 3
+        `).all();
+        const recentReid = db.prepare(`
+            SELECT 'reid' as type, name, (SELECT COUNT(*) FROM reid_individuals WHERE run_id = reid_runs.id) as count, created_at as date 
+            FROM reid_runs ORDER BY created_at DESC LIMIT 3
+        `).all();
+        const recentActivity = [...recentGroups, ...recentBatches, ...recentReid]
+            .sort((a, b) => b.date - a.date)
+            .slice(0, 5);
+        return {
+            totalImages,
+            totalGroups,
+            totalDetections,
+            totalSpecies,
+            totalReidRuns,
+            totalIndividuals,
+            recentActivity
+        };
     }
 };

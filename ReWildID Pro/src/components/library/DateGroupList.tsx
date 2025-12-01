@@ -335,8 +335,8 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
 
             return (
                 <Box id={`group-${group.id}`} sx={{
-                    height: 48, // Fixed height prevents scroll jumps
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 4,
+                    height: 78, // Fixed height prevents scroll jumps (+24 for bottom margin)
+                    display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', px: 4, pt: 2.5,
                     '&:hover .collapse-arrow': { opacity: 1, transform: 'translateX(0)' },
                     '&:hover .group-menu-button': { opacity: 1 },
                     '&:hover .group-select-button': { opacity: 1 },
@@ -533,7 +533,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
     // Average item height for better Virtuoso estimation
     const avgItemHeight = useMemo(() => {
         const rowHeight = getRowHeight() + 16;
-        return Math.round((56 + 48 + rowHeight * 3) / 5);
+        return Math.round((56 + 72 + rowHeight * 3) / 5); // 56=date-header, 72=group-header
     }, [getRowHeight]);
 
     // Empty state - show header content so filter/search controls remain accessible

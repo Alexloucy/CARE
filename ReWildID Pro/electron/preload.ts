@@ -83,5 +83,6 @@ contextBridge.exposeInMainWorld('api', {
     getReidResults: (filter: any) => ipcRenderer.invoke('getReidResults', filter),
     updateReidIndividualName: (id: number, displayName: string) => ipcRenderer.invoke('updateReidIndividualName', id, displayName),
     updateReidIndividualColor: (id: number, color: string) => ipcRenderer.invoke('updateReidIndividualColor', id, color),
-    mergeReidIndividuals: (targetId: number, sourceIds: number[]) => ipcRenderer.invoke('mergeReidIndividuals', targetId, sourceIds)
+    mergeReidIndividuals: (targetId: number, sourceIds: number[]) => ipcRenderer.invoke('mergeReidIndividuals', targetId, sourceIds),
+    getDashboardStats: () => ipcRenderer.invoke('getDashboardStats')
 });
