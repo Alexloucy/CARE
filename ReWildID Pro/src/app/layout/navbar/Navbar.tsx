@@ -5,7 +5,7 @@ import {
     Sidebar,
     Sun,
     Moon,
-    Bell,
+    ListChecks,
     CaretLeft,
     CaretRight,
     SignOut,
@@ -161,7 +161,7 @@ export default function Navbar({
                     xs: '100%',
                     md: `calc(100% - ${leftSidebarWidth}px - ${rightSidebarWidth}px)`
                 },
-                transition: (theme: import('@mui/material').Theme) => theme.transitions.create(['width', 'left', 'right'], {
+                transition: (theme) => theme.transitions.create(['width', 'left', 'right'], {
                     easing: theme.transitions.easing.sharp,
                     duration: theme.transitions.duration.enteringScreen,
                 }),
@@ -281,7 +281,7 @@ export default function Navbar({
                         </IconButton>
                     </Tooltip>
 
-                    <Tooltip title="Notifications">
+                    <Tooltip title="Tasks">
                         <IconButton
                             color="inherit"
                             size="small"
@@ -304,7 +304,7 @@ export default function Navbar({
                                     } 
                                 }}
                             >
-                                <Bell size={20} />
+                                <ListChecks size={20} />
                             </Badge>
                         </IconButton>
                     </Tooltip>
@@ -319,16 +319,6 @@ export default function Navbar({
                             <Gear size={20} />
                         </IconButton>
                     </Tooltip>
-                    <Tooltip title="Sign Out">
-                        <IconButton
-                            color="inherit"
-                            size="small"
-                            onClick={() => navigate('/auth')}
-                        >
-                            <SignOut size={20} />
-                        </IconButton>
-                    </Tooltip>
-
                     {inElectron && (
                         <Box sx={{ display: 'flex', gap: 0.5, ml: 1, WebkitAppRegion: 'no-drag' }}>
                             <Tooltip title="Minimize">

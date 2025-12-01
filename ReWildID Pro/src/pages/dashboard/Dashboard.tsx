@@ -1,8 +1,7 @@
-import { Box, Typography, alpha, useTheme, Skeleton } from '@mui/material';
-import { useState, useEffect } from 'react';
+import { Box, Typography, alpha, useTheme, Skeleton, Tooltip } from '@mui/material';
+import { useState, useEffect, useMemo } from 'react';
 import { 
-    Images, Sparkle, Fingerprint, FolderSimple, 
-    ListBullets, Clock, FolderOpen, Tag
+    Sparkle, Fingerprint, Clock, FolderOpen, ChartDonut, TrendUp, CalendarBlank, Users
 } from '@phosphor-icons/react';
 
 interface DashboardStats {
@@ -13,55 +12,41 @@ interface DashboardStats {
     totalReidRuns: number;
     totalIndividuals: number;
     recentActivity: { type: string; name: string; count: number; date: number }[];
+    speciesBreakdown?: { label: string; count: number }[];
+    individualsPerSpecies?: { species: string; count: number }[];
+    detectionTimeline?: { month: string; count: number }[];
+    groupDistribution?: { name: string; images: number; detections: number }[];
 }
 
-// Stat Card Component
+// Card backgrounds from neurolink theme
+const CARD_BG_LIGHT = '#F7F9FB';
+const CARD_BG_DARK = '#1e1e24';
+
+// Clean Stat Card - compact design
 const StatCard = ({ 
     title, 
     value, 
-    icon: Icon, 
-    color,
     loading 
 }: { 
     title: string; 
     value: number | string; 
-    icon: React.ElementType; 
-    color: string;
     loading?: boolean;
 }) => {
+    const theme = useTheme();
     return (
         <Box sx={{ 
-            p: 2.5, 
-            borderRadius: 3, 
-            bgcolor: alpha(color, 0.08),
-            border: `1px solid ${alpha(color, 0.2)}`,
-            flex: 1,
-            minWidth: 140,
-            transition: 'all 0.2s',
-            '&:hover': {
-                bgcolor: alpha(color, 0.12),
-                borderColor: alpha(color, 0.3)
-            }
+            p: 2,
+            borderRadius: '16px',
+            bgcolor: theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT,
+            transition: 'background-color 0.2s',
         }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
-                <Typography variant="body2" color="text.secondary" fontWeight={500}>
-                    {title}
-                </Typography>
-                <Box sx={{ 
-                    p: 0.75, 
-                    borderRadius: 1.5, 
-                    bgcolor: alpha(color, 0.15),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                }}>
-                    <Icon size={18} weight="duotone" color={color} />
-                </Box>
-            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5, fontWeight: 500 }}>
+                {title}
+            </Typography>
             {loading ? (
-                <Skeleton variant="text" width={60} height={40} />
+                <Skeleton variant="text" width={60} height={32} />
             ) : (
-                <Typography variant="h4" fontWeight={700} sx={{ color }}>
+                <Typography variant="h5" fontWeight={600} color="text.primary">
                     {typeof value === 'number' ? value.toLocaleString() : value}
                 </Typography>
             )}
@@ -69,7 +54,521 @@ const StatCard = ({
     );
 };
 
-// Activity Item Component
+// Custom Ring/Donut Chart Component with hover effects
+const RingChart = ({ 
+    data, 
+    size = 180,
+    loading 
+}: { 
+    data: { label: string; count: number; color: string }[];
+    size?: number;
+    loading?: boolean;
+}) => {
+    const theme = useTheme();
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+    const [animationProgress, setAnimationProgress] = useState(0);
+    
+    const total = data.reduce((sum, d) => sum + d.count, 0);
+    const strokeWidth = 24;
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    
+    // Animation on mount
+    useEffect(() => {
+        const timer = setTimeout(() => setAnimationProgress(1), 100);
+        return () => clearTimeout(timer);
+    }, [data]);
+    
+    if (loading || total === 0) {
+        return (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <Box sx={{ 
+                    width: size, 
+                    height: size, 
+                    borderRadius: '50%', 
+                    border: `${strokeWidth}px solid ${alpha(theme.palette.text.primary, 0.05)}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }}>
+                    {loading ? (
+                        <Skeleton variant="circular" width={size - strokeWidth * 2} height={size - strokeWidth * 2} />
+                    ) : (
+                        <Typography variant="body2" color="text.secondary">No data</Typography>
+                    )}
+                </Box>
+            </Box>
+        );
+    }
+    
+    let currentOffset = 0;
+    const segments = data.map((segment, idx) => {
+        const segmentLength = (segment.count / total) * circumference * animationProgress;
+        const offset = currentOffset;
+        currentOffset += segmentLength;
+        return { ...segment, segmentLength, offset, idx };
+    });
+    
+    const hoveredData = hoveredIndex !== null ? data[hoveredIndex] : null;
+    
+    return (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, overflow: 'visible' }}>
+            <Box sx={{ position: 'relative', width: size + 12, height: size + 12, p: '6px', overflow: 'visible' }}>
+                <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
+                    {segments.map((segment) => (
+                        <circle
+                            key={segment.idx}
+                            cx={size / 2}
+                            cy={size / 2}
+                            r={radius}
+                            fill="none"
+                            stroke={segment.color}
+                            strokeWidth={hoveredIndex === segment.idx ? strokeWidth + 6 : strokeWidth}
+                            strokeDasharray={`${segment.segmentLength} ${circumference - segment.segmentLength}`}
+                            strokeDashoffset={-segment.offset}
+                            strokeLinecap="round"
+                            style={{ 
+                                transition: 'stroke-dasharray 0.8s ease-out, stroke-width 0.2s ease',
+                                cursor: 'pointer',
+                                opacity: hoveredIndex !== null && hoveredIndex !== segment.idx ? 0.4 : 1,
+                                filter: hoveredIndex === segment.idx ? 'brightness(1.1)' : 'none'
+                            }}
+                            onMouseEnter={() => setHoveredIndex(segment.idx)}
+                            onMouseLeave={() => setHoveredIndex(null)}
+                        />
+                    ))}
+                </svg>
+                <Box sx={{ 
+                    position: 'absolute', 
+                    top: '50%', 
+                    left: '50%', 
+                    transform: 'translate(-50%, -50%)',
+                    textAlign: 'center',
+                    transition: 'all 0.2s ease'
+                }}>
+                    {hoveredData ? (
+                        <>
+                            <Typography variant="h5" fontWeight={600}>{hoveredData.count}</Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ 
+                                maxWidth: 80, 
+                                display: 'block',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                            }}>
+                                {hoveredData.label}
+                            </Typography>
+                        </>
+                    ) : (
+                        <>
+                            <Typography variant="h5" fontWeight={600}>{total}</Typography>
+                            <Typography variant="caption" color="text.secondary">Total</Typography>
+                        </>
+                    )}
+                </Box>
+            </Box>
+            
+            {/* Legend */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {data.slice(0, 6).map((item, idx) => (
+                    <Box 
+                        key={idx} 
+                        sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 1.5,
+                            p: 0.5,
+                            borderRadius: 1,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            bgcolor: hoveredIndex === idx ? alpha(item.color, 0.15) : 'transparent',
+                            '&:hover': { bgcolor: alpha(item.color, 0.15) }
+                        }}
+                        onMouseEnter={() => setHoveredIndex(idx)}
+                        onMouseLeave={() => setHoveredIndex(null)}
+                    >
+                        <Box sx={{ 
+                            width: 10, 
+                            height: 10, 
+                            borderRadius: '50%', 
+                            bgcolor: item.color, 
+                            flexShrink: 0,
+                            transition: 'transform 0.2s ease',
+                            transform: hoveredIndex === idx ? 'scale(1.3)' : 'scale(1)'
+                        }} />
+                        <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 100 }}>
+                            {item.label}
+                        </Typography>
+                        <Typography variant="body2" fontWeight={500} sx={{ ml: 'auto' }}>
+                            {((item.count / total) * 100).toFixed(0)}%
+                        </Typography>
+                    </Box>
+                ))}
+            </Box>
+        </Box>
+    );
+};
+
+// Animated Bar Chart (horizontal) with hover effects
+const BarChart = ({ 
+    data, 
+    loading 
+}: { 
+    data: { label: string; value: number }[];
+    loading?: boolean;
+}) => {
+    const theme = useTheme();
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+    const [animationProgress, setAnimationProgress] = useState(0);
+    const maxValue = Math.max(...data.map(d => d.value), 1);
+    
+    // Animation on mount
+    useEffect(() => {
+        const timer = setTimeout(() => setAnimationProgress(1), 100);
+        return () => clearTimeout(timer);
+    }, [data]);
+    
+    if (loading) {
+        return (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {[1, 2, 3, 4].map(i => (
+                    <Skeleton key={i} variant="rounded" height={32} />
+                ))}
+            </Box>
+        );
+    }
+    
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            {data.map((item, idx) => {
+                const isHovered = hoveredIndex === idx;
+                const color = CHART_COLORS[idx % CHART_COLORS.length];
+                return (
+                    <Tooltip 
+                        key={idx}
+                        title={`${item.label}: ${item.value.toLocaleString()}`}
+                        arrow
+                        placement="top"
+                    >
+                        <Box 
+                            sx={{ 
+                                cursor: 'pointer',
+                                p: 0.5,
+                                mx: -0.5,
+                                borderRadius: 1,
+                                transition: 'background-color 0.2s ease',
+                                bgcolor: isHovered ? alpha(color, 0.1) : 'transparent'
+                            }}
+                            onMouseEnter={() => setHoveredIndex(idx)}
+                            onMouseLeave={() => setHoveredIndex(null)}
+                        >
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                <Typography 
+                                    variant="body2" 
+                                    color={isHovered ? 'text.primary' : 'text.secondary'}
+                                    sx={{ transition: 'color 0.2s ease', fontWeight: isHovered ? 500 : 400 }}
+                                >
+                                    {item.label}
+                                </Typography>
+                                <Typography variant="body2" fontWeight={500}>{item.value.toLocaleString()}</Typography>
+                            </Box>
+                            <Box sx={{ 
+                                height: isHovered ? 10 : 8, 
+                                borderRadius: 4, 
+                                bgcolor: alpha(theme.palette.text.primary, 0.06),
+                                overflow: 'hidden',
+                                transition: 'height 0.2s ease'
+                            }}>
+                                <Box sx={{ 
+                                    height: '100%', 
+                                    width: `${(item.value / maxValue) * 100 * animationProgress}%`,
+                                    bgcolor: color,
+                                    borderRadius: 4,
+                                    transition: 'width 0.8s ease-out, filter 0.2s ease',
+                                    filter: isHovered ? 'brightness(1.15)' : 'none'
+                                }} />
+                            </Box>
+                        </Box>
+                    </Tooltip>
+                );
+            })}
+        </Box>
+    );
+};
+
+// Timeline Chart - Detection activity over time (SVG line chart)
+const TimelineChart = ({ 
+    data, 
+    loading 
+}: { 
+    data: { month: string; count: number }[];
+    loading?: boolean;
+}) => {
+    const theme = useTheme();
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+    const [animationProgress, setAnimationProgress] = useState(0);
+    
+    useEffect(() => {
+        const timer = setTimeout(() => setAnimationProgress(1), 100);
+        return () => clearTimeout(timer);
+    }, [data]);
+    
+    if (loading || data.length === 0) {
+        return (
+            <Box sx={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {loading ? <Skeleton variant="rounded" width="100%" height={120} /> : (
+                    <Typography variant="body2" color="text.secondary">No timeline data available</Typography>
+                )}
+            </Box>
+        );
+    }
+    
+    const maxValue = Math.max(...data.map(d => d.count), 1);
+    const width = 360;
+    const height = 140;
+    const padding = { top: 20, right: 20, bottom: 30, left: 40 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+    
+    const points = data.map((d, i) => ({
+        x: padding.left + (i / Math.max(data.length - 1, 1)) * chartWidth,
+        y: padding.top + chartHeight - (d.count / maxValue) * chartHeight * animationProgress,
+        ...d,
+        idx: i
+    }));
+    
+    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+    const areaPath = `${linePath} L ${points[points.length - 1]?.x || 0} ${padding.top + chartHeight} L ${padding.left} ${padding.top + chartHeight} Z`;
+    
+    const formatMonth = (m: string) => {
+        const [year, month] = m.split('-');
+        const date = new Date(parseInt(year), parseInt(month) - 1);
+        return date.toLocaleDateString('en-US', { month: 'short' });
+    };
+    
+    return (
+        <Box sx={{ position: 'relative', overflow: 'visible', pt: 4, mt: -2 }}>
+            <svg width={width} height={height} style={{ overflow: 'visible' }}>
+                {/* Grid lines */}
+                {[0, 0.25, 0.5, 0.75, 1].map((v, i) => (
+                    <line
+                        key={i}
+                        x1={padding.left}
+                        y1={padding.top + chartHeight * (1 - v)}
+                        x2={width - padding.right}
+                        y2={padding.top + chartHeight * (1 - v)}
+                        stroke={alpha(theme.palette.text.primary, 0.06)}
+                        strokeDasharray="4 4"
+                    />
+                ))}
+                
+                {/* Area fill */}
+                <path
+                    d={areaPath}
+                    fill={`url(#areaGradient-${theme.palette.mode})`}
+                    style={{ transition: 'all 0.8s ease-out' }}
+                />
+                
+                {/* Line */}
+                <path
+                    d={linePath}
+                    fill="none"
+                    stroke={CHART_COLORS[0]}
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ transition: 'all 0.8s ease-out' }}
+                />
+                
+                {/* Data points */}
+                {points.map((p) => (
+                    <g key={p.idx}>
+                        <circle
+                            cx={p.x}
+                            cy={p.y}
+                            r={hoveredIndex === p.idx ? 6 : 4}
+                            fill={theme.palette.background.paper}
+                            stroke={CHART_COLORS[0]}
+                            strokeWidth={2}
+                            style={{ 
+                                cursor: 'pointer', 
+                                transition: 'all 0.2s ease',
+                                filter: hoveredIndex === p.idx ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' : 'none'
+                            }}
+                            onMouseEnter={() => setHoveredIndex(p.idx)}
+                            onMouseLeave={() => setHoveredIndex(null)}
+                        />
+                        {/* Tooltip on hover */}
+                        {hoveredIndex === p.idx && (
+                            <g>
+                                <rect
+                                    x={p.x - 50}
+                                    y={p.y - 35}
+                                    width={100}
+                                    height={24}
+                                    rx={6}
+                                    fill={alpha(theme.palette.text.primary, 0.9)}
+                                />
+                                <text
+                                    x={p.x}
+                                    y={p.y - 18}
+                                    textAnchor="middle"
+                                    fill={theme.palette.background.paper}
+                                    fontSize={12}
+                                    fontWeight={500}
+                                >
+                                    {p.count} detections
+                                </text>
+                            </g>
+                        )}
+                    </g>
+                ))}
+                
+                {/* X-axis labels */}
+                {points.map((p) => (
+                    <text
+                        key={`label-${p.idx}`}
+                        x={p.x}
+                        y={height - 8}
+                        textAnchor="middle"
+                        fill={alpha(theme.palette.text.secondary, 0.8)}
+                        fontSize={11}
+                    >
+                        {formatMonth(p.month)}
+                    </text>
+                ))}
+                
+                {/* Gradient definition */}
+                <defs>
+                    <linearGradient id={`areaGradient-${theme.palette.mode}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor={CHART_COLORS[0]} stopOpacity={0.3} />
+                        <stop offset="100%" stopColor={CHART_COLORS[0]} stopOpacity={0.02} />
+                    </linearGradient>
+                </defs>
+            </svg>
+        </Box>
+    );
+};
+
+// Population Bar Chart - Individuals per species (vertical bars)
+const PopulationChart = ({ 
+    data, 
+    loading 
+}: { 
+    data: { species: string; count: number }[];
+    loading?: boolean;
+}) => {
+    const theme = useTheme();
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+    const [animationProgress, setAnimationProgress] = useState(0);
+    
+    useEffect(() => {
+        const timer = setTimeout(() => setAnimationProgress(1), 100);
+        return () => clearTimeout(timer);
+    }, [data]);
+    
+    if (loading || data.length === 0) {
+        return (
+            <Box sx={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {loading ? <Skeleton variant="rounded" width="100%" height={120} /> : (
+                    <Typography variant="body2" color="text.secondary">No individuals tracked yet</Typography>
+                )}
+            </Box>
+        );
+    }
+    
+    const maxValue = Math.max(...data.map(d => d.count), 1);
+    const width = 360;
+    const height = 160;
+    const padding = { top: 20, right: 10, bottom: 40, left: 10 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+    const barWidth = Math.min(40, chartWidth / data.length - 12);
+    const gap = (chartWidth - barWidth * data.length) / (data.length + 1);
+    
+    return (
+        <Box sx={{ position: 'relative' }}>
+            <svg width={width} height={height} style={{ overflow: 'visible' }}>
+                {/* Grid lines */}
+                {[0, 0.5, 1].map((v, i) => (
+                    <line
+                        key={i}
+                        x1={padding.left}
+                        y1={padding.top + chartHeight * (1 - v)}
+                        x2={width - padding.right}
+                        y2={padding.top + chartHeight * (1 - v)}
+                        stroke={alpha(theme.palette.text.primary, 0.06)}
+                        strokeDasharray="4 4"
+                    />
+                ))}
+                
+                {/* Bars */}
+                {data.map((d, i) => {
+                    const barHeight = (d.count / maxValue) * chartHeight * animationProgress;
+                    const x = padding.left + gap + i * (barWidth + gap);
+                    const y = padding.top + chartHeight - barHeight;
+                    const isHovered = hoveredIndex === i;
+                    const color = CHART_COLORS[i % CHART_COLORS.length];
+                    
+                    return (
+                        <g key={i}>
+                            <rect
+                                x={x}
+                                y={y}
+                                width={barWidth}
+                                height={barHeight}
+                                rx={6}
+                                fill={color}
+                                style={{ 
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s ease',
+                                    filter: isHovered ? 'brightness(1.15) drop-shadow(0 4px 8px rgba(0,0,0,0.15))' : 'none',
+                                    transform: isHovered ? 'translateY(-2px)' : 'none',
+                                    transformOrigin: `${x + barWidth/2}px ${y + barHeight}px`
+                                }}
+                                onMouseEnter={() => setHoveredIndex(i)}
+                                onMouseLeave={() => setHoveredIndex(null)}
+                            />
+                            
+                            {/* Value label */}
+                            <text
+                                x={x + barWidth / 2}
+                                y={y - 6}
+                                textAnchor="middle"
+                                fill={theme.palette.text.primary}
+                                fontSize={12}
+                                fontWeight={600}
+                                style={{ 
+                                    opacity: animationProgress,
+                                    transition: 'opacity 0.3s ease 0.5s'
+                                }}
+                            >
+                                {d.count}
+                            </text>
+                            
+                            {/* Species label */}
+                            <text
+                                x={x + barWidth / 2}
+                                y={height - 8}
+                                textAnchor="middle"
+                                fill={isHovered ? theme.palette.text.primary : alpha(theme.palette.text.secondary, 0.8)}
+                                fontSize={10}
+                                style={{ 
+                                    transition: 'fill 0.2s ease',
+                                    fontWeight: isHovered ? 500 : 400
+                                }}
+                            >
+                                {d.species.length > 8 ? d.species.slice(0, 7) + '…' : d.species}
+                            </text>
+                        </g>
+                    );
+                })}
+            </svg>
+        </Box>
+    );
+};
+
+// Activity Item Component - cleaner design
 const ActivityItem = ({ 
     type, 
     name, 
@@ -82,24 +581,24 @@ const ActivityItem = ({
     date: number;
 }) => {
     const theme = useTheme();
-    const typeConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-        group: { icon: FolderOpen, color: '#4285F4', label: 'Uploaded' },
-        classification: { icon: Sparkle, color: '#9C27B0', label: 'Classified' },
-        reid: { icon: Fingerprint, color: '#FF6B6B', label: 'Re-identified' }
+    const typeConfig: Record<string, { icon: React.ElementType; label: string }> = {
+        group: { icon: FolderOpen, label: 'Uploaded' },
+        classification: { icon: Sparkle, label: 'Classified' },
+        reid: { icon: Fingerprint, label: 'Re-identified' }
     };
     const config = typeConfig[type] || typeConfig.group;
     const Icon = config.icon;
     
     const formatDate = (ts: number) => {
-        const date = new Date(ts);
+        const d = new Date(ts);
         const now = new Date();
-        const diff = now.getTime() - date.getTime();
+        const diff = now.getTime() - d.getTime();
         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
         
         if (days === 0) return 'Today';
         if (days === 1) return 'Yesterday';
         if (days < 7) return `${days} days ago`;
-        return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
     };
 
     return (
@@ -107,20 +606,20 @@ const ActivityItem = ({
             display: 'flex', 
             alignItems: 'center', 
             gap: 2, 
-            p: 1.5, 
-            borderRadius: 2,
-            '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.03) }
+            py: 1.5,
+            borderBottom: `1px solid ${theme.palette.divider}`,
+            '&:last-child': { borderBottom: 'none' }
         }}>
             <Box sx={{ 
                 p: 1, 
                 borderRadius: 2, 
-                bgcolor: alpha(config.color, 0.1),
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
                 display: 'flex'
             }}>
-                <Icon size={20} weight="duotone" color={config.color} />
+                <Icon size={18} weight="duotone" color={theme.palette.primary.main} />
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="body2" fontWeight={600} noWrap>{name}</Typography>
+                <Typography variant="body2" fontWeight={500} noWrap>{name}</Typography>
                 <Typography variant="caption" color="text.secondary">
                     {config.label} • {count} item{count !== 1 ? 's' : ''}
                 </Typography>
@@ -132,6 +631,16 @@ const ActivityItem = ({
     );
 };
 
+// Chart colors from SnowUI design palette
+const CHART_COLORS = [
+    '#95A4FC', // Purple/Blue
+    '#BAEDBD', // Light Green
+    '#B1E3FF', // Light Blue
+    '#A8C5DA', // Gray Blue
+    '#A1E3CB', // Teal
+    '#FFB1C1', // Light Pink
+];
+
 export default function Dashboard() {
     const theme = useTheme();
     const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -141,8 +650,12 @@ export default function Dashboard() {
         const loadStats = async () => {
             try {
                 const res = await window.api.getDashboardStats();
+                console.log('[Dashboard] getDashboardStats response:', res);
                 if (res.ok && res.stats) {
+                    console.log('[Dashboard] Stats received:', res.stats);
                     setStats(res.stats);
+                } else {
+                    console.error('[Dashboard] getDashboardStats failed:', res.error);
                 }
             } catch (e) {
                 console.error('Failed to load dashboard stats:', e);
@@ -152,87 +665,146 @@ export default function Dashboard() {
         loadStats();
     }, []);
 
+    // Prepare species data for ring chart
+    const speciesChartData = useMemo(() => {
+        if (!stats?.speciesBreakdown || stats.speciesBreakdown.length === 0) {
+            // Fallback: create from totalSpecies if no breakdown
+            if (stats?.totalDetections && stats?.totalSpecies) {
+                return [
+                    { label: `${stats.totalSpecies} Species`, count: stats.totalDetections, color: CHART_COLORS[0] }
+                ];
+            }
+            return [];
+        }
+        return stats.speciesBreakdown.map((s, i) => ({
+            label: s.label,
+            count: s.count,
+            color: CHART_COLORS[i % CHART_COLORS.length]
+        }));
+    }, [stats]);
+
+    // Summary stats for bar chart
+    const summaryBarData = useMemo(() => [
+        { label: 'Images', value: stats?.totalImages || 0 },
+        { label: 'Detections', value: stats?.totalDetections || 0 },
+        { label: 'Individuals', value: stats?.totalIndividuals || 0 },
+        { label: 'ReID Runs', value: stats?.totalReidRuns || 0 },
+    ], [stats]);
+
     return (
-        <Box sx={{ pt: '64px', px: 3, pb: 3, minHeight: '100vh' }}>
+        <Box sx={{ pt: '64px', px: 3, pb: 4, minHeight: '100vh' }}>
             {/* Header */}
-            <Box sx={{ py: 2, mb: 2 }}>
+            <Box sx={{ py: 3, mb: 1 }}>
                 <Typography variant="h5" fontWeight={600}>Dashboard</Typography>
                 <Typography variant="body2" color="text.secondary">
-                    Welcome to RewildID Pro
+                    Wildlife monitoring and conservation insights (Dev Only, actual insightful charts to be discussed)
                 </Typography>
             </Box>
 
-            {/* Stats Grid */}
+            {/* Top Stats Row - 4 cards */}
             <Box sx={{ 
                 display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', 
+                gridTemplateColumns: 'repeat(4, 1fr)', 
                 gap: 2, 
-                mb: 4 
+                mb: 3 
             }}>
-                <StatCard 
-                    title="Total Images" 
-                    value={stats?.totalImages || 0} 
-                    icon={Images} 
-                    color="#4285F4"
-                    loading={loading}
-                />
-                <StatCard 
-                    title="Groups" 
-                    value={stats?.totalGroups || 0} 
-                    icon={FolderSimple} 
-                    color="#34A853"
-                    loading={loading}
-                />
-                <StatCard 
-                    title="Detections" 
-                    value={stats?.totalDetections || 0} 
-                    icon={ListBullets} 
-                    color="#9C27B0"
-                    loading={loading}
-                />
-                <StatCard 
-                    title="Species" 
-                    value={stats?.totalSpecies || 0} 
-                    icon={Tag} 
-                    color="#FF9800"
-                    loading={loading}
-                />
-                <StatCard 
-                    title="ReID Runs" 
-                    value={stats?.totalReidRuns || 0} 
-                    icon={Sparkle} 
-                    color="#E91E63"
-                    loading={loading}
-                />
-                <StatCard 
-                    title="Individuals" 
-                    value={stats?.totalIndividuals || 0} 
-                    icon={Fingerprint} 
-                    color="#FF6B6B"
-                    loading={loading}
-                />
+                <StatCard title="Total Images" value={stats?.totalImages || 0} loading={loading} />
+                <StatCard title="Detections" value={stats?.totalDetections || 0} loading={loading} />
+                <StatCard title="Individuals" value={stats?.totalIndividuals || 0} loading={loading} />
+                <StatCard title="Groups" value={stats?.totalGroups || 0} loading={loading} />
             </Box>
 
-            {/* Recent Activity */}
+            {/* Row 1 - Species Distribution & Population Tracking */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 3 }}>
+                {/* Species Distribution Ring Chart */}
+                <Box sx={{ 
+                    p: 3, 
+                    borderRadius: '16px', 
+                    bgcolor: theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT,
+                    overflow: 'visible',
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                        <ChartDonut size={20} weight="duotone" color={theme.palette.primary.main} />
+                        <Typography variant="subtitle1" fontWeight={600}>Species Distribution</Typography>
+                    </Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2, mt: -2 }}>
+                        Breakdown of detected species across all images
+                    </Typography>
+                    <RingChart data={speciesChartData} loading={loading} />
+                </Box>
+
+                {/* Individuals Per Species - Population Tracking */}
+                <Box sx={{ 
+                    p: 3, 
+                    borderRadius: '16px', 
+                    bgcolor: theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT,
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                        <Users size={20} weight="duotone" color={theme.palette.primary.main} />
+                        <Typography variant="subtitle1" fontWeight={600}>Population Tracking</Typography>
+                    </Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2, mt: -2 }}>
+                        Unique individuals identified per species
+                    </Typography>
+                    <PopulationChart data={stats?.individualsPerSpecies || []} loading={loading} />
+                </Box>
+            </Box>
+
+            {/* Row 2 - Detection Timeline & Data Summary */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 3 }}>
+                {/* Detection Activity Timeline */}
+                <Box sx={{ 
+                    p: 3, 
+                    borderRadius: '16px', 
+                    bgcolor: theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT,
+                    overflow: 'visible',
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                        <CalendarBlank size={20} weight="duotone" color={theme.palette.primary.main} />
+                        <Typography variant="subtitle1" fontWeight={600}>Detection Activity</Typography>
+                    </Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2, mt: -2 }}>
+                        Wildlife detections over the last 6 months
+                    </Typography>
+                    <TimelineChart data={stats?.detectionTimeline || []} loading={loading} />
+                </Box>
+
+                {/* Summary Bar Chart */}
+                <Box sx={{ 
+                    p: 3, 
+                    borderRadius: '16px', 
+                    bgcolor: theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT,
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                        <TrendUp size={20} weight="duotone" color={theme.palette.primary.main} />
+                        <Typography variant="subtitle1" fontWeight={600}>Data Summary</Typography>
+                    </Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2, mt: -2 }}>
+                        Overview of processed wildlife data
+                    </Typography>
+                    <BarChart data={summaryBarData} loading={loading} />
+                </Box>
+            </Box>
+
+            {/* Bottom Section - Recent Activity */}
             <Box sx={{ 
                 p: 3, 
-                borderRadius: 3, 
-                border: `1px solid ${theme.palette.divider}`,
-                bgcolor: theme.palette.mode === 'light' ? '#F9F9F9' : theme.palette.background.paper
+                borderRadius: '16px', 
+                bgcolor: theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT,
             }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                    <Clock size={22} weight="duotone" />
-                    <Typography variant="h6" fontWeight={600}>Recent Activity</Typography>
+                    <Clock size={20} weight="duotone" color={theme.palette.primary.main} />
+                    <Typography variant="subtitle1" fontWeight={600}>Recent Activity</Typography>
                 </Box>
                 
                 {loading ? (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                         {[1, 2, 3].map(i => (
-                            <Skeleton key={i} variant="rounded" height={56} />
+                            <Skeleton key={i} variant="rounded" height={52} />
                         ))}
                     </Box>
                 ) : stats?.recentActivity && stats.recentActivity.length > 0 ? (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Box>
                         {stats.recentActivity.map((activity, idx) => (
                             <ActivityItem 
                                 key={idx} 
@@ -245,7 +817,7 @@ export default function Dashboard() {
                     </Box>
                 ) : (
                     <Box sx={{ py: 4, textAlign: 'center' }}>
-                        <Clock size={48} weight="thin" color={theme.palette.text.disabled} />
+                        <Clock size={40} weight="thin" color={theme.palette.text.disabled} />
                         <Typography color="text.secondary" sx={{ mt: 1 }}>
                             No recent activity yet
                         </Typography>

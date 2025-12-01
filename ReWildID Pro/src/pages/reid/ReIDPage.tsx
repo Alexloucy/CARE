@@ -24,7 +24,7 @@ interface ReidIndividual { id: number; run_id: number; name: string; display_nam
 const SkeletonCard: React.FC = () => {
     const theme = useTheme();
     return (
-        <Box sx={{ borderRadius: 2, overflow: 'hidden', border: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.mode === 'light' ? '#F9F9F9' : theme.palette.background.paper }}>
+        <Box sx={{ borderRadius: 2, overflow: 'hidden', border: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.mode === 'light' ? '#F7F9FB' : theme.palette.background.paper }}>
             <Skeleton variant="rectangular" width="100%" height={130} animation="wave" />
             <Box sx={{ p: 1.25 }}>
                 <Skeleton variant="text" width="70%" height={20} animation="wave" />
@@ -39,7 +39,7 @@ const IndividualCard: React.FC<{ individual: ReidIndividual; onClick: () => void
     const firstDet = individual.detections[0];
     const thumbUrl = firstDet ? imageUrls.get(firstDet.image_preview_path || firstDet.image_path) : undefined;
     return (
-        <Box onClick={onClick} sx={{ cursor: 'pointer', borderRadius: 2, overflow: 'hidden', transition: 'all 0.15s', border: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.mode === 'light' ? '#F9F9F9' : theme.palette.background.paper, '&:hover': { borderColor: individual.color } }}>
+        <Box onClick={onClick} sx={{ cursor: 'pointer', borderRadius: 2, overflow: 'hidden', transition: 'all 0.15s', border: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.mode === 'light' ? '#F7F9FB' : theme.palette.background.paper, '&:hover': { borderColor: individual.color } }}>
             <Box sx={{ width: '100%', height: 130, bgcolor: theme.palette.mode === 'light' ? '#f0f0f0' : '#0a0a0a', position: 'relative', overflow: 'hidden' }}>
                 {thumbUrl ? <Box component="img" src={thumbUrl} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Fingerprint size={40} weight="thin" color={theme.palette.text.disabled} /></Box>}
                 <Box sx={{ position: 'absolute', top: 8, left: 8, width: 12, height: 12, borderRadius: '50%', bgcolor: individual.color, border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />

@@ -888,6 +888,9 @@ export const DatabaseService = {
         totalReidRuns: number;
         totalIndividuals: number;
         recentActivity: { type: string; name: string; count: number; date: number }[];
+        speciesBreakdown: { label: string; count: number }[];
+        individualsPerSpecies: { species: string; count: number }[];
+        detectionTimeline: { month: string; count: number }[];
     } => {
         const totalImages = (db.prepare('SELECT COUNT(*) as count FROM images').get() as { count: number }).count;
         const totalGroups = (db.prepare('SELECT COUNT(*) as count FROM groups').get() as { count: number }).count;
@@ -895,6 +898,37 @@ export const DatabaseService = {
         const totalSpecies = (db.prepare("SELECT COUNT(DISTINCT label) as count FROM detections WHERE label IS NOT NULL AND label != '' AND LOWER(label) != 'blank'").get() as { count: number }).count;
         const totalReidRuns = (db.prepare('SELECT COUNT(*) as count FROM reid_runs').get() as { count: number }).count;
         const totalIndividuals = (db.prepare('SELECT COUNT(*) as count FROM reid_individuals').get() as { count: number }).count;
+
+        // Species breakdown for ring chart
+        const speciesBreakdown = db.prepare(`
+            SELECT label, COUNT(*) as count 
+            FROM detections 
+            WHERE label IS NOT NULL AND label != '' AND LOWER(label) != 'blank'
+            GROUP BY label 
+            ORDER BY count DESC 
+            LIMIT 7
+        `).all() as { label: string; count: number }[];
+
+        // Individuals per species - get species from detections via reid_members
+        const individualsPerSpecies = db.prepare(`
+            SELECT d.label as species, COUNT(DISTINCT ri.id) as count
+            FROM reid_individuals ri
+            JOIN reid_members rm ON rm.individual_id = ri.id
+            JOIN detections d ON d.id = rm.detection_id
+            WHERE d.label IS NOT NULL AND d.label != '' AND LOWER(d.label) != 'blank'
+            GROUP BY d.label
+            ORDER BY count DESC
+            LIMIT 6
+        `).all() as { species: string; count: number }[];
+
+        // Detection timeline - last 6 months
+        const detectionTimeline = db.prepare(`
+            SELECT strftime('%Y-%m', datetime(created_at/1000, 'unixepoch')) as month, COUNT(*) as count
+            FROM detections
+            WHERE created_at > (strftime('%s', 'now', '-6 months') * 1000)
+            GROUP BY month
+            ORDER BY month ASC
+        `).all() as { month: string; count: number }[];
 
         // Recent activity - last 5 items from various tables
         const recentGroups = db.prepare(`
@@ -923,7 +957,10 @@ export const DatabaseService = {
             totalSpecies,
             totalReidRuns,
             totalIndividuals,
-            recentActivity
+            recentActivity,
+            speciesBreakdown,
+            individualsPerSpecies,
+            detectionTimeline
         };
     }
 };

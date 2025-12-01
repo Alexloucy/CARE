@@ -212,6 +212,9 @@ export interface ElectronApi {
             totalReidRuns: number;
             totalIndividuals: number;
             recentActivity: { type: string; name: string; count: number; date: number }[];
+            speciesBreakdown: { label: string; count: number }[];
+            individualsPerSpecies: { species: string; count: number }[];
+            detectionTimeline: { month: string; count: number }[];
         };
         error?: string;
     }>;
