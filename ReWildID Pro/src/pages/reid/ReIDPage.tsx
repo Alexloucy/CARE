@@ -328,7 +328,7 @@ const ReIDPage: React.FC = () => {
     const [fullImageUrls, setFullImageUrls] = useState<Map<string, string>>(new Map());
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     
-    // Read liquid glass settings from localStorage (shared with MediaExplorer)
+    // Read liquid glass settings from localStorage (shared with MediaExplorer and Settings page)
     const [useLiquidGlass, setUseLiquidGlass] = useState(() => {
         const saved = localStorage.getItem('mediaExplorer_useLiquidGlass');
         return saved === null ? true : saved === 'true';
@@ -337,8 +337,21 @@ const ReIDPage: React.FC = () => {
         const saved = localStorage.getItem('mediaExplorer_useRayTracedGlass');
         return saved === null ? true : saved === 'true';
     });
+
+    // Sync settings from Settings page
+    useEffect(() => {
+        const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === 'mediaExplorer_useLiquidGlass' && e.newValue !== null) {
+                setUseLiquidGlass(e.newValue === 'true');
+            } else if (e.key === 'mediaExplorer_useRayTracedGlass' && e.newValue !== null) {
+                setUseRayTracedGlass(e.newValue === 'true');
+            }
+        };
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
     
-    // Search and settings
+    // Search and settings menu
     const [searchQuery, setSearchQuery] = useState('');
     const [settingsMenuPos, setSettingsMenuPos] = useState<{ top: number; left: number } | null>(null);
 

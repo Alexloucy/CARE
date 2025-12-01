@@ -1,9 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Box, Typography, Modal, IconButton, Fade, Backdrop, Paper, useTheme } from '@mui/material';
 import { X, MagnifyingGlassPlus, MagnifyingGlassMinus, CaretLeft, CaretRight, Trash, Sparkle } from '@phosphor-icons/react';
-import { FileDetails, Detection } from '../types/electron';
+import { FileDetails, Detection, ReidInfoForImage } from '../types/electron';
 import { LiquidGlassOverlay } from './LiquidGlassOverlay';
 
+
+interface ReidInfoForDetection {
+    individualDisplayName: string;
+    individualColor: string;
+    species: string;
+}
 
 // DetectionBox Component with fluid animations (1:1 copy of AiModeButton behavior)
 interface DetectionBoxProps {
@@ -17,6 +23,7 @@ interface DetectionBoxProps {
     customPopupContent?: React.ReactNode;
     popupTitle?: string;
     popupIcon?: React.ReactNode;
+    reidResults?: ReidInfoForDetection[];
 }
 
 const DetectionBox: React.FC<DetectionBoxProps> = ({ 
@@ -28,7 +35,8 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
     onDelete,
     customPopupContent,
     popupTitle = "Detection Details",
-    popupIcon = <Sparkle size={18} weight="fill" color="#4285F4" />
+    popupIcon = <Sparkle size={18} weight="fill" color="#4285F4" />,
+    reidResults
 }) => {
     const [isHovered, setIsHovered] = useState(false);
     const boxRef = useRef<HTMLDivElement>(null);
@@ -133,6 +141,10 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                         border: `1px solid ${theme.palette.divider}`,
                     }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            {/* Classification Section */}
+                            <Typography variant="caption" fontWeight="600" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                Classification
+                            </Typography>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Typography variant="caption" color="text.secondary">Species</Typography>
                                 <Box sx={{ 
@@ -158,6 +170,36 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                                     {(detection.detection_confidence * 100).toFixed(1)}%
                                 </Typography>
                             </Box>
+                            
+                            {/* Re-identification Section */}
+                            {reidResults && reidResults.length > 0 && (
+                                <>
+                                    <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, mt: 1, pt: 1 }} />
+                                    <Typography variant="caption" fontWeight="600" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                        Re-identification
+                                    </Typography>
+                                    {reidResults.map((reid, idx) => (
+                                        <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Typography variant="caption" color="text.secondary">Individual</Typography>
+                                            <Box sx={{ 
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 0.5,
+                                                bgcolor: `${reid.individualColor}20`, 
+                                                color: reid.individualColor, 
+                                                px: 1, py: 0.2, 
+                                                borderRadius: 1,
+                                                fontSize: '0.75rem',
+                                                fontWeight: 600
+                                            }}>
+                                                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: reid.individualColor }} />
+                                                {reid.individualDisplayName}
+                                            </Box>
+                                        </Box>
+                                    ))}
+                                </>
+                            )}
+                            
                             {onDelete && (
                                 <IconButton
                                     size="small"
@@ -326,6 +368,10 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                                 </Box>
                                 
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                    {/* Classification Section */}
+                                    <Typography variant="caption" fontWeight="600" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                        Classification
+                                    </Typography>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <Typography variant="caption" color="text.secondary">Species</Typography>
                                         <Box sx={{ 
@@ -351,6 +397,36 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                                             {(detection.detection_confidence * 100).toFixed(1)}%
                                         </Typography>
                                     </Box>
+                                    
+                                    {/* Re-identification Section */}
+                                    {reidResults && reidResults.length > 0 && (
+                                        <>
+                                            <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, mt: 1, pt: 1 }} />
+                                            <Typography variant="caption" fontWeight="600" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                Re-identification
+                                            </Typography>
+                                            {reidResults.map((reid, idx) => (
+                                                <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <Typography variant="caption" color="text.secondary">Individual</Typography>
+                                                    <Box sx={{ 
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 0.5,
+                                                        bgcolor: `${reid.individualColor}20`, 
+                                                        color: reid.individualColor, 
+                                                        px: 1, py: 0.2, 
+                                                        borderRadius: 1,
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: 600
+                                                    }}>
+                                                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: reid.individualColor }} />
+                                                        {reid.individualDisplayName}
+                                                    </Box>
+                                                </Box>
+                                            ))}
+                                        </>
+                                    )}
+                                    
                                     {onDelete && (
                                         <IconButton
                                             size="small"
@@ -382,6 +458,7 @@ interface ImageModalProps {
     hasPrev?: boolean;
     onDelete?: () => void;
     detections?: Detection[];
+    reidResults?: ReidInfoForImage[];
     useLiquidGlass?: boolean;
     useRayTracedGlass?: boolean;
     onDeleteDetection?: (id: number) => void;
@@ -398,6 +475,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
     hasPrev,
     onDelete,
     detections,
+    reidResults,
     useLiquidGlass = true,
     useRayTracedGlass = true,
     onDeleteDetection
@@ -633,6 +711,11 @@ const ImageModal: React.FC<ImageModalProps> = ({
                                         }).filter(Boolean) as { bbox: { x: number; y: number; width: number; height: number }; label?: string; detection?: Detection }[] : []}
                                         containerWidth={imageDimensions.displayed.width}
                                         containerHeight={imageDimensions.displayed.height}
+                                        reidResults={reidResults?.map(r => ({
+                                            individualDisplayName: r.individualDisplayName,
+                                            individualColor: r.individualColor,
+                                            species: r.species
+                                        }))}
                                     />
                                 </Box>
                             ) : (
@@ -663,6 +746,11 @@ const ImageModal: React.FC<ImageModalProps> = ({
                                                 containerHeight={imageDimensions.displayed.height}
                                                 useLiquidGlass={useLiquidGlass}
                                                 onDelete={onDeleteDetection}
+                                                reidResults={reidResults?.map(r => ({
+                                                    individualDisplayName: r.individualDisplayName,
+                                                    individualColor: r.individualColor,
+                                                    species: r.species
+                                                }))}
                                             />
                                         );
                                     })}

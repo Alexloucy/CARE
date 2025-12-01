@@ -206,6 +206,42 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
         localStorage.setItem('mediaExplorer_showReidTags', showReidTags.toString());
     }, [gridItemSize, showFileNames, aspectRatio, useLiquidGlass, useRayTracedGlass, showSpeciesTags, showReidTags]);
 
+    // Sync settings from Settings page (storage event listener)
+    useEffect(() => {
+        const handleStorageChange = (e: StorageEvent) => {
+            if (!e.key?.startsWith('mediaExplorer_')) return;
+            const key = e.key.replace('mediaExplorer_', '');
+            const value = e.newValue;
+            if (value === null) return;
+
+            switch (key) {
+                case 'gridSize':
+                    setGridItemSize(parseInt(value, 10));
+                    break;
+                case 'showNames':
+                    setShowFileNames(value === 'true');
+                    break;
+                case 'aspectRatio':
+                    setAspectRatio(value);
+                    break;
+                case 'useLiquidGlass':
+                    setUseLiquidGlass(value === 'true');
+                    break;
+                case 'useRayTracedGlass':
+                    setUseRayTracedGlass(value === 'true');
+                    break;
+                case 'showSpeciesTags':
+                    setShowSpeciesTags(value === 'true');
+                    break;
+                case 'showReidTags':
+                    setShowReidTags(value === 'true');
+                    break;
+            }
+        };
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
+
     // Hotkey: ESC to exit selection mode
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -649,6 +685,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                     }
                 }}
                 detections={selectedImage?.image.detections}
+                reidResults={selectedImage?.image.reidResults}
                 useLiquidGlass={useLiquidGlass}
                 useRayTracedGlass={useRayTracedGlass}
                 onDeleteDetection={onDeleteDetection}

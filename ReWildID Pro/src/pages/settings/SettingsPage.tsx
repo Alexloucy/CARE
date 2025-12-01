@@ -1,0 +1,347 @@
+import React, { useState, useEffect } from 'react';
+import {
+    Box,
+    Container,
+    Typography,
+    Accordion,
+    AccordionSummary,
+    AccordionDetails,
+    Table,
+    TableBody,
+    TableRow,
+    TableCell,
+    TableContainer,
+    Slider,
+    ToggleButton,
+    ToggleButtonGroup,
+    IconButton,
+    Tooltip,
+    useTheme
+} from '@mui/material';
+import {
+    CaretDown,
+    GridFour,
+    Eye,
+    Sparkle,
+    Tag,
+    Fingerprint,
+    ArrowCounterClockwise,
+    Image as ImageIcon,
+    Cube,
+    TextT,
+    Drop
+} from '@phosphor-icons/react';
+import StyledSwitch from '../../components/StyledSwitch';
+
+// Settings item interface
+interface SettingsItem {
+    key: string;
+    label: string;
+    description?: string;
+    icon: JSX.Element;
+    section: 'display' | 'visual' | 'tags';
+    type: 'switch' | 'slider' | 'toggle';
+    options?: string[];
+    min?: number;
+    max?: number;
+    defaultValue?: any;
+}
+
+// All settings items configuration
+const settingsItems: SettingsItem[] = [
+    // Display Settings
+    {
+        key: 'gridSize',
+        label: 'Grid Size',
+        description: 'Adjust the size of image thumbnails in the library grid',
+        icon: <GridFour size={24} />,
+        section: 'display',
+        type: 'slider',
+        min: 100,
+        max: 715,
+        defaultValue: 180
+    },
+    {
+        key: 'aspectRatio',
+        label: 'Aspect Ratio',
+        description: 'Set the aspect ratio for image thumbnails',
+        icon: <ImageIcon size={24} />,
+        section: 'display',
+        type: 'toggle',
+        options: ['1/1', '4/3', '16/9', '9/16', '1.618/1', '1/1.618'],
+        defaultValue: '1.618/1'
+    },
+    {
+        key: 'showNames',
+        label: 'Show File Names',
+        description: 'Display file names below image thumbnails',
+        icon: <TextT size={24} />,
+        section: 'display',
+        type: 'switch',
+        defaultValue: false
+    },
+    // Visual Effects
+    {
+        key: 'useLiquidGlass',
+        label: 'Liquid Glass BBox',
+        description: 'Use liquid glass effect for detection bounding boxes',
+        icon: <Drop size={24} />,
+        section: 'visual',
+        type: 'switch',
+        defaultValue: true
+    },
+    {
+        key: 'useRayTracedGlass',
+        label: 'Ray-traced Glass',
+        description: 'Enable ray-traced rendering for liquid glass effect (requires Liquid Glass to be enabled)',
+        icon: <Cube size={24} />,
+        section: 'visual',
+        type: 'switch',
+        defaultValue: true
+    },
+    // Tags
+    {
+        key: 'showSpeciesTags',
+        label: 'Show Species Tags',
+        description: 'Display species classification tags on image thumbnails',
+        icon: <Tag size={24} />,
+        section: 'tags',
+        type: 'switch',
+        defaultValue: true
+    },
+    {
+        key: 'showReidTags',
+        label: 'Show Individual Tags',
+        description: 'Display re-identification individual name tags on image thumbnails',
+        icon: <Fingerprint size={24} />,
+        section: 'tags',
+        type: 'switch',
+        defaultValue: true
+    },
+];
+
+// Settings sections configuration
+const sections = [
+    {
+        id: 'display',
+        title: 'Display Settings',
+        description: 'Customize how images are displayed in the library',
+        icon: <Eye size={20} />
+    },
+    {
+        id: 'visual',
+        title: 'Visual Effects',
+        description: 'Configure visual effects for detection overlays',
+        icon: <Sparkle size={20} />
+    },
+    {
+        id: 'tags',
+        title: 'Tag Visibility',
+        description: 'Control which tags are shown on image thumbnails',
+        icon: <Tag size={20} />
+    },
+];
+
+const SettingsPage: React.FC = () => {
+    const theme = useTheme();
+
+    // Load all settings from localStorage
+    const [settings, setSettings] = useState<Record<string, any>>(() => {
+        const initial: Record<string, any> = {};
+        settingsItems.forEach(item => {
+            const storageKey = `mediaExplorer_${item.key}`;
+            const saved = localStorage.getItem(storageKey);
+            if (saved !== null) {
+                if (item.type === 'switch') {
+                    initial[item.key] = saved === 'true';
+                } else if (item.type === 'slider') {
+                    initial[item.key] = parseInt(saved, 10);
+                } else {
+                    initial[item.key] = saved;
+                }
+            } else {
+                initial[item.key] = item.defaultValue;
+            }
+        });
+        return initial;
+    });
+
+    // Persist settings to localStorage
+    useEffect(() => {
+        Object.entries(settings).forEach(([key, value]) => {
+            localStorage.setItem(`mediaExplorer_${key}`, value.toString());
+        });
+    }, [settings]);
+
+    // Update a single setting
+    const updateSetting = (key: string, value: any) => {
+        setSettings(prev => ({ ...prev, [key]: value }));
+    };
+
+    // Reset a single setting to default
+    const resetSetting = (key: string) => {
+        const item = settingsItems.find(i => i.key === key);
+        if (item) {
+            updateSetting(key, item.defaultValue);
+        }
+    };
+
+    // Render a setting row based on its type
+    const renderSettingRow = (item: SettingsItem) => {
+        const value = settings[item.key];
+        const isDisabled = item.key === 'useRayTracedGlass' && !settings['useLiquidGlass'];
+
+        return (
+            <TableRow key={item.key} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                <TableCell sx={{ width: 50, pr: 1, borderBottom: 'none', opacity: isDisabled ? 0.5 : 1 }}>
+                    {React.cloneElement(item.icon, { color: theme.palette.text.secondary })}
+                </TableCell>
+                <TableCell sx={{ borderBottom: 'none', opacity: isDisabled ? 0.5 : 1 }}>
+                    <Typography variant="body2" fontWeight="medium">
+                        {item.label}
+                    </Typography>
+                    {item.description && (
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25 }}>
+                            {item.description}
+                        </Typography>
+                    )}
+                </TableCell>
+                <TableCell align="right" sx={{ borderBottom: 'none', minWidth: item.type === 'toggle' ? 280 : 120 }}>
+                    {item.type === 'switch' && (
+                        <StyledSwitch
+                            checked={Boolean(value)}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateSetting(item.key, e.target.checked)}
+                            disabled={isDisabled}
+                            inputProps={{ 'aria-label': `${item.label} toggle` }}
+                        />
+                    )}
+                    {item.type === 'slider' && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Slider
+                                size="small"
+                                value={value}
+                                min={item.min}
+                                max={item.max}
+                                onChange={(_: Event, newValue: number | number[]) => updateSetting(item.key, newValue as number)}
+                                valueLabelDisplay="auto"
+                                valueLabelFormat={(v: number) => `${v}px`}
+                                sx={{ width: 150 }}
+                            />
+                            <Tooltip title="Reset to Default">
+                                <IconButton size="small" onClick={() => resetSetting(item.key)}>
+                                    <ArrowCounterClockwise size={14} />
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
+                    )}
+                    {item.type === 'toggle' && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <ToggleButtonGroup
+                                value={value}
+                                exclusive
+                                onChange={(_: React.MouseEvent<HTMLElement>, newValue: string | null) => newValue && updateSetting(item.key, newValue)}
+                                size="small"
+                            >
+                                {item.options?.map(opt => (
+                                    <ToggleButton 
+                                        key={opt} 
+                                        value={opt} 
+                                        sx={{ 
+                                            py: 0.5, 
+                                            px: 1.5,
+                                            fontSize: '0.75rem'
+                                        }}
+                                    >
+                                        {opt === '1.618/1' || opt === '1/1.618' ? 'Φ' : opt.replace('/', ':')}
+                                    </ToggleButton>
+                                ))}
+                            </ToggleButtonGroup>
+                            <Tooltip title="Reset to Default">
+                                <IconButton size="small" onClick={() => resetSetting(item.key)}>
+                                    <ArrowCounterClockwise size={14} />
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
+                    )}
+                </TableCell>
+            </TableRow>
+        );
+    };
+
+    return (
+        <Box sx={{ pt: '80px', minHeight: '100vh' }}>
+            <Container maxWidth="md" sx={{ pb: 4 }}>
+                {/* Page Title */}
+                <Typography variant="h4" fontWeight="bold" sx={{ mb: 3 }}>
+                    Settings
+                </Typography>
+
+                {/* Settings Sections */}
+                {sections.map(({ id, title, description }) => (
+                    <Accordion
+                        key={id}
+                        defaultExpanded
+                        disableGutters
+                        square
+                        elevation={0}
+                        sx={{
+                            mb: 2,
+                            border: `1px solid ${theme.palette.divider}`,
+                            borderRadius: 2.5,
+                            '&:before': { display: 'none' },
+                            overflow: 'hidden'
+                        }}
+                    >
+                        <AccordionSummary
+                            expandIcon={<CaretDown size={20} />}
+                            sx={{
+                                px: 2,
+                                minHeight: '56px',
+                                '& .MuiAccordionSummary-content': {
+                                    my: '12px'
+                                },
+                                '&.Mui-expanded': {
+                                    minHeight: '56px',
+                                    borderBottom: `1px solid ${theme.palette.divider}`
+                                }
+                            }}
+                        >
+                            <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', pr: 1 }}>
+                                <Typography variant="h6" fontWeight="600">
+                                    {title}
+                                </Typography>
+                                {description && (
+                                    <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{ mt: 0, lineHeight: 1.3 }}
+                                    >
+                                        {description}
+                                    </Typography>
+                                )}
+                            </Box>
+                        </AccordionSummary>
+                        <AccordionDetails sx={{ pt: 1, px: 2, pb: 2 }}>
+                            <TableContainer>
+                                <Table>
+                                    <TableBody>
+                                        {settingsItems
+                                            .filter(item => item.section === id)
+                                            .map(renderSettingRow)}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </AccordionDetails>
+                    </Accordion>
+                ))}
+
+                {/* Footer note */}
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 3, textAlign: 'center' }}>
+                    Settings are saved automatically and will persist across sessions.
+                </Typography>
+            </Container>
+        </Box>
+    );
+};
+
+export default SettingsPage;

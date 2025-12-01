@@ -268,12 +268,19 @@ function GlassRenderer({ imageUrl, targetBbox, containerWidth, containerHeight, 
   );
 }
 
+export interface ReidInfo {
+  individualDisplayName: string;
+  individualColor: string;
+  species: string;
+}
+
 export interface LiquidGlassOverlayProps {
   imageUrl: string;
   bboxes: { bbox: BBox; label?: string; detection?: Detection }[];
   containerWidth: number;
   containerHeight: number;
   customPopupContent?: React.ReactNode;
+  reidResults?: ReidInfo[];
 }
 
 export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
@@ -281,7 +288,8 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
   bboxes,
   containerWidth,
   containerHeight,
-  customPopupContent
+  customPopupContent,
+  reidResults
 }) => {
   const theme = useTheme();
   const [labelPosition, setLabelPosition] = useState({ x: containerWidth / 2, y: containerHeight / 2 });
@@ -396,6 +404,10 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
           >
             {customPopupContent ? customPopupContent : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {/* Classification Section */}
+                <Typography variant="caption" fontWeight="600" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Classification
+                </Typography>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography variant="caption" color="text.secondary">Species</Typography>
                   <Box sx={{ 
@@ -421,6 +433,35 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
                     {((detection?.detection_confidence ?? 0) * 100).toFixed(1)}%
                   </Typography>
                 </Box>
+                
+                {/* Re-identification Section */}
+                {reidResults && reidResults.length > 0 && (
+                  <>
+                    <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, mt: 1, pt: 1 }} />
+                    <Typography variant="caption" fontWeight="600" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Re-identification
+                    </Typography>
+                    {reidResults.map((reid, idx) => (
+                      <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" color="text.secondary">Individual</Typography>
+                        <Box sx={{ 
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          bgcolor: `${reid.individualColor}20`, 
+                          color: reid.individualColor, 
+                          px: 1, py: 0.2, 
+                          borderRadius: 1,
+                          fontSize: '0.75rem',
+                          fontWeight: 600
+                        }}>
+                          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: reid.individualColor }} />
+                          {reid.individualDisplayName}
+                        </Box>
+                      </Box>
+                    ))}
+                  </>
+                )}
               </Box>
             )}
           </Paper>
