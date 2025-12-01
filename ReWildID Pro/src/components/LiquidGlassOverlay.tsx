@@ -8,6 +8,8 @@
 import React, { useRef, useMemo, useEffect, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { Box, Paper, Typography, Fade, useTheme } from '@mui/material';
+import { Detection } from '../types/electron';
 
 // Module-level storage for animated position - persists across remounts
 const persistentAnimatedBbox = {
@@ -68,11 +70,13 @@ const fragmentShader = `
     vec2 fragCoord = vUv * uResolution;
     
     // Calculate bbox center and half-size (flip Y for shader coords)
+    // Add fixed pixel offset to push distortion edges outside the animal
+    float edgeOffset = 55.0; // Fixed 30px offset on each side
     vec2 bboxCenter = vec2(uBbox.x + uBbox.z * 0.5, uResolution.y - (uBbox.y + uBbox.w * 0.5));
-    vec2 bboxHalfSize = vec2(uBbox.z * 0.5, uBbox.w * 0.5);
+    vec2 bboxHalfSize = vec2(uBbox.z * 0.5 + edgeOffset, uBbox.w * 0.5 + edgeOffset);
     
     vec2 p = vec2(fragCoord.x, fragCoord.y);
-    float sd = sdfRoundedRect(bboxCenter, bboxHalfSize, p, uBorderRadius);
+    float sd = sdfRoundedRect(bboxCenter, bboxHalfSize, p, uBorderRadius + edgeOffset);
     
     // Outside the glass - fully transparent
     if (sd > 0.0) {
@@ -85,10 +89,10 @@ const fragmentShader = `
     // Incident ray (looking straight at screen)
     vec3 incident = vec3(0.0, 0.0, -1.0);
     
-    // Chromatic aberration - subtle IOR difference per channel
-    float index_r = 1.42;
+    // Chromatic aberration - more visible IOR difference per channel
+    float index_r = 1.35;
     float index_g = 1.45;
-    float index_b = 1.48;
+    float index_b = 1.55;
     
     vec3 refract_r = refract(incident, normal, 1.0 / index_r);
     vec3 refract_g = refract(incident, normal, 1.0 / index_g);
@@ -217,12 +221,15 @@ function GlassRenderer({ imageUrl, targetBbox, containerWidth, containerHeight, 
     const material = meshRef.current.material as THREE.ShaderMaterial;
     if (!material.uniforms) return;
     
-    // Smooth lerp toward target (0.08 = smooth sliding)
-    const lerp = 0.08;
-    persistentAnimatedBbox.x += (targetBbox.x - persistentAnimatedBbox.x) * lerp;
-    persistentAnimatedBbox.y += (targetBbox.y - persistentAnimatedBbox.y) * lerp;
-    persistentAnimatedBbox.width += (targetBbox.width - persistentAnimatedBbox.width) * lerp;
-    persistentAnimatedBbox.height += (targetBbox.height - persistentAnimatedBbox.height) * lerp;
+    // Only animate when we have a valid target (width/height > 0)
+    // This freezes position during image loading when bboxes is empty
+    if (targetBbox.width > 0 && targetBbox.height > 0) {
+      const lerp = 0.02; // Slower, smoother sliding
+      persistentAnimatedBbox.x += (targetBbox.x - persistentAnimatedBbox.x) * lerp;
+      persistentAnimatedBbox.y += (targetBbox.y - persistentAnimatedBbox.y) * lerp;
+      persistentAnimatedBbox.width += (targetBbox.width - persistentAnimatedBbox.width) * lerp;
+      persistentAnimatedBbox.height += (targetBbox.height - persistentAnimatedBbox.height) * lerp;
+    }
     
     // Report position for label
     onAnimatedPosition({ x: persistentAnimatedBbox.x, y: persistentAnimatedBbox.y });
@@ -263,7 +270,7 @@ function GlassRenderer({ imageUrl, targetBbox, containerWidth, containerHeight, 
 
 export interface LiquidGlassOverlayProps {
   imageUrl: string;
-  bboxes: { bbox: BBox; label?: string }[];
+  bboxes: { bbox: BBox; label?: string; detection?: Detection }[];
   containerWidth: number;
   containerHeight: number;
 }
@@ -274,11 +281,18 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
   containerWidth,
   containerHeight
 }) => {
+  const theme = useTheme();
   const [labelPosition, setLabelPosition] = useState({ x: containerWidth / 2, y: containerHeight / 2 });
+  const [isHovered, setIsHovered] = useState(false);
 
   // Get first bbox as target (for now, single detection)
-  const targetBbox = bboxes[0]?.bbox || { x: containerWidth / 2 - 150, y: containerHeight / 2 - 100, width: 300, height: 200 };
+  // When bboxes is empty (during image loading), use 0-size target so animation freezes
+  const targetBbox = bboxes[0]?.bbox || { x: 0, y: 0, width: 0, height: 0 };
   const label = bboxes[0]?.label;
+  const detection = bboxes[0]?.detection;
+  
+  // Edge offset matches shader (50px)
+  const edgeOffset = 55;
 
   return (
     <div
@@ -314,13 +328,31 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
         />
       </Canvas>
 
-      {/* Label rendered in HTML for crisp text */}
+      {/* Hover area - invisible clickable region over the glass */}
+      {targetBbox.width > 0 && (
+        <Box
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          sx={{
+            position: 'absolute',
+            left: labelPosition.x - edgeOffset,
+            top: labelPosition.y - edgeOffset,
+            width: targetBbox.width + edgeOffset * 2,
+            height: targetBbox.height + edgeOffset * 2,
+            pointerEvents: 'auto',
+            cursor: 'pointer',
+            borderRadius: '30px',
+          }}
+        />
+      )}
+
+      {/* Label rendered in HTML for crisp text - offset by edge expansion */}
       {label && (
         <div
           style={{
             position: 'absolute',
-            left: labelPosition.x + 8,
-            top: labelPosition.y - 32,
+            left: labelPosition.x - 42, // Adjust for 50px edge offset
+            top: labelPosition.y - 82, // Adjust for 50px edge offset
             padding: '4px 12px',
             background: 'rgba(255, 255, 255, 0.2)',
             backdropFilter: 'blur(12px)',
@@ -337,6 +369,58 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
         >
           {label}
         </div>
+      )}
+
+      {/* Info popup on hover */}
+      {detection && (
+        <Fade in={isHovered}>
+          <Paper
+            sx={{
+              position: 'absolute',
+              left: labelPosition.x + targetBbox.width + edgeOffset + 16,
+              top: labelPosition.y - edgeOffset,
+              width: 240,
+              p: 2,
+              bgcolor: theme.palette.mode === 'dark' ? 'rgba(30, 30, 30, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+              backdropFilter: 'blur(12px)',
+              borderRadius: 3,
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+              border: `1px solid ${theme.palette.divider}`,
+              pointerEvents: 'auto',
+              zIndex: 20,
+            }}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          >
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="caption" color="text.secondary">Species</Typography>
+                <Box sx={{ 
+                  bgcolor: 'rgba(66, 133, 244, 0.1)', 
+                  color: '#4285F4', 
+                  px: 1, py: 0.2, 
+                  borderRadius: 1,
+                  fontSize: '0.75rem',
+                  fontWeight: 600
+                }}>
+                  {detection.label}
+                </Box>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption" color="text.secondary">Confidence</Typography>
+                <Typography variant="caption" fontWeight="600" sx={{ fontFamily: 'monospace' }}>
+                  {(detection.confidence * 100).toFixed(1)}%
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption" color="text.secondary">Detection Score</Typography>
+                <Typography variant="caption" fontWeight="600" sx={{ fontFamily: 'monospace' }}>
+                  {(detection.detection_confidence * 100).toFixed(1)}%
+                </Typography>
+              </Box>
+            </Box>
+          </Paper>
+        </Fade>
       )}
     </div>
   );

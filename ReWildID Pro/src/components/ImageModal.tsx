@@ -138,7 +138,7 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                         {onDelete && (
                             <IconButton
                                 size="small"
-                                onClick={(e) => { e.stopPropagation(); onDelete(detection.id); }}
+                                onClick={(e: React.MouseEvent) => { e.stopPropagation(); onDelete(detection.id); }}
                                 sx={{ mt: 1, color: '#ff4444', '&:hover': { bgcolor: 'rgba(255,68,68,0.1)' } }}
                             >
                                 <Trash size={16} />
@@ -330,7 +330,7 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                                     {onDelete && (
                                         <IconButton
                                             size="small"
-                                            onClick={(e) => { e.stopPropagation(); onDelete(detection.id); }}
+                                            onClick={(e: React.MouseEvent) => { e.stopPropagation(); onDelete(detection.id); }}
                                             sx={{ mt: 1, color: '#ff4444', width: '100%', borderRadius: 1, '&:hover': { bgcolor: 'rgba(255,68,68,0.1)' } }}
                                         >
                                             <Trash size={16} />
@@ -383,6 +383,8 @@ const ImageModal: React.FC<ImageModalProps> = ({
     const imageRef = useRef<HTMLImageElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [imageDimensions, setImageDimensions] = useState({ natural: { width: 0, height: 0 }, displayed: { width: 0, height: 0 } });
+    // Track which imageUrl the current dimensions belong to
+    const dimensionsForUrl = useRef<string | undefined>(undefined);
 
     // Reset state when opening a new image
     useEffect(() => {
@@ -416,8 +418,13 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 natural: { width: img.naturalWidth, height: img.naturalHeight },
                 displayed: { width: displayedWidth, height: displayedHeight }
             });
+            // Mark these dimensions as belonging to the current image
+            dimensionsForUrl.current = imageUrl;
         }
     };
+
+    // Check if dimensions are valid for the current image
+    const dimensionsAreValid = dimensionsForUrl.current === imageUrl && imageDimensions.natural.width > 0;
 
     // Keyboard Navigation
     useEffect(() => {
@@ -513,7 +520,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
         >
             <Fade in={open}>
                 <Box
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
                     sx={{
                         position: 'relative',
                         width: '90vw',
@@ -551,7 +558,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
                         }}
                         onWheel={handleWheel}
                         onMouseDown={handleMouseDown}
-                        onMouseMove={(e) => {
+                        onMouseMove={(e: React.MouseEvent<HTMLDivElement>) => {
                             handleMouseMove(e);
                         }}
                         onMouseUp={handleMouseUp}
@@ -594,10 +601,10 @@ const ImageModal: React.FC<ImageModalProps> = ({
                                 >
                                     <LiquidGlassOverlay
                                         imageUrl={imageUrl}
-                                        bboxes={detections.map(det => {
+                                        bboxes={dimensionsAreValid ? detections.map(det => {
                                             const bbox = transformBbox(det);
-                                            return bbox ? { bbox, label: det.label } : null;
-                                        }).filter(Boolean) as { bbox: { x: number; y: number; width: number; height: number }; label?: string }[]}
+                                            return bbox ? { bbox, label: det.label, detection: det } : null;
+                                        }).filter(Boolean) as { bbox: { x: number; y: number; width: number; height: number }; label?: string; detection?: Detection }[] : []}
                                         containerWidth={imageDimensions.displayed.width}
                                         containerHeight={imageDimensions.displayed.height}
                                     />
@@ -640,7 +647,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
                         {/* Navigation Buttons (Overlay) */}
                         {hasPrev && (
                             <IconButton
-                                onClick={(e) => { e.stopPropagation(); onPrev?.(); }}
+                                onClick={(e: React.MouseEvent) => { e.stopPropagation(); onPrev?.(); }}
                                 sx={{
                                     position: 'absolute',
                                     left: 16,
@@ -658,7 +665,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
                         )}
                         {hasNext && (
                             <IconButton
-                                onClick={(e) => { e.stopPropagation(); onNext?.(); }}
+                                onClick={(e: React.MouseEvent) => { e.stopPropagation(); onNext?.(); }}
                                 sx={{
                                     position: 'absolute',
                                     right: 16,
@@ -690,7 +697,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
                             backdropFilter: 'blur(4px)'
                         }}>
                             <IconButton
-                                onClick={(e) => {
+                                onClick={(e: React.MouseEvent) => {
                                     e.stopPropagation();
                                     if (window.confirm('Are you sure you want to delete this image?')) {
                                         onDelete?.();
