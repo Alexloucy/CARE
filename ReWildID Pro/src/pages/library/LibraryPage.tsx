@@ -493,7 +493,7 @@ const LibraryPage: React.FC = () => {
                         </Menu>
 
                         <Button variant="contained" startIcon={<Plus />} onClick={triggerUpload} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>
-                            Upload
+                            New Job
                         </Button>
                     </>
                 }

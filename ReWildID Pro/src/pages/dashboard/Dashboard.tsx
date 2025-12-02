@@ -3,6 +3,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { 
     Sparkle, Fingerprint, Clock, FolderOpen, ChartDonut, TrendUp, CalendarBlank, Users
 } from '@phosphor-icons/react';
+import { triggerUpload } from '../../utils/navigationEvents';
+import AiModeButton from '../../components/AiModeButton';
+import { AiModeContext } from '../../contexts/AiModeContext';
 
 interface DashboardStats {
     totalImages: number;
@@ -646,6 +649,16 @@ export default function Dashboard() {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // AI Button Effect State
+    const [shouldPlayEffect, setShouldPlayEffect] = useState(false);
+
+    // Trigger effect once on mount
+    useEffect(() => {
+        setShouldPlayEffect(true);
+        const timer = setTimeout(() => setShouldPlayEffect(false), 3000);
+        return () => clearTimeout(timer);
+    }, []);
+
     useEffect(() => {
         const loadStats = async () => {
             try {
@@ -694,11 +707,19 @@ export default function Dashboard() {
     return (
         <Box sx={{ pt: '64px', px: 3, pb: 4, minHeight: '100vh' }}>
             {/* Header */}
-            <Box sx={{ py: 3, mb: 1 }}>
-                <Typography variant="h5" fontWeight={600}>Dashboard</Typography>
-                <Typography variant="body2" color="text.secondary">
-                    Wildlife monitoring and conservation insights (Dev Only, actual insightful charts to be discussed)
-                </Typography>
+            <Box sx={{ py: 3, mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Box>
+                    <Typography variant="h5" fontWeight={600}>Dashboard</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Wildlife monitoring and conservation insights (Dev Only, actual insightful charts to be discussed)
+                    </Typography>
+                </Box>
+                <AiModeContext.Provider value={{ shouldPlayEffect, setShouldPlayEffect }}>
+                    <AiModeButton 
+                        text="New Job" 
+                        onClick={triggerUpload}
+                    />
+                </AiModeContext.Provider>
             </Box>
 
             {/* Top Stats Row - 4 cards */}
