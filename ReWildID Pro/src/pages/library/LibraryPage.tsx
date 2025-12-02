@@ -32,6 +32,7 @@ import { GroupNameDialog } from '../../components/GroupNameDialog';
 import { LibraryFilter } from '../../components/library/LibraryFilterDialog';
 import { MediaExplorer } from '../../components/library/MediaExplorer';
 import { LiquidGlassButton } from '../../components/LiquidGlassButton';
+import { OnboardingTour } from '../../components/OnboardingTour';
 
 // Utils
 import { triggerUpload } from '../../utils/navigationEvents';
@@ -329,6 +330,7 @@ const LibraryPage: React.FC = () => {
 
     return (
         <>
+            <OnboardingTour page="library" />
             <MediaExplorer
                 title="Library"
                 loading={loading}
@@ -492,7 +494,7 @@ const LibraryPage: React.FC = () => {
                             ))}
                         </Menu>
 
-                        <Button variant="contained" startIcon={<Plus />} onClick={triggerUpload} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>
+                        <Button data-tour="library-new-job" variant="contained" startIcon={<Plus />} onClick={triggerUpload} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>
                             New Job
                         </Button>
                     </>

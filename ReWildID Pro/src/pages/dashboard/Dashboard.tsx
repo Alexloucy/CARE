@@ -6,6 +6,7 @@ import {
 import { triggerUpload } from '../../utils/navigationEvents';
 import AiModeButton from '../../components/AiModeButton';
 import { AiModeContext } from '../../contexts/AiModeContext';
+import { OnboardingTour } from '../../components/OnboardingTour';
 
 interface DashboardStats {
     totalImages: number;
@@ -706,6 +707,7 @@ export default function Dashboard() {
 
     return (
         <Box sx={{ pt: '64px', px: 3, pb: 4, minHeight: '100vh' }}>
+            <OnboardingTour page="dashboard" />
             {/* Header */}
             <Box sx={{ py: 3, mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <Box>
@@ -714,12 +716,14 @@ export default function Dashboard() {
                         Wildlife monitoring and conservation insights (Dev Only, actual insightful charts to be discussed)
                     </Typography>
                 </Box>
-                <AiModeContext.Provider value={{ shouldPlayEffect, setShouldPlayEffect }}>
-                    <AiModeButton 
-                        text="New Job" 
-                        onClick={triggerUpload}
-                    />
-                </AiModeContext.Provider>
+                <Box data-tour="new-job">
+                    <AiModeContext.Provider value={{ shouldPlayEffect, setShouldPlayEffect }}>
+                        <AiModeButton 
+                            text="New Job" 
+                            onClick={triggerUpload}
+                        />
+                    </AiModeContext.Provider>
+                </Box>
             </Box>
 
             {/* Top Stats Row - 4 cards */}

@@ -477,6 +477,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                     {aiButtonMode === 'analyse' ? (
                         <>
                             <AiModeButton
+                                data-tour="library-analyse"
                                 text={group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length > 0
                                     ? `Analyse (${group.images.filter((img: DBImage) => selectedImageIds.has(img.id)).length})`
                                     : "Analyse"}

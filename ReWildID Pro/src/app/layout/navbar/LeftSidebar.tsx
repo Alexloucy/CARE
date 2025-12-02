@@ -161,6 +161,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
                     return (
                         <Box key={item.key} sx={{ position: 'relative' }}>
                             <ListItemButton
+                                data-tour={`nav-${item.key}`}
                                 selected={isActive}
                                 onClick={() => handleNavigate(item.path)}
                                 sx={{

@@ -411,6 +411,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
             {/* Content */}
             <Box
                 ref={zoomContainerRef}
+                data-tour="library-grid"
                 sx={{
                     flex: 1,
                     overflow: 'hidden', // Virtualized list handles scrolling
@@ -496,6 +497,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
 
                                         <Tooltip title="Filter">
                                             <IconButton
+                                                data-tour="library-filter"
                                                 onClick={() => setFilterDialogOpen(true)}
                                                 color={activeFilter ? 'inherit' : 'default'}
                                                 sx={{
@@ -521,6 +523,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
 
                                         <Tooltip title={isSelectionMode ? "Cancel Selection" : "Select Items"}>
                                             <IconButton
+                                                data-tour="library-select"
                                                 onClick={toggleSelectionMode}
                                                 color={isSelectionMode ? "inherit" : "default"}
                                                 sx={{

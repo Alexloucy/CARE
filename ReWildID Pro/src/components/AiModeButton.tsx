@@ -9,6 +9,7 @@ interface AiModeButtonProps {
     sx?: SxProps<Theme>;
     icon?: React.ReactNode;
     typographyProps?: TypographyProps;
+    'data-tour'?: string;
 }
 
 const AiModeButton: React.FC<AiModeButtonProps> = ({ 
@@ -16,7 +17,8 @@ const AiModeButton: React.FC<AiModeButtonProps> = ({
     onClick, 
     sx,
     icon = <SparkleIcon size={20} weight="fill" />,
-    typographyProps
+    typographyProps,
+    'data-tour': dataTour
 }) => {
     const [renderPosition, setRenderPosition] = useState({ x: 0, y: 0 });
     const targetPosition = useRef({ x: 0, y: 0 });
@@ -135,6 +137,7 @@ const AiModeButton: React.FC<AiModeButtonProps> = ({
     return (
         <Box
             ref={buttonRef}
+            data-tour={dataTour}
             onMouseMove={handleMouseMove}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}

@@ -30,9 +30,11 @@ import {
     Cube,
     TextT,
     Drop,
-    BoundingBox
+    BoundingBox,
+    Lightbulb
 } from '@phosphor-icons/react';
 import StyledSwitch from '../../components/StyledSwitch';
+import { resetAllTours } from '../../components/OnboardingTour';
 
 // Settings item interface
 interface SettingsItem {
@@ -344,6 +346,43 @@ const SettingsPage: React.FC = () => {
                         </AccordionDetails>
                     </Accordion>
                 ))}
+
+                {/* Reset Onboarding Tours */}
+                <Box
+                    sx={{
+                        mt: 3,
+                        p: 2,
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: 2.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                    }}
+                >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Lightbulb size={24} />
+                        <Box>
+                            <Typography variant="body1" fontWeight={500}>Reset Guided Tours</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                Show the onboarding walkthrough again for all pages
+                            </Typography>
+                        </Box>
+                    </Box>
+                    <Tooltip title="Reset Tours">
+                        <IconButton 
+                            onClick={() => {
+                                resetAllTours();
+                                alert('Tours have been reset! You will see them again when visiting each page.');
+                            }}
+                            sx={{ 
+                                bgcolor: theme.palette.action.hover,
+                                '&:hover': { bgcolor: theme.palette.action.selected }
+                            }}
+                        >
+                            <ArrowCounterClockwise size={20} />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
 
                 {/* Footer note */}
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 3, textAlign: 'center' }}>
