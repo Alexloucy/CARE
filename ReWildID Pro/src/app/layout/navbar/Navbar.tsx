@@ -161,7 +161,7 @@ export default function Navbar({
                     xs: '100%',
                     md: `calc(100% - ${leftSidebarWidth}px - ${rightSidebarWidth}px)`
                 },
-                transition: (theme) => theme.transitions.create(['width', 'left', 'right'], {
+                transition: (theme: any) => theme.transitions.create(['width', 'left', 'right'], {
                     easing: theme.transitions.easing.sharp,
                     duration: theme.transitions.duration.enteringScreen,
                 }),

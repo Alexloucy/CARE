@@ -204,15 +204,16 @@ const ImageCard: React.FC<ImageCardProps> = ({
                             </Box>
                         )}
 
-                        {/* Badge Top Left (ReID Name) - offset when selection icon is visible */}
+                        {/* Badge (ReID Name) - moves to top-right under species when selection mode */}
                         {badgeBottomLeft && (
                             <Box sx={{
                                 position: 'absolute',
-                                top: 8,
-                                left: (selectable || selected) ? 36 : 8,
+                                top: (selectable || selected) ? 36 : 8,
+                                left: (selectable || selected) ? 'auto' : 8,
+                                right: (selectable || selected) ? 11 : 'auto',
                                 zIndex: 2,
                                 pointerEvents: 'none',
-                                transition: 'left 0.15s ease'
+                                transition: 'top 0.15s ease'
                             }}>
                                 {badgeBottomLeft}
                             </Box>
