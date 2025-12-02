@@ -15,6 +15,7 @@ import { GroupNameDialog } from '../../components/GroupNameDialog';
 import { LibrarySearchBar } from '../../components/library/LibrarySearchBar';
 import { DetectionBox } from '../../components/ImageModal';
 import { LiquidGlassOverlay } from '../../components/LiquidGlassOverlay';
+import { RefreshNotification } from '../../components/RefreshNotification';
 import { Detection } from '../../types/electron';
 
 interface ReidRun { id: number; name: string; species: string; created_at: number; individual_count: number; detection_count: number; }
@@ -514,6 +515,11 @@ const ReIDPage: React.FC = () => {
 
     return (
         <Box sx={{ pt: '64px', px: 3, pb: 3, minHeight: '100vh' }}>
+            <RefreshNotification 
+                watchJobTypes={['reid']}
+                onRefresh={refreshData}
+                message="Re-identification completed"
+            />
             {runs.length === 0 ? (
                 <Box sx={{ height: 'calc(100vh - 180px)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 2, opacity: 0.6 }}>
                     <Fingerprint size={64} weight="thin" color={theme.palette.text.primary} />

@@ -15,6 +15,7 @@ import { useSelection } from '../../hooks/useSelection';
 import { LibraryFilter } from '../../components/library/LibraryFilterDialog';
 import { MediaExplorer } from '../../components/library/MediaExplorer';
 import { GroupNameDialog } from '../../components/GroupNameDialog';
+import { RefreshNotification } from '../../components/RefreshNotification';
 import { DateSection, GroupData } from '../../types/library';
 
 // Utils
@@ -380,6 +381,11 @@ const ClassificationPage: React.FC = () => {
 
     return (
         <>
+        <RefreshNotification 
+            watchJobTypes={['detect']}
+            onRefresh={refreshLibrary}
+            message="Classification completed"
+        />
         <MediaExplorer
             title="Classification"
             loading={loading}

@@ -33,6 +33,7 @@ import { LibraryFilter } from '../../components/library/LibraryFilterDialog';
 import { MediaExplorer } from '../../components/library/MediaExplorer';
 import { LiquidGlassButton } from '../../components/LiquidGlassButton';
 import { OnboardingTour } from '../../components/OnboardingTour';
+import { RefreshNotification } from '../../components/RefreshNotification';
 
 // Utils
 import { triggerUpload } from '../../utils/navigationEvents';
@@ -331,6 +332,11 @@ const LibraryPage: React.FC = () => {
     return (
         <>
             <OnboardingTour page="library" />
+            <RefreshNotification 
+                watchJobTypes={['detect', 'reid']}
+                onRefresh={refreshLibrary}
+                message="Classification or Re-ID completed"
+            />
             <MediaExplorer
                 title="Library"
                 loading={loading}
