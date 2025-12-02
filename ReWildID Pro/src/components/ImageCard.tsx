@@ -208,7 +208,7 @@ const ImageCard: React.FC<ImageCardProps> = ({
                         {badgeBottomLeft && (
                             <Box sx={{
                                 position: 'absolute',
-                                top: (selectable || selected) ? 36 : 8,
+                                top: (selectable || selected) ? 36 : 10,
                                 left: (selectable || selected) ? 'auto' : 8,
                                 right: (selectable || selected) ? 11 : 'auto',
                                 zIndex: 2,
