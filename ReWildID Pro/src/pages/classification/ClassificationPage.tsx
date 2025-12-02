@@ -1,7 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Menu, MenuItem, useTheme } from '@mui/material';
-import { PencilSimple, Trash } from '@phosphor-icons/react';
+import { ArrowLineUp, CheckSquare, Funnel, PencilSimple, Trash } from '@phosphor-icons/react';
+import { Box, Tooltip } from '@mui/material';
+import { LiquidGlassButton } from '../../components/LiquidGlassButton';
 import { DBImage } from '../../types/electron';
 
 // Hooks
@@ -21,6 +23,9 @@ import { triggerUpload } from '../../utils/navigationEvents';
 const ClassificationPage: React.FC = () => {
     const theme = useTheme();
     const { leftSidebarOpen, rightSidebarOpen } = useOutletContext<{ leftSidebarOpen: boolean; rightSidebarOpen: boolean }>();
+
+    // Scroll state for floating buttons
+    const [isScrolled, setIsScrolled] = useState(false);
 
     // 1. Filter & Search State
     const [filterDialogOpen, setFilterDialogOpen] = useState(false);
@@ -410,6 +415,7 @@ const ClassificationPage: React.FC = () => {
             aiButtonMode="reid"
             onReID={handleReID}
             onUpload={triggerUpload}
+            onScrollStateChange={setIsScrolled}
             groupMenu={
                 <Menu
                     anchorEl={anchorEl}
@@ -448,6 +454,67 @@ const ClassificationPage: React.FC = () => {
             title="Rename Classification Batch"
             initialValue={batchToRename?.name || ''}
         />
+
+        {/* Floating Action Buttons - Show when scrolled */}
+        <Box
+            sx={{
+                position: 'fixed',
+                top: 80,
+                right: 16,
+                display: 'flex',
+                flexDirection: 'row',
+                gap: 1,
+                zIndex: 1000,
+                p: 1.5,
+                opacity: isScrolled ? 1 : 0,
+                transform: isScrolled ? 'translateX(0)' : 'translateX(calc(100% + 32px))',
+                transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease',
+                pointerEvents: isScrolled ? 'auto' : 'none',
+                '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    inset: 0,
+                    borderRadius: '24px',
+                    background: 'rgba(0,0,0,0.35)',
+                    filter: 'blur(30px)',
+                    zIndex: -1,
+                    pointerEvents: 'none'
+                }
+            }}
+        >
+            <Tooltip title="Filter">
+                <span>
+                    <LiquidGlassButton
+                        size={32}
+                        icon={<Funnel size={16} weight={activeFilter ? 'fill' : 'regular'} />}
+                        onClick={() => setFilterDialogOpen(true)}
+                    />
+                </span>
+            </Tooltip>
+            <Tooltip title={isSelectionMode ? 'Exit Selection' : 'Select'}>
+                <span>
+                    <LiquidGlassButton
+                        size={32}
+                        icon={<CheckSquare size={16} weight={isSelectionMode ? 'fill' : 'regular'} />}
+                        onClick={toggleSelectionMode}
+                    />
+                </span>
+            </Tooltip>
+            <Tooltip title="Back to Top">
+                <span>
+                    <LiquidGlassButton
+                        size={32}
+                        icon={<ArrowLineUp size={16} />}
+                        onClick={() => {
+                            const virtuosoContainer = document.querySelector('[data-virtuoso-scroller]');
+                            if (virtuosoContainer) {
+                                virtuosoContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                            }
+                        }}
+                    />
+                </span>
+            </Tooltip>
+        </Box>
         </>
     );
 };

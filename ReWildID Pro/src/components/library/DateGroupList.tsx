@@ -45,6 +45,8 @@ interface DateGroupListProps {
     onUpload?: () => void;
     // Sort mode
     sortBy?: SortOption;
+    // Scroll state callback
+    onScrollStateChange?: (isScrolled: boolean) => void;
     // Tag visibility
     showSpeciesTags?: boolean;
     showReidTags?: boolean;
@@ -84,12 +86,14 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
         availableSpecies = [],
         onUpload,
         sortBy = 'default',
+        onScrollStateChange,
         showSpeciesTags = true,
         showReidTags = true
     } = props;
 
     const theme = useTheme();
     const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(new Set());
+    const lastScrollState = useRef(false);
     const [containerWidth, setContainerWidth] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
     const virtuosoRef = useRef<VirtuosoHandle>(null);
@@ -855,6 +859,15 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                             onActiveItemChange(item.id);
                             break;
                         }
+                    }
+                }}
+                onScroll={(e) => {
+                    if (!onScrollStateChange) return;
+                    const scrollTop = (e.target as HTMLElement).scrollTop;
+                    const isScrolled = scrollTop > 150;
+                    if (isScrolled !== lastScrollState.current) {
+                        lastScrollState.current = isScrolled;
+                        onScrollStateChange(isScrolled);
                     }
                 }}
                 components={virtuosoComponents}

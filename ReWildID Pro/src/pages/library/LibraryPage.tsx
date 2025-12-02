@@ -1,4 +1,5 @@
 import {
+    Box,
     Button,
     IconButton,
     Menu, MenuItem,
@@ -6,10 +7,14 @@ import {
     useTheme
 } from '@mui/material';
 import {
+    ArrowLineUp,
     ArrowsDownUp,
+    CheckSquare,
+    Funnel,
     PencilSimple,
     Plus,
-    Trash
+    Trash,
+    UploadSimple
 } from '@phosphor-icons/react';
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
@@ -26,6 +31,7 @@ import { useSelection } from '../../hooks/useSelection';
 import { GroupNameDialog } from '../../components/GroupNameDialog';
 import { LibraryFilter } from '../../components/library/LibraryFilterDialog';
 import { MediaExplorer } from '../../components/library/MediaExplorer';
+import { LiquidGlassButton } from '../../components/LiquidGlassButton';
 
 // Utils
 import { triggerUpload } from '../../utils/navigationEvents';
@@ -35,6 +41,9 @@ type SortOption = 'default' | 'species' | 'individual' | 'name';
 const LibraryPage: React.FC = () => {
     const theme = useTheme();
     const { leftSidebarOpen, rightSidebarOpen } = useOutletContext<{ leftSidebarOpen: boolean; rightSidebarOpen: boolean }>();
+
+    // Scroll state for floating buttons
+    const [isScrolled, setIsScrolled] = useState(false);
 
     // 1. Filter & Search State (Must be defined before data loading)
     const [filterDialogOpen, setFilterDialogOpen] = useState(false);
@@ -357,6 +366,7 @@ const LibraryPage: React.FC = () => {
                 leftSidebarOpen={leftSidebarOpen}
                 rightSidebarOpen={rightSidebarOpen}
                 onUpload={triggerUpload}
+                onScrollStateChange={setIsScrolled}
                 headerActions={
                     <>
                         <Tooltip title="Sort">
@@ -527,6 +537,88 @@ const LibraryPage: React.FC = () => {
                 title="Rename Group"
                 initialValue={groupToRename?.name || ''}
             />
+
+            {/* Floating Action Buttons - Show when scrolled */}
+            <Box
+                sx={{
+                    position: 'fixed',
+                    top: 80,
+                    right: 16,
+                    display: 'flex',
+                    flexDirection: 'row',
+                    gap: 1,
+                    zIndex: 1000,
+                    p: 1.5,
+                    opacity: isScrolled ? 1 : 0,
+                    transform: isScrolled ? 'translateX(0)' : 'translateX(calc(100% + 32px))',
+                    transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease',
+                    pointerEvents: isScrolled ? 'auto' : 'none',
+                    '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        inset: 0,
+                        borderRadius: '24px',
+                        background: 'rgba(0,0,0,0.35)',
+                        filter: 'blur(30px)',
+                        zIndex: -1,
+                        pointerEvents: 'none'
+                    }
+                }}
+            >
+                    <Tooltip title="Filter">
+                        <span>
+                            <LiquidGlassButton
+                                size={32}
+                                icon={<Funnel size={16} weight={activeFilter ? 'fill' : 'regular'} />}
+                                onClick={() => setFilterDialogOpen(true)}
+                            />
+                        </span>
+                    </Tooltip>
+                    <Tooltip title={isSelectionMode ? 'Exit Selection' : 'Select'}>
+                        <span>
+                            <LiquidGlassButton
+                                size={32}
+                                icon={<CheckSquare size={16} weight={isSelectionMode ? 'fill' : 'regular'} />}
+                                onClick={toggleSelectionMode}
+                            />
+                        </span>
+                    </Tooltip>
+                    <Tooltip title="Sort">
+                        <span>
+                            <LiquidGlassButton
+                                size={32}
+                                icon={<ArrowsDownUp size={16} weight={sortBy !== 'default' ? 'fill' : 'regular'} />}
+                                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    setSortMenuPos({ top: rect.bottom + 8, left: rect.right });
+                                }}
+                            />
+                        </span>
+                    </Tooltip>
+                    <Tooltip title="Upload">
+                        <span>
+                            <LiquidGlassButton
+                                size={32}
+                                icon={<UploadSimple size={16} />}
+                                onClick={triggerUpload}
+                            />
+                        </span>
+                    </Tooltip>
+                    <Tooltip title="Back to Top">
+                        <span>
+                            <LiquidGlassButton
+                                size={32}
+                                icon={<ArrowLineUp size={16} />}
+                                onClick={() => {
+                                    const virtuosoContainer = document.querySelector('[data-virtuoso-scroller]');
+                                    if (virtuosoContainer) {
+                                        virtuosoContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }
+                                }}
+                            />
+                        </span>
+                    </Tooltip>
+            </Box>
         </>
     );
 };

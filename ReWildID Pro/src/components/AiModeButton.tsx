@@ -84,11 +84,11 @@ const AiModeButton: React.FC<AiModeButtonProps> = ({
         
         const animate = () => {
             setRenderPosition(prev => ({
-                x: prev.x + (targetPosition.current.x - prev.x) * 0.03,
-                y: prev.y + (targetPosition.current.y - prev.y) * 0.03
+                x: prev.x + (targetPosition.current.x - prev.x) * 0.06,
+                y: prev.y + (targetPosition.current.y - prev.y) * 0.06
             }));
             // Smooth rotation animation
-            setGradientRotation(prev => prev + (targetRotation.current - prev) * 0.03);
+            setGradientRotation(prev => prev + (targetRotation.current - prev) * 0.06);
             animationFrameId = requestAnimationFrame(animate);
         };
         

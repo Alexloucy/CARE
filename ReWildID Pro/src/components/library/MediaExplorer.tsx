@@ -106,6 +106,9 @@ interface MediaExplorerProps {
     
     // Empty state action
     onUpload?: () => void;
+    
+    // Scroll state callback
+    onScrollStateChange?: (isScrolled: boolean) => void;
 }
 
 export const MediaExplorer: React.FC<MediaExplorerProps> = ({
@@ -150,7 +153,8 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     onReID,
     onClassify,
     onUpload,
-    selectedReidRunId = null
+    selectedReidRunId = null,
+    onScrollStateChange
 }) => {
     const theme = useTheme();
 
@@ -481,6 +485,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         sortBy={sortBy}
                         showSpeciesTags={showSpeciesTags}
                         showReidTags={showReidTags && selectedReidRunId !== null}
+                        onScrollStateChange={onScrollStateChange}
                         headerContent={
                             <>
                                 <Box sx={{ height: `${NAVBAR_HEIGHT}px` }} />

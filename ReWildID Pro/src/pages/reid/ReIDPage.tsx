@@ -6,10 +6,11 @@ import {
     Switch, Tooltip
 } from '@mui/material';
 import {
-    Fingerprint, DotsThreeVertical, PencilSimple, Trash, CaretDown, CaretRight,
+    ArrowLineUp, Fingerprint, DotsThreeVertical, PencilSimple, Trash, CaretDown, CaretRight,
     Images as ImagesIcon, X, CaretLeft, MagnifyingGlassPlus, MagnifyingGlassMinus, Sparkle,
     Gear
 } from '@phosphor-icons/react';
+import { LiquidGlassButton } from '../../components/LiquidGlassButton';
 import { GroupNameDialog } from '../../components/GroupNameDialog';
 import { LibrarySearchBar } from '../../components/library/LibrarySearchBar';
 import { DetectionBox } from '../../components/ImageModal';
@@ -355,8 +356,20 @@ const ReIDPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [settingsMenuPos, setSettingsMenuPos] = useState<{ top: number; left: number } | null>(null);
 
+    // Scroll state for floating button
+    const [isScrolled, setIsScrolled] = useState(false);
+
     const refreshData = useCallback(() => {
         setRefreshTrigger(prev => prev + 1);
+    }, []);
+
+    // Scroll detection
+    useEffect(() => {
+        const handleScroll = () => {
+            setIsScrolled(window.scrollY > 150);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
     // Listen for refresh events from TaskPanel
@@ -640,6 +653,41 @@ const ReIDPage: React.FC = () => {
             </Menu>
             
             <IndividualModal open={modalOpen} onClose={() => setModalOpen(false)} individual={selectedIndividual} imageUrls={imageUrls} fullImageUrls={fullImageUrls} loadFullImage={loadFullImage} useLiquidGlass={useLiquidGlass} useRayTracedGlass={useRayTracedGlass} />
+
+            {/* Floating Action Button - Back to Top */}
+            <Box
+                sx={{
+                    position: 'fixed',
+                    top: 80,
+                    right: 16,
+                    zIndex: 1000,
+                    p: 1.5,
+                    opacity: isScrolled ? 1 : 0,
+                    transform: isScrolled ? 'translateX(0)' : 'translateX(calc(100% + 32px))',
+                    transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease',
+                    pointerEvents: isScrolled ? 'auto' : 'none',
+                    '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        inset: 0,
+                        borderRadius: '24px',
+                        background: 'rgba(0,0,0,0.35)',
+                        filter: 'blur(30px)',
+                        zIndex: -1,
+                        pointerEvents: 'none'
+                    }
+                }}
+            >
+                <Tooltip title="Back to Top">
+                    <span>
+                        <LiquidGlassButton
+                            size={32}
+                            icon={<ArrowLineUp size={16} />}
+                            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                        />
+                    </span>
+                </Tooltip>
+            </Box>
         </Box>
     );
 };
