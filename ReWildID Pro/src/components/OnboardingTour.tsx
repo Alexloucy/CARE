@@ -76,7 +76,7 @@ const LIBRARY_STEPS: DriveStep[] = [
         element: '[data-tour="library-select"]',
         popover: {
             title: 'Select Mode',
-            description: 'Enter selection mode to select multiple images for batch operations.',
+            description: 'Enter selection mode to select multiple images for batch operations. You can also long-press any image to start selecting!',
             side: 'bottom',
             align: 'center',
         },
