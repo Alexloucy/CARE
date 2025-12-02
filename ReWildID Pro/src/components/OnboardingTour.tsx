@@ -73,6 +73,15 @@ const LIBRARY_STEPS: DriveStep[] = [
         },
     },
     {
+        element: '[data-tour="library-sort"]',
+        popover: {
+            title: 'Sort Images',
+            description: 'Sort images by species, individual (from Re-ID runs), or filename.',
+            side: 'bottom',
+            align: 'center',
+        },
+    },
+    {
         element: '[data-tour="library-analyse"]',
         popover: {
             title: 'Analyse with AI ✨',

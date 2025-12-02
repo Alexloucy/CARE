@@ -379,6 +379,7 @@ const LibraryPage: React.FC = () => {
                     <>
                         <Tooltip title="Sort">
                             <IconButton
+                                data-tour="library-sort"
                                 onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                                     const rect = e.currentTarget.getBoundingClientRect();
                                     setSortMenuPos({ top: rect.bottom, left: rect.right });
