@@ -55,15 +55,6 @@ const DASHBOARD_STEPS: DriveStep[] = [
 
 const LIBRARY_STEPS: DriveStep[] = [
     {
-        element: '[data-tour="library-new-job"]',
-        popover: {
-            title: 'Upload Images',
-            description: 'Upload new images or drag & drop folders anywhere on this page.',
-            side: 'bottom',
-            align: 'end',
-        },
-    },
-    {
         element: '[data-tour="library-filter"]',
         popover: {
             title: 'Filter',
