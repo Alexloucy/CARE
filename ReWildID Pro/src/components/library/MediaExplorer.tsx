@@ -405,6 +405,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                     onDateClick={handleDateClick}
                     onGroupClick={handleGroupClick}
                     activeId={activeId}
+                    rightSidebarOpen={rightSidebarOpen}
                 />
             )}
 

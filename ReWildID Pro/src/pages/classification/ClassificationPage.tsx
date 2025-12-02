@@ -466,7 +466,7 @@ const ClassificationPage: React.FC = () => {
             sx={{
                 position: 'fixed',
                 top: 80,
-                right: 16,
+                right: rightSidebarOpen ? 228 : 16,
                 display: 'flex',
                 flexDirection: 'row',
                 gap: 1,
@@ -474,7 +474,7 @@ const ClassificationPage: React.FC = () => {
                 p: 1.5,
                 opacity: isScrolled ? 1 : 0,
                 transform: isScrolled ? 'translateX(0)' : 'translateX(calc(100% + 32px))',
-                transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease',
+                transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, right 0.3s ease',
                 pointerEvents: isScrolled ? 'auto' : 'none',
                 '&::before': {
                     content: '""',

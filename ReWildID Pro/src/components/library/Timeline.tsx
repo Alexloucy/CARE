@@ -7,9 +7,10 @@ interface TimelineProps {
     onDateClick: (date: string) => void;
     onGroupClick: (groupId: number) => void;
     activeId?: string;
+    rightSidebarOpen?: boolean;
 }
 
-export const Timeline: React.FC<TimelineProps> = ({ dateSections, onDateClick, onGroupClick, activeId }) => {
+export const Timeline: React.FC<TimelineProps> = ({ dateSections, onDateClick, onGroupClick, activeId, rightSidebarOpen = false }) => {
     const theme = useTheme();
     const scrollRef = useRef<HTMLDivElement>(null);
     const activeRef = useRef<HTMLDivElement>(null);
@@ -99,7 +100,7 @@ export const Timeline: React.FC<TimelineProps> = ({ dateSections, onDateClick, o
     return (
         <Box sx={{ 
             position: 'fixed', 
-            right: 0, 
+            right: rightSidebarOpen ? 212 : 0, 
             top: 160, 
             bottom: 40,
             width: 140, // Slightly narrower to move closer to right
@@ -110,6 +111,7 @@ export const Timeline: React.FC<TimelineProps> = ({ dateSections, onDateClick, o
             pointerEvents: 'none', 
             maskImage: 'linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%)',
             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%)',
+            transition: 'right 0.3s ease',
         }}>
             {/* Scrollable Container */}
             <Box 
