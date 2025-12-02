@@ -8,7 +8,6 @@ import {
     ListChecks,
     CaretLeft,
     CaretRight,
-    SignOut,
     Gear,
     X,
     Minus,
