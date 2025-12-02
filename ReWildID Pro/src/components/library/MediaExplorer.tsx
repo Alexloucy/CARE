@@ -98,6 +98,9 @@ interface MediaExplorerProps {
 
     // AI Analysis support
     aiButtonMode?: 'detect' | 'reid' | 'analyse';
+    
+    // ReID Run Filter - only show ReID tags when a specific run is selected
+    selectedReidRunId?: number | null;
     onReID?: (images: DBImage[], species: string) => void;
     onClassify?: (images: DBImage[]) => void;
     
@@ -146,7 +149,8 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     aiButtonMode = 'detect',
     onReID,
     onClassify,
-    onUpload
+    onUpload,
+    selectedReidRunId = null
 }) => {
     const theme = useTheme();
 
@@ -179,6 +183,10 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
         const saved = localStorage.getItem('mediaExplorer_showReidTags');
         return saved === null ? true : saved === 'true';
     });
+    const [showBoundingBoxes, setShowBoundingBoxes] = useState(() => {
+        const saved = localStorage.getItem('mediaExplorer_showBoundingBoxes');
+        return saved === null ? true : saved === 'true';
+    });
     
     const [settingsMenuPos, setSettingsMenuPos] = useState<{ top: number; left: number } | null>(null);
     const [selectedImage, setSelectedImage] = useState<{ image: DBImage, url: string } | null>(null);
@@ -204,7 +212,8 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
         localStorage.setItem('mediaExplorer_useRayTracedGlass', useRayTracedGlass.toString());
         localStorage.setItem('mediaExplorer_showSpeciesTags', showSpeciesTags.toString());
         localStorage.setItem('mediaExplorer_showReidTags', showReidTags.toString());
-    }, [gridItemSize, showFileNames, aspectRatio, useLiquidGlass, useRayTracedGlass, showSpeciesTags, showReidTags]);
+        localStorage.setItem('mediaExplorer_showBoundingBoxes', showBoundingBoxes.toString());
+    }, [gridItemSize, showFileNames, aspectRatio, useLiquidGlass, useRayTracedGlass, showSpeciesTags, showReidTags, showBoundingBoxes]);
 
     // Sync settings from Settings page (storage event listener)
     useEffect(() => {
@@ -235,6 +244,9 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                     break;
                 case 'showReidTags':
                     setShowReidTags(value === 'true');
+                    break;
+                case 'showBoundingBoxes':
+                    setShowBoundingBoxes(value === 'true');
                     break;
             }
         };
@@ -468,7 +480,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         onUpload={onUpload}
                         sortBy={sortBy}
                         showSpeciesTags={showSpeciesTags}
-                        showReidTags={showReidTags}
+                        showReidTags={showReidTags && selectedReidRunId !== null}
                         headerContent={
                             <>
                                 <Box sx={{ height: `${NAVBAR_HEIGHT}px` }} />
@@ -663,6 +675,16 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowReidTags(e.target.checked)}
                     />
                 </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                    <Typography variant="subtitle2" fontWeight="600">
+                        Show Bounding Boxes
+                    </Typography>
+                    <Switch
+                        size="small"
+                        checked={showBoundingBoxes}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowBoundingBoxes(e.target.checked)}
+                    />
+                </Box>
             </Menu>
 
             <ImageModal
@@ -684,7 +706,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                         setSelectedImage(null);
                     }
                 }}
-                detections={selectedImage?.image.detections}
+                detections={showBoundingBoxes ? selectedImage?.image.detections : []}
                 reidResults={selectedImage?.image.reidResults}
                 useLiquidGlass={useLiquidGlass}
                 useRayTracedGlass={useRayTracedGlass}

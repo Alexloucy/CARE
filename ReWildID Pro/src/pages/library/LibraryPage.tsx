@@ -11,9 +11,9 @@ import {
     Plus,
     Trash
 } from '@phosphor-icons/react';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { DBImage } from '../../types/electron';
+import { DBImage, ReidRunWithStats } from '../../types/electron';
 
 // Hooks
 import { useGroupActions } from '../../hooks/useGroupActions';
@@ -45,6 +45,11 @@ const LibraryPage: React.FC = () => {
     const [sortBy, setSortBy] = useState<SortOption>('default');
     const [sortMenuPos, setSortMenuPos] = useState<{ top: number; left: number } | null>(null);
 
+    // ReID Run Filter State (linked to "By Individual" sort)
+    const [reidRuns, setReidRuns] = useState<ReidRunWithStats[]>([]);
+    const [selectedReidRunId, setSelectedReidRunId] = useState<number | null>(null);
+    const [individualSubmenuPos, setIndividualSubmenuPos] = useState<{ top: number; left: number } | null>(null);
+
     // Construct DB Filter
     const dbFilter = useMemo(() => ({
         date: activeFilter?.date || null,
@@ -69,9 +74,21 @@ const LibraryPage: React.FC = () => {
         });
     }, []);
 
+    // Fetch ReID Runs
+    const fetchReidRuns = useCallback(async () => {
+        const result = await window.api.getReidRuns();
+        if (result.ok && result.runs) {
+            setReidRuns(result.runs);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchReidRuns();
+    }, [fetchReidRuns]);
+
     // Unified Refresh
     const refreshLibrary = async () => {
-        await Promise.all([refreshFullLibrary(), refreshFilteredLibrary()]);
+        await Promise.all([refreshFullLibrary(), refreshFilteredLibrary(), fetchReidRuns()]);
     };
 
     // Listen for refresh events from TaskPanel
@@ -131,11 +148,19 @@ const LibraryPage: React.FC = () => {
         }));
     }, [rawImages, imageMetadata]);
     
+    // Filter by ReID Run (client-side)
+    const reidFilteredImages = useMemo(() => {
+        if (selectedReidRunId === null) return imagesWithMetadata;
+        return imagesWithMetadata.filter(img => 
+            img.reidResults?.some(r => r.runId === selectedReidRunId)
+        );
+    }, [imagesWithMetadata, selectedReidRunId]);
+
     // Sort images
     const allImages = useMemo(() => {
-        if (sortBy === 'default') return imagesWithMetadata;
+        if (sortBy === 'default') return reidFilteredImages;
         
-        return [...imagesWithMetadata].sort((a, b) => {
+        return [...reidFilteredImages].sort((a, b) => {
             switch (sortBy) {
                 case 'species': {
                     const aSpecies = a.detections?.find(d => d.label && d.label !== 'blank')?.label || '';
@@ -156,22 +181,28 @@ const LibraryPage: React.FC = () => {
                     return 0;
             }
         });
-    }, [imagesWithMetadata, sortBy]);
+    }, [reidFilteredImages, sortBy]);
     
-    // Update dateSections with enriched images (keep original structure)
+    // Update dateSections with enriched images (keep original structure) + apply ReID filter
     const enrichedDateSections = useMemo(() => {
         return filteredDateSections.map(section => ({
             ...section,
             groups: section.groups.map(group => ({
                 ...group,
-                images: group.images.map(img => ({
-                    ...img,
-                    detections: imageMetadata[img.id]?.detections || img.detections || [],
-                    reidResults: imageMetadata[img.id]?.reidResults || []
-                }))
-            }))
-        }));
-    }, [filteredDateSections, imageMetadata]);
+                images: group.images
+                    .map(img => ({
+                        ...img,
+                        detections: imageMetadata[img.id]?.detections || img.detections || [],
+                        reidResults: imageMetadata[img.id]?.reidResults || []
+                    }))
+                    .filter(img => {
+                        // Apply ReID run filter
+                        if (selectedReidRunId === null) return true;
+                        return img.reidResults?.some(r => r.runId === selectedReidRunId);
+                    })
+            })).filter(group => group.images.length > 0) // Remove empty groups
+        })).filter(section => section.groups.length > 0); // Remove empty sections
+    }, [filteredDateSections, imageMetadata, selectedReidRunId]);
 
     // Effect: Prune selection when filter hides items
     useEffect(() => {
@@ -322,6 +353,7 @@ const LibraryPage: React.FC = () => {
                 onClassify={handleGroupClassify}
                 onReID={handleGroupReID}
                 onDeleteImage={handleDeleteImage}
+                selectedReidRunId={selectedReidRunId}
                 leftSidebarOpen={leftSidebarOpen}
                 rightSidebarOpen={rightSidebarOpen}
                 onUpload={triggerUpload}
@@ -364,34 +396,92 @@ const LibraryPage: React.FC = () => {
                             }}
                         >
                             <MenuItem 
-                                onClick={() => { setSortBy('default'); setSortMenuPos(null); }} 
+                                onClick={() => { setSortBy('default'); setSelectedReidRunId(null); setSortMenuPos(null); }} 
                                 selected={sortBy === 'default'}
                                 sx={{ borderRadius: '8px', py: 1 }}
                             >
                                 Default
                             </MenuItem>
                             <MenuItem 
-                                onClick={() => { setSortBy('species'); setSortMenuPos(null); }} 
+                                onClick={() => { setSortBy('species'); setSelectedReidRunId(null); setSortMenuPos(null); }} 
                                 selected={sortBy === 'species'}
                                 sx={{ borderRadius: '8px', py: 1 }}
                             >
                                 By Species
                             </MenuItem>
                             <MenuItem 
-                                onClick={() => { setSortBy('individual'); setSortMenuPos(null); }} 
+                                onClick={() => {
+                                    if (reidRuns.length === 0) {
+                                        // No ReID runs available
+                                        setSortMenuPos(null);
+                                        return;
+                                    }
+                                    // Show submenu at same position as sort menu (under the button)
+                                    if (sortMenuPos) {
+                                        setIndividualSubmenuPos({ top: sortMenuPos.top, left: sortMenuPos.left });
+                                    }
+                                    setSortMenuPos(null);
+                                }} 
                                 selected={sortBy === 'individual'}
-                                sx={{ borderRadius: '8px', py: 1 }}
+                                disabled={reidRuns.length === 0}
+                                sx={{ borderRadius: '8px', py: 1, display: 'flex', justifyContent: 'space-between' }}
                             >
-                                By Individual
+                                <span>By Individual</span>
+                                {reidRuns.length > 0 && <span style={{ opacity: 0.5, fontSize: '0.9em' }}>›</span>}
                             </MenuItem>
                             <MenuItem 
-                                onClick={() => { setSortBy('name'); setSortMenuPos(null); }} 
+                                onClick={() => { setSortBy('name'); setSelectedReidRunId(null); setSortMenuPos(null); }} 
                                 selected={sortBy === 'name'}
                                 sx={{ borderRadius: '8px', py: 1 }}
                             >
-                                By Name
+                                By Image Name
                             </MenuItem>
                         </Menu>
+
+                        {/* By Individual Submenu - Select ReID Run */}
+                        <Menu
+                            open={Boolean(individualSubmenuPos)}
+                            onClose={() => setIndividualSubmenuPos(null)}
+                            anchorReference="anchorPosition"
+                            anchorPosition={individualSubmenuPos ? { top: individualSubmenuPos.top, left: individualSubmenuPos.left } : undefined}
+                            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                            slotProps={{
+                                paper: {
+                                    elevation: 0,
+                                    sx: {
+                                        backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(45, 45, 45, 0.95)',
+                                        backdropFilter: 'blur(8px)',
+                                        borderRadius: '12px',
+                                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                                        border: `1px solid ${theme.palette.divider}`,
+                                        minWidth: '220px',
+                                        maxHeight: '300px',
+                                        p: 1,
+                                        mt: 0
+                                    }
+                                }
+                            }}
+                        >
+                            <MenuItem disabled sx={{ opacity: 0.6, fontSize: '0.8rem', py: 0.5 }}>
+                                Select ReID Run
+                            </MenuItem>
+                            {reidRuns.map(run => (
+                                <MenuItem 
+                                    key={run.id}
+                                    onClick={() => { 
+                                        setSortBy('individual'); 
+                                        setSelectedReidRunId(run.id); 
+                                        setIndividualSubmenuPos(null); 
+                                    }} 
+                                    selected={sortBy === 'individual' && selectedReidRunId === run.id}
+                                    sx={{ borderRadius: '8px', py: 1, display: 'flex', justifyContent: 'space-between', gap: 2 }}
+                                >
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{run.name}</span>
+                                    <span style={{ opacity: 0.5, fontSize: '0.85em', flexShrink: 0 }}>{run.individual_count} ind.</span>
+                                </MenuItem>
+                            ))}
+                        </Menu>
+
                         <Button variant="contained" startIcon={<Plus />} onClick={triggerUpload} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>
                             Upload
                         </Button>
