@@ -29,7 +29,8 @@ import {
     Image as ImageIcon,
     Cube,
     TextT,
-    Drop
+    Drop,
+    BoundingBox
 } from '@phosphor-icons/react';
 import StyledSwitch from '../../components/StyledSwitch';
 
@@ -114,6 +115,15 @@ const settingsItems: SettingsItem[] = [
         label: 'Show Individual Tags',
         description: 'Display re-identification individual name tags on image thumbnails',
         icon: <Fingerprint size={24} />,
+        section: 'tags',
+        type: 'switch',
+        defaultValue: true
+    },
+    {
+        key: 'showBoundingBoxes',
+        label: 'Show Bounding Boxes',
+        description: 'Display detection bounding boxes when viewing images in full screen',
+        icon: <BoundingBox size={24} />,
         section: 'tags',
         type: 'switch',
         defaultValue: true
