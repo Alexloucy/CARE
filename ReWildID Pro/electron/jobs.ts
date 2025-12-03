@@ -534,28 +534,18 @@ export class JobManager {
         try {
             await fs.ensureDir(tempDir);
 
-            job.message = 'Checking images for detections...';
+            job.message = 'Loading detections...';
             this.emitUpdate();
 
-            // Step 1: Get images without detections
-            const imagesWithoutDetections = DatabaseService.getImagesWithoutDetections(imageIds);
-
-            // Step 2: If images need detection, run it first
-            if (imagesWithoutDetections.length > 0) {
-                job.message = `Running classification on ${imagesWithoutDetections.length} images first...`;
-                this.emitUpdate();
-
-                // Run detection inline with image IDs
-                await this.runDetectionInline(job, imagesWithoutDetections);
-
-                job.message = 'Classification complete. Starting ReID...';
-                this.emitUpdate();
-            }
-
-            // Step 3: Get LATEST detections for selected images (only from most recent batch per image)
-            const allDetections = DatabaseService.getLatestDetectionsForImages(imageIds);
+            // Get LATEST detections for selected images (only from most recent batch per image)
+            // Detection is now handled separately before this job is queued
             
+            // Debug: Also get ALL detections to compare
+            const allDetectionsRaw = DatabaseService.getDetectionsForImages(imageIds);
             console.log(`[ReID Debug] imageIds: ${JSON.stringify(imageIds)}`);
+            console.log(`[ReID Debug] ALL detections (any batch): ${allDetectionsRaw.length}`);
+            
+            const allDetections = DatabaseService.getLatestDetectionsForImages(imageIds);
             console.log(`[ReID Debug] allDetections count (latest batch only): ${allDetections.length}`);
             console.log(`[ReID Debug] allDetections labels: ${JSON.stringify(allDetections.map((d: any) => d.label))}`);
 
@@ -616,14 +606,13 @@ export class JobManager {
                         const current = parseInt(processMatch[1]);
                         const total = parseInt(processMatch[2]);
                         if (total > 0) {
-                            // Use 50-100% range for ReID (0-50% was detection)
-                            job.progress = 50 + Math.floor((current / total) * 50);
-                            job.message = `ReID: ${current}/${total}`;
+                            job.progress = Math.floor((current / total) * 100);
+                            job.message = `Processing: ${current}/${total}`;
                             this.emitUpdate();
                         }
                     } else if (txt.includes('Loading model')) {
                         job.message = 'Loading ReID models...';
-                        job.progress = 50;
+                        job.progress = 5;
                         this.emitUpdate();
                     } else if (txt.includes('STATUS: PROCESSING')) {
                         job.message = 'Computing embeddings...';
@@ -679,7 +668,16 @@ export class JobManager {
     }
 
     private async handleDetectJob(job: Job) {
-        const { selectedPaths } = job.payload;
+        const { selectedPaths, chainToReid, imageIds: chainedImageIds } = job.payload;
+        
+        // Build path-to-ID map if we're chaining (to avoid duplicate image issues)
+        const pathToIdMap = new Map<string, number>();
+        if (chainToReid && chainedImageIds) {
+            const images = DatabaseService.getImagesByIds(chainedImageIds);
+            for (const img of images) {
+                pathToIdMap.set(img.original_path, img.id);
+            }
+        }
         // Use project root for data to keep it local
         const baseDataDir = process.cwd();
         // Create unique, deterministic output paths based on job ID
@@ -783,7 +781,9 @@ export class JobManager {
             const batchName = `Detection ${dateStr} ${timeStr}`;
             
             const batchId = DatabaseService.createDetectionBatch(batchName);
+            console.log(`[Detect Job] Created batch ${batchId}, processing ${absolutePaths.length} images`);
 
+            let savedCount = 0;
             for (const originalPath of absolutePaths) {
                 const filename = path.basename(originalPath);
                 const jsonFilename = path.parse(filename).name + '.json';
@@ -792,33 +792,38 @@ export class JobManager {
                 if (await fs.pathExists(jsonPath)) {
                     try {
                         const result = await fs.readJson(jsonPath);
-                        const image = DatabaseService.getImageByPath(originalPath);
+                        
+                        // Use the path-to-ID map if available (for chained jobs), otherwise lookup by path
+                        const imageId = pathToIdMap.get(originalPath) ?? DatabaseService.getImageByPath(originalPath)?.id;
 
-                        if (image && result.boxes && Array.isArray(result.boxes)) {
+                        if (imageId && result.boxes && Array.isArray(result.boxes)) {
+                            console.log(`[Detect Job] Saving detections for image ID ${imageId} (path: ${originalPath})`);
                             for (const box of result.boxes) {
-                                // Skip if label is null (no detection) unless we want to track "empty"
-                                // Based on schema, label is nullable, so we can store it.
-                                // But "no detection" usually means empty box list in some formats, or a specific "empty" entry.
-                                // detection_utils outputs: { label: null, confidence: 0, bbox: [] } for no detection.
-                                
                                 if (box.bbox && box.bbox.length === 4) {
                                     DatabaseService.addDetection(
                                         batchId,
-                                        image.id,
+                                        imageId,
                                         box.label,
                                         box.pred_conf || 0,
                                         box.detection_conf || 0,
-                                        box.bbox, // [x1, y1, x2, y2]
+                                        box.bbox,
                                         box.source || 'unknown'
                                     );
+                                    savedCount++;
                                 }
                             }
+                        } else {
+                            console.log(`[Detect Job] No image found for path: ${originalPath}, result.boxes: ${JSON.stringify(result.boxes)}`);
                         }
                     } catch (e) {
                         console.error(`Failed to parse result for ${originalPath}`, e);
                     }
+                } else {
+                    console.log(`[Detect Job] No JSON found at: ${jsonPath}`);
                 }
             }
+            
+            console.log(`[Detect Job] Saved ${savedCount} detections to batch ${batchId}`);
 
             // Handle chained actions
             const { chainToReid, imageIds, species } = job.payload;

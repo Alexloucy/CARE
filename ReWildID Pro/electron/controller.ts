@@ -1235,6 +1235,7 @@ export async function saveImages(sourcePaths: string[]) {
 /**
  * Smart ReID - Add re-identification job to queue
  * Uses the job manager for proper async handling
+ * If images need detection first, queues a detect job that chains to reid
  */
 export async function smartReID(imageIds: number[], species: string) {
     try {
@@ -1245,8 +1246,31 @@ export async function smartReID(imageIds: number[], species: string) {
             return { ok: false, error: 'No species selected.' };
         }
 
-        // Add to Job Queue (handled by JobManager.handleReidJob)
-        JobManager.getInstance().addJob('reid', { imageIds, species });
+        // Check if any images need detection first
+        const imagesWithoutDetections = DatabaseService.getImagesWithoutDetections(imageIds);
+        
+        console.log(`[smartReID] imageIds: ${JSON.stringify(imageIds)}`);
+        console.log(`[smartReID] imagesWithoutDetections: ${JSON.stringify(imagesWithoutDetections)}`);
+        
+        if (imagesWithoutDetections.length > 0) {
+            // Get paths for images that need detection
+            const images = DatabaseService.getImagesByIds(imagesWithoutDetections);
+            const selectedPaths = images.map(img => img.original_path);
+            
+            console.log(`[smartReID] Queuing detect job for ${selectedPaths.length} images, then reid`);
+            
+            // Queue a detect job that will chain to reid
+            JobManager.getInstance().addJob('detect', { 
+                selectedPaths, 
+                chainToReid: true, 
+                imageIds, 
+                species 
+            });
+        } else {
+            console.log(`[smartReID] All images have detections, queuing reid directly`);
+            // All images have detections, queue reid directly
+            JobManager.getInstance().addJob('reid', { imageIds, species });
+        }
 
         return { ok: true };
     } catch (error) {
