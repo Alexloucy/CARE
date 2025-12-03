@@ -36,21 +36,21 @@ const SkeletonCard: React.FC = () => {
     );
 };
 
-const IndividualCard: React.FC<{ individual: ReidIndividual; onClick: () => void; imageUrls: Map<string, string> }> = ({ individual, onClick, imageUrls }) => {
+const IndividualCard: React.FC<{ individual: ReidIndividual; onClick: () => void; imageUrls: Map<string, string>; showColors?: boolean }> = ({ individual, onClick, imageUrls, showColors = false }) => {
     const theme = useTheme();
     const firstDet = individual.detections[0];
     const thumbUrl = firstDet ? imageUrls.get(firstDet.image_preview_path || firstDet.image_path) : undefined;
     return (
-        <Box onClick={onClick} onDragStart={(e: React.DragEvent) => e.preventDefault()} sx={{ cursor: 'pointer', borderRadius: 2, overflow: 'hidden', transition: 'all 0.15s', border: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.mode === 'light' ? '#F7F9FB' : theme.palette.background.paper, userSelect: 'none', '&:hover': { borderColor: individual.color } }}>
+        <Box onClick={onClick} onDragStart={(e: React.DragEvent) => e.preventDefault()} sx={{ cursor: 'pointer', borderRadius: 2, overflow: 'hidden', transition: 'all 0.15s', border: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.mode === 'light' ? '#F7F9FB' : theme.palette.background.paper, userSelect: 'none', '&:hover': { borderColor: showColors ? individual.color : theme.palette.primary.main } }}>
             <Box sx={{ width: '100%', height: 130, bgcolor: theme.palette.mode === 'light' ? '#f0f0f0' : '#0a0a0a', position: 'relative', overflow: 'hidden' }}>
                 {thumbUrl ? <Box component="img" src={thumbUrl} draggable={false} sx={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', WebkitUserDrag: 'none', pointerEvents: 'none' }} /> : <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Fingerprint size={40} weight="thin" color={theme.palette.text.disabled} /></Box>}
-                <Box sx={{ position: 'absolute', top: 8, left: 8, width: 12, height: 12, borderRadius: '50%', bgcolor: individual.color, border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                {showColors && <Box sx={{ position: 'absolute', top: 8, left: 8, width: 12, height: 12, borderRadius: '50%', bgcolor: individual.color, border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />}
                 <Box sx={{ position: 'absolute', bottom: 6, right: 6, display: 'flex', alignItems: 'center', gap: 0.4, bgcolor: 'rgba(0,0,0,0.6)', color: 'white', px: 0.8, py: 0.3, borderRadius: 1, fontSize: '12px' }}>
                     <ImagesIcon size={14} />{individual.member_count}
                 </Box>
             </Box>
             <Box sx={{ p: 1.25 }}>
-                <Typography variant="body2" fontWeight={600} noWrap sx={{ color: individual.color }}>{individual.display_name}</Typography>
+                <Typography variant="body2" fontWeight={600} noWrap sx={{ color: showColors ? individual.color : 'text.primary' }}>{individual.display_name}</Typography>
                 <Typography variant="caption" color="text.secondary">{individual.member_count} sighting{individual.member_count !== 1 ? 's' : ''}</Typography>
             </Box>
         </Box>
@@ -66,9 +66,10 @@ interface RunGroupProps {
     hasMore: boolean;
     loadingMore: boolean;
     onLoadMore: () => void;
+    showColors: boolean;
 }
 
-const RunGroup: React.FC<RunGroupProps> = ({ run, individuals, imageUrls, onIndividualClick, onMenuOpen, hasMore, loadingMore, onLoadMore }) => {
+const RunGroup: React.FC<RunGroupProps> = ({ run, individuals, imageUrls, onIndividualClick, onMenuOpen, hasMore, loadingMore, onLoadMore, showColors }) => {
     const theme = useTheme();
     const [expanded, setExpanded] = useState(true);
     const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -105,7 +106,7 @@ const RunGroup: React.FC<RunGroupProps> = ({ run, individuals, imageUrls, onIndi
             </Box>
             <Collapse in={expanded}>
                 <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 2, pl: 4 }}>
-                    {individuals.map((ind) => <IndividualCard key={ind.id} individual={ind} onClick={() => onIndividualClick(ind)} imageUrls={imageUrls} />)}
+                    {individuals.map((ind) => <IndividualCard key={ind.id} individual={ind} onClick={() => onIndividualClick(ind)} imageUrls={imageUrls} showColors={showColors} />)}
                     {loadingMore && Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={`skeleton-${i}`} />)}
                 </Box>
                 {hasMore && <Box ref={loadMoreRef} sx={{ height: 20, mt: 2 }} />}
@@ -153,6 +154,10 @@ const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({
         const saved = localStorage.getItem('mediaExplorer_showBoundingBoxes');
         return saved === null ? true : saved === 'true';
     });
+    const [showColors, setShowColors] = useState(() => {
+        const saved = localStorage.getItem('reid_showColors');
+        return saved === 'true'; // default false
+    });
     const [containerWidth, setContainerWidth] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
     const [settingsMenuPos, setSettingsMenuPos] = useState<{ top: number; left: number } | null>(null);
@@ -182,6 +187,9 @@ const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({
                 case 'mediaExplorer_showBoundingBoxes':
                     setShowBoundingBoxes(e.newValue === 'true');
                     break;
+            }
+            if (e.key === 'reid_showColors' && e.newValue !== null) {
+                setShowColors(e.newValue === 'true');
             }
         };
         window.addEventListener('storage', handleStorageChange);
@@ -368,7 +376,7 @@ const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({
                 <IconButton onClick={onBack} sx={{ bgcolor: alpha(theme.palette.text.primary, 0.05), '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.1) } }}>
                     <CaretLeft size={20} />
                 </IconButton>
-                <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: individual.color, border: '2px solid', borderColor: theme.palette.background.paper, boxShadow: 1 }} />
+                {showColors && <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: individual.color, border: '2px solid', borderColor: theme.palette.background.paper, boxShadow: 1 }} />}
                 <Box sx={{ flex: 1 }}>
                     <Typography variant="h5" fontWeight={600}>{individual.display_name}</Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -388,7 +396,7 @@ const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({
                 </Tooltip>
             </Box>
         </Box>
-    ), [individual, dbImages.length, onBack, theme, setSettingsMenuPos]);
+    ), [individual, dbImages.length, onBack, theme, setSettingsMenuPos, showColors]);
 
     // Virtuoso components with Header (scrolls with content)
     const virtuosoComponents = useMemo(() => ({
@@ -616,6 +624,19 @@ const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowBoundingBoxes(e.target.checked)}
                 />
             </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                <Typography variant="subtitle2" fontWeight="600">
+                    Show ID Colors
+                </Typography>
+                <Switch
+                    size="small"
+                    checked={showColors}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        setShowColors(e.target.checked);
+                        localStorage.setItem('reid_showColors', e.target.checked.toString());
+                    }}
+                />
+            </Box>
         </Menu>
 
         {/* Image Modal - rendered at root level outside scrollable container */}
@@ -676,6 +697,10 @@ const ReIDPage: React.FC = () => {
         const saved = localStorage.getItem('mediaExplorer_useRayTracedGlass');
         return saved === null ? true : saved === 'true';
     });
+    const [showColors, setShowColors] = useState(() => {
+        const saved = localStorage.getItem('reid_showColors');
+        return saved === 'true'; // default false
+    });
 
     // Sync settings from Settings page
     useEffect(() => {
@@ -684,6 +709,8 @@ const ReIDPage: React.FC = () => {
                 setUseLiquidGlass(e.newValue === 'true');
             } else if (e.key === 'mediaExplorer_useRayTracedGlass' && e.newValue !== null) {
                 setUseRayTracedGlass(e.newValue === 'true');
+            } else if (e.key === 'reid_showColors' && e.newValue !== null) {
+                setShowColors(e.newValue === 'true');
             }
         };
         window.addEventListener('storage', handleStorageChange);
@@ -935,6 +962,7 @@ const ReIDPage: React.FC = () => {
                                 hasMore={runPagination?.hasMore || false}
                                 loadingMore={isLoadingMore}
                                 onLoadMore={() => loadMoreForRun(run.id)}
+                                showColors={showColors}
                             />
                         );
                     })}
@@ -1001,6 +1029,22 @@ const ReIDPage: React.FC = () => {
                         />
                     </Box>
                 )}
+
+                <Divider sx={{ my: 1 }} />
+
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                    <Typography variant="body2">
+                        Show ID Colors
+                    </Typography>
+                    <Switch
+                        size="small"
+                        checked={showColors}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            setShowColors(e.target.checked);
+                            localStorage.setItem('reid_showColors', e.target.checked.toString());
+                        }}
+                    />
+                </Box>
             </Menu>
 
             {/* Floating Action Button - Back to Top */}
