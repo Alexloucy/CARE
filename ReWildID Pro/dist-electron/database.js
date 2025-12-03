@@ -101,17 +101,7 @@ const initSchema = () => {
     db.exec(createReidMembersTable);
 };
 initSchema();
-// Distinct animal-inspired names for reid individuals
-const INDIVIDUAL_NAMES = [
-    'Atlas', 'Blaze', 'Cedar', 'Dusk', 'Echo', 'Fern', 'Ghost', 'Hazel',
-    'Ivy', 'Jasper', 'Kai', 'Luna', 'Moss', 'Nova', 'Oak', 'Pebble',
-    'Quill', 'River', 'Shadow', 'Thorn', 'Uma', 'Vale', 'Willow', 'Zephyr',
-    'Amber', 'Birch', 'Coral', 'Delta', 'Ember', 'Flint', 'Gale', 'Haze',
-    'Iris', 'Jade', 'Koda', 'Leaf', 'Maple', 'Nimbus', 'Onyx', 'Pine',
-    'Quinn', 'Raven', 'Slate', 'Terra', 'Umber', 'Vex', 'Wren', 'Zen',
-    'Ash', 'Brook', 'Cliff', 'Dawn', 'Elm', 'Frost', 'Grove', 'Hollow'
-];
-// Distinct, accessible colors (not too similar to each other)
+// Distinct, accessible colors for reid individuals
 const INDIVIDUAL_COLORS = [
     '#E57373', '#64B5F6', '#81C784', '#FFD54F', '#BA68C8',
     '#4DB6AC', '#FF8A65', '#A1887F', '#90A4AE', '#F06292',
@@ -120,38 +110,21 @@ const INDIVIDUAL_COLORS = [
     '#C5E1A5', '#FFCC80', '#CE93D8', '#80CBC4', '#EF9A9A',
     '#81D4FA', '#A5D6A7', '#FFE082', '#B0BEC5', '#F48FB1'
 ];
-// Generate a unique display name, handling collisions
+// Generate a unique display name using simple ID format (ID-1, ID-2, etc.)
 function generateDisplayName(existingNames) {
-    const usedBasenames = new Map();
-    // Count existing name usages
+    // Find the highest existing ID number
+    let maxId = 0;
     for (const existing of existingNames) {
-        const match = existing.match(/^(.+?)(?: (\d+))?$/);
+        const match = existing.match(/^ID-(\d+)$/);
         if (match) {
-            const base = match[1];
-            const num = match[2] ? parseInt(match[2]) : 1;
-            usedBasenames.set(base, Math.max(usedBasenames.get(base) || 0, num));
+            const num = parseInt(match[1]);
+            if (num > maxId)
+                maxId = num;
         }
     }
-    // Find first unused name or increment counter
-    for (const baseName of INDIVIDUAL_NAMES) {
-        if (!usedBasenames.has(baseName)) {
-            const colorIndex = existingNames.length % INDIVIDUAL_COLORS.length;
-            return { name: baseName, color: INDIVIDUAL_COLORS[colorIndex] };
-        }
-    }
-    // All names used, find one with lowest counter and increment
-    let minCount = Infinity;
-    let minName = INDIVIDUAL_NAMES[0];
-    for (const baseName of INDIVIDUAL_NAMES) {
-        const count = usedBasenames.get(baseName) || 0;
-        if (count < minCount) {
-            minCount = count;
-            minName = baseName;
-        }
-    }
-    const newCount = (usedBasenames.get(minName) || 1) + 1;
-    const colorIndex = existingNames.length % INDIVIDUAL_COLORS.length;
-    return { name: `${minName} ${newCount}`, color: INDIVIDUAL_COLORS[colorIndex] };
+    const newId = maxId + 1;
+    const colorIndex = (newId - 1) % INDIVIDUAL_COLORS.length;
+    return { name: `ID-${newId}`, color: INDIVIDUAL_COLORS[colorIndex] };
 }
 exports.DatabaseService = {
     // --- Groups ---
