@@ -23,6 +23,7 @@ import {
     deleteImage,
     updateGroupName,
     getImages,
+    getImagesByIds,
     checkIsDirectory,
     openFileDialog,
     saveImages,
@@ -175,6 +176,7 @@ ipcMain.handle('browseImage', (_, date, folderPath) => browseImage(date, folderP
 ipcMain.handle('viewImage', (_, originalPath) => viewImage(originalPath));
 ipcMain.handle('getImagePaths', (_, currentFolder) => getImagePaths(currentFolder));
 ipcMain.handle('getImages', (_, filter) => getImages(filter));
+ipcMain.handle('getImagesByIds', (_, imageIds) => getImagesByIds(imageIds));
 ipcMain.handle('downloadSelectedGalleryImages', (_, selectedPaths) => downloadSelectedGalleryImages(selectedPaths));
 ipcMain.handle('uploadImage', (_, relativePath, originalPath) => uploadImage(relativePath, originalPath));
 ipcMain.handle('uploadPaths', (_, filePaths, groupName, afterAction, species) => uploadPaths(filePaths, groupName, afterAction, species));

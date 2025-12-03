@@ -80,8 +80,10 @@ const fragmentShader = `
     vec2 fragCoord = vUv * uResolution;
     
     // Calculate bbox center and half-size (flip Y for shader coords)
-    // Add fixed pixel offset to push distortion edges outside the animal
-    float edgeOffset = 55.0; // Fixed 30px offset on each side
+    // Slightly enlarge the dome beyond the bbox so distortion primarily
+    // affects the area around the animal rather than only inside it.
+    // Use a size-proportional offset to avoid huge halos for large bboxes.
+    float edgeOffset = 0.18 * min(uBbox.z, uBbox.w);
     vec2 bboxCenter = vec2(uBbox.x + uBbox.z * 0.5, uResolution.y - (uBbox.y + uBbox.w * 0.5));
     vec2 bboxHalfSize = vec2(uBbox.z * 0.5 + edgeOffset, uBbox.w * 0.5 + edgeOffset);
     
@@ -134,12 +136,13 @@ const fragmentShader = `
     vec3 glassColor = mix(refractColor.rgb, reflectColor, fresnel * 0.4);
     glassColor = mix(glassColor, vec3(1.0), 0.05);
     
-    // Edge highlight
-    float edgeGlow = smoothstep(-uThickness * 0.3, 0.0, sd);
-    glassColor += vec3(1.0) * edgeGlow * 0.15;
+    // Edge highlight - make rim more pronounced for clearer bbox
+    float edgeGlow = smoothstep(-uThickness * 0.18, 0.0, sd);
+    glassColor += vec3(1.0) * edgeGlow * 0.40;
     
-    // Anti-aliased edge
-    float alpha = smoothstep(0.0, -2.0, sd) * uOpacity;
+    // Anti-aliased edge, slightly stronger near the rim
+    float baseAlpha = smoothstep(0.0, -2.0, sd) * uOpacity;
+    float alpha = baseAlpha * (0.75 + edgeGlow * 0.5);
     
     gl_FragColor = vec4(glassColor, alpha);
   }
@@ -385,23 +388,10 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
     if (!isDragging) return;
     const deltaX = e.clientX - dragStartRef.current.mouseX;
     const deltaY = e.clientY - dragStartRef.current.mouseY;
-    
-    // Rubber-band effect for bottom only (positive Y = downward)
-    const rubberBand = (value: number, limit: number) => {
-      if (value <= limit) return value;
-      // Apply diminishing returns beyond the limit
-      const excess = value - limit;
-      const dampedExcess = limit * (1 - Math.exp(-excess / limit));
-      return limit + dampedExcess * 0.3;
-    };
-    
-    const maxDragDown = 120; // Soft limit for dragging down
-    const rawX = dragStartRef.current.offsetX + deltaX;
-    const rawY = dragStartRef.current.offsetY + deltaY;
-    
-    // Free movement for X and upward Y, rubber-band only for downward
-    dragState.offsetX = rawX;
-    dragState.offsetY = rawY > 0 ? rubberBand(rawY, maxDragDown) : rawY;
+
+    // Linear, unconstrained dragging in both axes
+    dragState.offsetX = dragStartRef.current.offsetX + deltaX;
+    dragState.offsetY = dragStartRef.current.offsetY + deltaY;
   }, [isDragging]);
   
   const handleMouseUp = useCallback(() => {
@@ -492,8 +482,8 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
         <div
           style={{
             position: 'absolute',
-            left: labelPosition.x - 42,
-            top: labelPosition.y - 82,
+            left: labelPosition.x - 32,
+            top: labelPosition.y - 56,
             padding: '4px 12px',
             background: 'rgba(255, 255, 255, 0.2)',
             backdropFilter: 'blur(12px)',
@@ -512,7 +502,9 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
             transition: 'opacity 0.2s ease-out'
           }}
         >
-          {label}
+          {detection
+            ? `${label} ${(detection.confidence * 100).toFixed(1)}%`
+            : label}
         </div>
       )}
 

@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('api', {
     viewImage: (originalPath: string) => ipcRenderer.invoke('viewImage', originalPath),
     getImagePaths: (currentFolder: string) => ipcRenderer.invoke('getImagePaths', currentFolder),
     getImages: (filter?: any) => ipcRenderer.invoke('getImages', filter),
+    getImagesByIds: (imageIds: number[]) => ipcRenderer.invoke('getImagesByIds', imageIds),
     uploadPaths: (filePaths: string[], groupName?: string, afterAction?: 'classify' | 'reid', species?: string) => 
         ipcRenderer.invoke('uploadPaths', filePaths, groupName, afterAction, species),
     deleteGroup: (id: number) => ipcRenderer.invoke('deleteGroup', id),

@@ -162,6 +162,15 @@ export async function getImages(filter?: { date?: string, groupIds?: number[], s
     }
 }
 
+export async function getImagesByIds(imageIds: number[]) {
+    try {
+        const images = DatabaseService.getImagesByIds(imageIds);
+        return { ok: true, images };
+    } catch (error: unknown) {
+        return { ok: false, error: 'getImagesByIds failed: ' + error }
+    }
+}
+
 export async function deleteGroup(id: number) {
     try {
         DatabaseService.deleteGroup(id);

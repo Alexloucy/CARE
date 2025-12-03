@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Box, Typography, Modal, IconButton, Fade, Backdrop, Paper, useTheme } from '@mui/material';
 import { X, MagnifyingGlassPlus, MagnifyingGlassMinus, CaretLeft, CaretRight, Trash, Sparkle } from '@phosphor-icons/react';
 import { FileDetails, Detection, ReidInfoForImage } from '../types/electron';
@@ -498,13 +498,16 @@ const ImageModal: React.FC<ImageModalProps> = ({
         }
     }, [open, imageUrl]); // Reset when imageUrl changes too
 
-    // Calculate image dimensions when loaded
-    const handleImageLoad = () => {
+    // Calculate image dimensions
+    const calculateDimensions = useCallback(() => {
         if (imageRef.current && containerRef.current) {
             const img = imageRef.current;
             const container = containerRef.current;
             const containerRect = container.getBoundingClientRect();
             
+            // Only proceed if container has size
+            if (containerRect.width === 0 || containerRect.height === 0) return;
+
             // Calculate displayed size (objectFit: contain)
             const imgAspect = img.naturalWidth / img.naturalHeight;
             const containerAspect = containerRect.width / containerRect.height;
@@ -525,7 +528,25 @@ const ImageModal: React.FC<ImageModalProps> = ({
             // Mark these dimensions as belonging to the current image
             dimensionsForUrl.current = imageUrl;
         }
+    }, [imageUrl]);
+
+    // Calculate image dimensions when loaded
+    const handleImageLoad = () => {
+        calculateDimensions();
     };
+
+    // Recalculate dimensions when container resizes
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const observer = new ResizeObserver(() => {
+            calculateDimensions();
+        });
+
+        observer.observe(container);
+        return () => observer.disconnect();
+    }, [calculateDimensions]);
 
     // Check if dimensions are valid for the current image
     const dimensionsAreValid = dimensionsForUrl.current === imageUrl && imageDimensions.natural.width > 0;
@@ -572,14 +593,14 @@ const ImageModal: React.FC<ImageModalProps> = ({
         setIsDragging(false);
     };
 
-    // Transform bbox coordinates from original image space to screen space
+    // Transform bbox coordinates from original image space to displayed image space
     const transformBbox = (detection: Detection) => {
-        if (!containerRef.current || imageDimensions.natural.width === 0) return null;
+        if (imageDimensions.natural.width === 0) return null;
         
         const { natural, displayed } = imageDimensions;
         const scale = displayed.width / natural.width;
         
-        // Convert from absolute coordinates to scaled coordinates
+        // Convert from absolute coordinates to scaled coordinates within displayed image
         const x1 = detection.x1 * scale;
         const y1 = detection.y1 * scale;
         const x2 = detection.x2 * scale;
@@ -588,14 +609,9 @@ const ImageModal: React.FC<ImageModalProps> = ({
         const width = x2 - x1;
         const height = y2 - y1;
         
-        // Apply zoom and pan
-        const containerRect = containerRef.current.getBoundingClientRect();
-        const offsetX = (containerRect.width - displayed.width) / 2;
-        const offsetY = (containerRect.height - displayed.height) / 2;
-        
         return {
-            x: offsetX + x1,
-            y: offsetY + y1,
+            x: x1,
+            y: y1,
             width,
             height
         };
@@ -690,16 +706,17 @@ const ImageModal: React.FC<ImageModalProps> = ({
                         {/* Bounding Box Overlay */}
                         {detections && detections.length > 0 && imageDimensions.natural.width > 0 && (
                             useLiquidGlass && useRayTracedGlass && imageUrl ? (
-                                /* Ray-traced liquid glass - single WebGL canvas */
+                                /* Ray-traced liquid glass - single WebGL canvas, aligned to displayed image area */
                                 <Box
                                     sx={{
                                         position: 'absolute',
-                                        top: 0,
-                                        left: 0,
-                                        width: '100%',
-                                        height: '100%',
+                                        top: '50%',
+                                        left: '50%',
+                                        width: imageDimensions.displayed.width,
+                                        height: imageDimensions.displayed.height,
                                         pointerEvents: 'none',
-                                        transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+                                        transform: `translate(-50%, -50%) scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+                                        transformOrigin: 'center center',
                                         transition: isDragging ? 'none' : 'transform 0.1s ease-out'
                                     }}
                                 >

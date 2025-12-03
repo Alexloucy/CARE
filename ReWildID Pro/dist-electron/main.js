@@ -121,6 +121,7 @@ electron_1.ipcMain.handle('browseImage', (_, date, folderPath) => (0, controller
 electron_1.ipcMain.handle('viewImage', (_, originalPath) => (0, controller_1.viewImage)(originalPath));
 electron_1.ipcMain.handle('getImagePaths', (_, currentFolder) => (0, controller_1.getImagePaths)(currentFolder));
 electron_1.ipcMain.handle('getImages', (_, filter) => (0, controller_1.getImages)(filter));
+electron_1.ipcMain.handle('getImagesByIds', (_, imageIds) => (0, controller_1.getImagesByIds)(imageIds));
 electron_1.ipcMain.handle('downloadSelectedGalleryImages', (_, selectedPaths) => (0, controller_1.downloadSelectedGalleryImages)(selectedPaths));
 electron_1.ipcMain.handle('uploadImage', (_, relativePath, originalPath) => (0, controller_1.uploadImage)(relativePath, originalPath));
 electron_1.ipcMain.handle('uploadPaths', (_, filePaths, groupName, afterAction, species) => (0, controller_1.uploadPaths)(filePaths, groupName, afterAction, species));

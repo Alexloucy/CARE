@@ -20,6 +20,7 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     viewImage: (originalPath) => electron_1.ipcRenderer.invoke('viewImage', originalPath),
     getImagePaths: (currentFolder) => electron_1.ipcRenderer.invoke('getImagePaths', currentFolder),
     getImages: (filter) => electron_1.ipcRenderer.invoke('getImages', filter),
+    getImagesByIds: (imageIds) => electron_1.ipcRenderer.invoke('getImagesByIds', imageIds),
     uploadPaths: (filePaths, groupName, afterAction, species) => electron_1.ipcRenderer.invoke('uploadPaths', filePaths, groupName, afterAction, species),
     deleteGroup: (id) => electron_1.ipcRenderer.invoke('deleteGroup', id),
     deleteImage: (id) => electron_1.ipcRenderer.invoke('deleteImage', id),

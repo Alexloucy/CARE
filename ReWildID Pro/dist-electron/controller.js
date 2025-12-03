@@ -7,6 +7,7 @@ exports.uploadImage = uploadImage;
 exports.uploadPaths = uploadPaths;
 exports.browseImage = browseImage;
 exports.getImages = getImages;
+exports.getImagesByIds = getImagesByIds;
 exports.deleteGroup = deleteGroup;
 exports.deleteImage = deleteImage;
 exports.updateGroupName = updateGroupName;
@@ -186,6 +187,15 @@ async function getImages(filter) {
     }
     catch (error) {
         return { ok: false, error: 'getImages failed: ' + error };
+    }
+}
+async function getImagesByIds(imageIds) {
+    try {
+        const images = database_1.DatabaseService.getImagesByIds(imageIds);
+        return { ok: true, images };
+    }
+    catch (error) {
+        return { ok: false, error: 'getImagesByIds failed: ' + error };
     }
 }
 async function deleteGroup(id) {

@@ -1,22 +1,21 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
-    Box, Typography, CircularProgress, IconButton, Menu, MenuItem,
-    Chip, alpha, useTheme, Collapse, Modal, Backdrop, Fade, Skeleton, Button,
-    Switch, Tooltip
+    Box, Typography, IconButton, Menu, MenuItem,
+    Chip, alpha, useTheme, Collapse, Skeleton, Button,
+    Switch, Tooltip, Slider
 } from '@mui/material';
+import { Virtuoso } from 'react-virtuoso';
 import {
     ArrowLineUp, Fingerprint, DotsThreeVertical, PencilSimple, Trash, CaretDown, CaretRight,
-    Images as ImagesIcon, X, CaretLeft, MagnifyingGlassPlus, MagnifyingGlassMinus, Sparkle,
-    Gear
+    Images as ImagesIcon, CaretLeft, Sparkle, Gear, ArrowCounterClockwise
 } from '@phosphor-icons/react';
 import { LiquidGlassButton } from '../../components/LiquidGlassButton';
 import { GroupNameDialog } from '../../components/GroupNameDialog';
 import { LibrarySearchBar } from '../../components/library/LibrarySearchBar';
-import { DetectionBox } from '../../components/ImageModal';
-import { LiquidGlassOverlay } from '../../components/LiquidGlassOverlay';
+import ImageModal from '../../components/ImageModal';
 import { RefreshNotification } from '../../components/RefreshNotification';
-import { Detection } from '../../types/electron';
+import { Detection, DBImage } from '../../types/electron';
 
 interface ReidRun { id: number; name: string; species: string; created_at: number; individual_count: number; detection_count: number; }
 interface ReidDetection { id: number; image_id: number; label: string; confidence: number; detection_confidence: number; x1: number; y1: number; x2: number; y2: number; source: string; batch_id: number; created_at: number; image_path: string; image_preview_path?: string; }
@@ -114,198 +113,402 @@ const RunGroup: React.FC<RunGroupProps> = ({ run, individuals, imageUrls, onIndi
     );
 };
 
-const IndividualModal: React.FC<{ open: boolean; onClose: () => void; individual: ReidIndividual | null; imageUrls: Map<string, string>; fullImageUrls: Map<string, string>; loadFullImage: (path: string) => void; useLiquidGlass?: boolean; useRayTracedGlass?: boolean }> = ({ open, onClose, individual, imageUrls, fullImageUrls, loadFullImage, useLiquidGlass = true, useRayTracedGlass = true }) => {
+// Detail view for viewing an individual's images - copies DateGroupList structure exactly
+interface IndividualDetailViewProps {
+    individual: ReidIndividual;
+    onBack: () => void;
+}
+
+const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({ 
+    individual, 
+    onBack
+}) => {
     const theme = useTheme();
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [zoom, setZoom] = useState(1);
-    const [position, setPosition] = useState({ x: 0, y: 0 });
-    const [isDragging, setIsDragging] = useState(false);
-    const dragStart = useRef({ x: 0, y: 0 });
-    const imageRef = useRef<HTMLImageElement>(null);
+    const [loading, setLoading] = useState(true);
+    const [dbImages, setDbImages] = useState<DBImage[]>([]);
+    const [imageUrls, setImageUrls] = useState<Record<number, string>>({});
+    const [fullImageUrls, setFullImageUrls] = useState<Record<number, string>>({});
+    const [selectedImage, setSelectedImage] = useState<DBImage | null>(null);
+    const [gridItemSize, setGridItemSize] = useState(() => {
+        const saved = localStorage.getItem('mediaExplorer_gridSize');
+        return saved ? parseInt(saved, 10) : 180;
+    });
+    const [useLiquidGlass] = useState(() => {
+        const saved = localStorage.getItem('mediaExplorer_useLiquidGlass');
+        return saved === null ? true : saved === 'true';
+    });
+    const [useRayTracedGlass] = useState(() => {
+        const saved = localStorage.getItem('mediaExplorer_useRayTracedGlass');
+        return saved === null ? true : saved === 'true';
+    });
+    const [containerWidth, setContainerWidth] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [imgDims, setImgDims] = useState({ natural: { width: 0, height: 0 }, displayed: { width: 0, height: 0 }, container: { width: 0, height: 0 } });
+    const [settingsMenuPos, setSettingsMenuPos] = useState<{ top: number; left: number } | null>(null);
 
-    const detections = individual?.detections || [];
-    const currentDet = detections[currentIndex];
-    const currentUrl = currentDet ? (fullImageUrls.get(currentDet.image_path) || imageUrls.get(currentDet.image_path)) : undefined;
+    // Zoom Handler - Callback ref ensures listener is attached immediately when node exists
+    const zoomRef = useCallback((node: HTMLDivElement | null) => {
+        if (!node) return;
 
-    // Preload all images for this individual when modal opens
+        const handleWheel = (e: WheelEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                const delta = e.deltaY * -2.5;
+                setGridItemSize(prev => Math.min(Math.max(prev + delta, 100), 715));
+            }
+        };
+
+        node.addEventListener('wheel', handleWheel, { passive: false });
+        
+        // Cleanup listener when node changes or unmounts
+        return () => {
+            node.removeEventListener('wheel', handleWheel);
+        };
+    }, []);
+
+    // Fetch DBImage objects for this individual's detections
     useEffect(() => {
-        if (open && individual && detections.length > 0) {
-            // Preload all images for smoother navigation
-            detections.forEach(det => {
-                if (!fullImageUrls.has(det.image_path)) {
-                    loadFullImage(det.image_path);
+        const fetchImages = async () => {
+            setLoading(true);
+            const imageIds = [...new Set(individual.detections.map(d => d.image_id))];
+            if (imageIds.length > 0) {
+                try {
+                    const result = await window.api.getImagesByIds(imageIds);
+                    if (result.ok && result.images) {
+                        setDbImages(result.images);
+                    }
+                } catch (error) {
+                    console.error('[IndividualDetailView] Error fetching images:', error);
                 }
-            });
+            }
+            setLoading(false);
+        };
+        fetchImages();
+    }, [individual.id]);
+
+    // Measure container width (same as DateGroupList)
+    // Re-run when loading changes because containerRef is only available after loading
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        const observer = new ResizeObserver(entries => {
+            for (const entry of entries) {
+                setContainerWidth(entry.contentRect.width);
+            }
+        });
+        observer.observe(container);
+        return () => observer.disconnect();
+    }, [loading]);
+
+    // Load thumbnails
+    useEffect(() => {
+        const loadThumbnails = async () => {
+            for (const img of dbImages) {
+                if (!imageUrls[img.id]) {
+                    const path = img.preview_path || img.original_path;
+                    try {
+                        const response = await window.api.viewImage(path);
+                        if (response.ok && response.data) {
+                            const blob = new Blob([response.data as unknown as BlobPart], { type: 'image/jpeg' });
+                            const url = URL.createObjectURL(blob);
+                            setImageUrls(prev => ({ ...prev, [img.id]: url }));
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+            }
+        };
+        if (dbImages.length > 0) loadThumbnails();
+    }, [dbImages]);
+
+    // Load full image for modal
+    const loadFullImage = useCallback(async (img: DBImage) => {
+        if (!fullImageUrls[img.id]) {
+            try {
+                const response = await window.api.viewImage(img.original_path);
+                if (response.ok && response.data) {
+                    const blob = new Blob([response.data as unknown as BlobPart], { type: 'image/jpeg' });
+                    const url = URL.createObjectURL(blob);
+                    setFullImageUrls(prev => ({ ...prev, [img.id]: url }));
+                }
+            } catch (e) { /* ignore */ }
         }
-    }, [open, individual?.id]);
+    }, [fullImageUrls]);
 
-    useEffect(() => { if (open && currentDet) { setZoom(1); setPosition({ x: 0, y: 0 }); } }, [open, currentIndex, currentDet]);
-    useEffect(() => { setCurrentIndex(0); }, [individual?.id]);
 
-    const handleImageLoad = () => {
-        if (imageRef.current && containerRef.current) {
-            const img = imageRef.current, rect = containerRef.current.getBoundingClientRect();
-            const aspect = img.naturalWidth / img.naturalHeight, cAspect = rect.width / rect.height;
-            const [dw, dh] = aspect > cAspect ? [rect.width, rect.width / aspect] : [rect.height * aspect, rect.height];
-            setImgDims({ natural: { width: img.naturalWidth, height: img.naturalHeight }, displayed: { width: dw, height: dh }, container: { width: rect.width, height: rect.height } });
+    // Column calculation (copied exactly from DateGroupList)
+    const horizontalPadding = 64; // px: 4 = 32px * 2
+    const gap = 16; // theme spacing 2
+    const availableWidth = containerWidth - horizontalPadding;
+    const columns = availableWidth > 0 ? Math.max(1, Math.floor((availableWidth + gap) / (gridItemSize + gap))) : 1;
+    const actualItemWidth = columns > 0 ? (availableWidth - (gap * (columns - 1))) / columns : gridItemSize;
+
+    // Row height calculation (copied from DateGroupList)
+    const aspectRatio = '1.618/1';
+    const getRowHeight = useCallback(() => {
+        const [w, h] = aspectRatio.split('/').map(Number);
+        return actualItemWidth * (h / w) + 16;
+    }, [actualItemWidth]);
+
+    // Flatten images into rows
+    const imageRows = useMemo(() => {
+        if (columns === 0) return [];
+        const rows: DBImage[][] = [];
+        for (let i = 0; i < dbImages.length; i += columns) {
+            rows.push(dbImages.slice(i, i + columns));
         }
-    };
+        return rows;
+    }, [dbImages, columns]);
 
-    const transformBbox = () => {
-        if (!containerRef.current || imgDims.natural.width === 0 || !currentDet) return null;
-        const scale = imgDims.displayed.width / imgDims.natural.width;
-        const rect = containerRef.current.getBoundingClientRect();
-        const offsetX = (rect.width - imgDims.displayed.width) / 2, offsetY = (rect.height - imgDims.displayed.height) / 2;
-        return { x: offsetX + currentDet.x1 * scale, y: offsetY + currentDet.y1 * scale, width: (currentDet.x2 - currentDet.x1) * scale, height: (currentDet.y2 - currentDet.y1) * scale };
-    };
+    // Get detection for current image
+    const getDetectionsForImage = useCallback((imgId: number): Detection[] => {
+        return individual.detections
+            .filter(d => d.image_id === imgId)
+            .map(d => ({
+                id: d.id,
+                image_id: d.image_id,
+                label: individual.display_name,
+                confidence: d.confidence,
+                detection_confidence: d.detection_confidence,
+                x1: d.x1,
+                y1: d.y1,
+                x2: d.x2,
+                y2: d.y2,
+                source: d.source,
+                batch_id: d.batch_id,
+                created_at: d.created_at
+            } as Detection));
+    }, [individual]);
 
-    if (!individual) return null;
-    const bbox = transformBbox();
+    // Navigation in modal
+    const currentIndex = selectedImage ? dbImages.findIndex(img => img.id === selectedImage.id) : -1;
+    const hasNext = currentIndex >= 0 && currentIndex < dbImages.length - 1;
+    const hasPrev = currentIndex > 0;
+    const goNext = useCallback(() => { 
+        if (hasNext) { 
+            const nextImg = dbImages[currentIndex + 1]; 
+            setSelectedImage(nextImg); 
+            loadFullImage(nextImg); 
+        } 
+    }, [hasNext, currentIndex, dbImages, loadFullImage]);
+    const goPrev = useCallback(() => { 
+        if (hasPrev) { 
+            const prevImg = dbImages[currentIndex - 1]; 
+            setSelectedImage(prevImg); 
+            loadFullImage(prevImg); 
+        } 
+    }, [hasPrev, currentIndex, dbImages, loadFullImage]);
+
+    // Handle image click
+    const handleImageClick = useCallback((img: DBImage) => {
+        setSelectedImage(img);
+        loadFullImage(img);
+    }, [loadFullImage]);
+
+    // Preload nearby images when modal is open
+    useEffect(() => {
+        if (selectedImage && currentIndex !== -1) {
+            for (let offset = 1; offset <= 3; offset++) {
+                if (currentIndex + offset < dbImages.length) loadFullImage(dbImages[currentIndex + offset]);
+                if (currentIndex - offset >= 0) loadFullImage(dbImages[currentIndex - offset]);
+            }
+        }
+    }, [selectedImage, currentIndex, dbImages, loadFullImage]);
+
+    // Header component that scrolls with content (via Virtuoso)
+    // Includes navbar spacer (64px) like MediaExplorer
+    const headerContent = useMemo(() => (
+        <Box>
+            {/* Navbar spacer */}
+            <Box sx={{ height: 64 }} />
+            {/* Individual header */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 2, px: 4 }}>
+                <IconButton onClick={onBack} sx={{ bgcolor: alpha(theme.palette.text.primary, 0.05), '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.1) } }}>
+                    <CaretLeft size={20} />
+                </IconButton>
+                <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: individual.color, border: '2px solid', borderColor: theme.palette.background.paper, boxShadow: 1 }} />
+                <Box sx={{ flex: 1 }}>
+                    <Typography variant="h5" fontWeight={600}>{individual.display_name}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        {individual.member_count} sighting{individual.member_count !== 1 ? 's' : ''} • {dbImages.length} image{dbImages.length !== 1 ? 's' : ''}
+                    </Typography>
+                </Box>
+                <Tooltip title="View Settings">
+                    <IconButton
+                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setSettingsMenuPos({ top: rect.bottom, left: rect.right });
+                        }}
+                        sx={{ '&:hover': { bgcolor: theme.palette.action.hover } }}
+                    >
+                        <Gear weight="regular" />
+                    </IconButton>
+                </Tooltip>
+            </Box>
+        </Box>
+    ), [individual, dbImages.length, onBack, theme, setSettingsMenuPos]);
+
+    // Virtuoso components with Header (scrolls with content)
+    const virtuosoComponents = useMemo(() => ({
+        Header: () => headerContent
+    }), [headerContent]);
+
+    if (loading) {
+        return (
+            <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', pt: '64px' }}>
+                <Typography color="text.secondary">Loading images...</Typography>
+            </Box>
+        );
+    }
+
+    const rowHeight = getRowHeight() + 24; // +24 for bottom margin (pb: 3)
 
     return (
-        <Modal open={open} onClose={onClose} closeAfterTransition slots={{ backdrop: Backdrop }} slotProps={{ backdrop: { timeout: 500, sx: { backgroundColor: 'rgba(0,0,0,0.85)' } } }}>
-            <Fade in={open}>
-                <Box onClick={(e: React.MouseEvent) => e.stopPropagation()} sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '90vw', height: '90vh', bgcolor: 'background.paper', borderRadius: 4, overflow: 'hidden', boxShadow: 24, display: 'flex', outline: 'none' }}>
-                    {/* SVG Filter for Liquid Glass Effect */}
-                    <svg style={{ display: 'none' }}>
-                        <filter id="container-glass" x="0%" y="0%" width="100%" height="100%">
-                            <feTurbulence type="fractalNoise" baseFrequency="0.008 0.008" numOctaves="2" seed="92" result="noise" />
-                            <feGaussianBlur in="noise" stdDeviation="0.02" result="blur" />
-                            <feDisplacementMap in="SourceGraphic" in2="blur" scale="77" xChannelSelector="R" yChannelSelector="G" />
-                        </filter>
-                    </svg>
-                    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-                        <Box ref={containerRef} sx={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'black', cursor: isDragging ? 'grabbing' : 'grab' }}
-                            onWheel={(e: React.WheelEvent) => { e.stopPropagation(); setZoom(z => e.deltaY < 0 ? Math.min(z + 0.1, 5) : Math.max(z - 0.1, 0.5)); }}
-                            onMouseDown={(e: React.MouseEvent) => { setIsDragging(true); dragStart.current = { x: e.clientX - position.x, y: e.clientY - position.y }; }}
-                            onMouseMove={(e: React.MouseEvent) => { if (isDragging) { e.preventDefault(); setPosition({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y }); } }}
-                            onMouseUp={() => setIsDragging(false)} onMouseLeave={() => setIsDragging(false)}>
-                            {currentUrl ? (
-                                <>
-                                    <img ref={imageRef} src={currentUrl} alt={individual.display_name} onLoad={handleImageLoad} style={{ width: '100%', height: '100%', objectFit: 'contain', transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`, transition: isDragging ? 'none' : 'transform 0.1s', userSelect: 'none' }} draggable={false} />
-                                    {bbox && imgDims.displayed.width > 0 && (
-                                        useLiquidGlass && useRayTracedGlass && imgDims.container.width > 0 ? (
-                                            /* Ray-traced liquid glass - positioned over displayed image area */
-                                            <Box sx={{ 
-                                                position: 'absolute', 
-                                                top: (imgDims.container.height - imgDims.displayed.height) / 2,
-                                                left: (imgDims.container.width - imgDims.displayed.width) / 2,
-                                                width: imgDims.displayed.width, 
-                                                height: imgDims.displayed.height, 
-                                                pointerEvents: 'none', 
-                                                transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`, 
-                                                transition: isDragging ? 'none' : 'transform 0.1s' 
-                                            }}>
-                                                <LiquidGlassOverlay
-                                                    imageUrl={currentUrl}
-                                                    bboxes={[{ 
-                                                        bbox: {
-                                                            // Adjust bbox coordinates relative to displayed image (remove offset)
-                                                            x: bbox.x - (imgDims.container.width - imgDims.displayed.width) / 2,
-                                                            y: bbox.y - (imgDims.container.height - imgDims.displayed.height) / 2,
-                                                            width: bbox.width,
-                                                            height: bbox.height
-                                                        }, 
-                                                        label: individual.display_name, 
-                                                        detection: { ...currentDet, label: individual.display_name } as Detection 
-                                                    }]}
-                                                    containerWidth={imgDims.displayed.width}
-                                                    containerHeight={imgDims.displayed.height}
-                                                    customPopupContent={
-                                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                                                <Fingerprint size={18} weight="fill" color={individual.color} />
-                                                                <Typography variant="subtitle2" fontWeight="700">Individual Details</Typography>
-                                                            </Box>
-                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                                <Typography variant="caption" color="text.secondary">Individual</Typography>
-                                                                <Box sx={{ bgcolor: alpha(individual.color, 0.15), color: individual.color, px: 1, py: 0.2, borderRadius: 1, fontSize: '0.75rem', fontWeight: 600 }}>
-                                                                    {individual.display_name}
-                                                                </Box>
-                                                            </Box>
-                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                                <Typography variant="caption" color="text.secondary">Sightings</Typography>
-                                                                <Typography variant="caption" fontWeight="600">{individual.member_count}</Typography>
-                                                            </Box>
-                                                        </Box>
-                                                    }
-                                                />
-                                            </Box>
+        <>
+        <Box
+            ref={zoomRef}
+            sx={{
+                flex: 1,
+                overflow: 'hidden',
+                height: '100%',
+                width: '100%'
+            }}
+        >
+            <Box ref={containerRef} sx={{ height: '100%', width: '100%' }}>
+                <Virtuoso
+                style={{ height: '100%' }}
+                totalCount={imageRows.length}
+                defaultItemHeight={rowHeight}
+                components={virtuosoComponents}
+                itemContent={(rowIndex: number) => {
+                    const row = imageRows[rowIndex];
+                    return (
+                        <Box sx={{ 
+                            height: rowHeight,
+                            display: 'grid', 
+                            gridTemplateColumns: `repeat(${columns}, 1fr)`,
+                            gap: 2,
+                            pb: 3,
+                            px: 4,
+                            overflow: 'hidden',
+                            alignItems: 'start'
+                        }}>
+                            {row.map(img => {
+                                const url = imageUrls[img.id];
+                                return (
+                                    <Box
+                                        key={img.id}
+                                        onClick={() => handleImageClick(img)}
+                                        sx={{
+                                            minWidth: 0,
+                                            height: 'fit-content',
+                                            aspectRatio,
+                                            borderRadius: 1.5,
+                                            overflow: 'hidden',
+                                            cursor: 'pointer',
+                                            bgcolor: theme.palette.mode === 'light' ? '#f5f5f5' : '#1a1a1a',
+                                            transition: 'transform 0.15s, box-shadow 0.15s',
+                                            '&:hover': {
+                                                transform: 'scale(1.02)',
+                                                boxShadow: 3
+                                            }
+                                        }}
+                                    >
+                                        {url ? (
+                                            <Box
+                                                component="img"
+                                                src={url}
+                                                sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                            />
                                         ) : (
-                                            /* CSS-based detection box (liquid glass or classic) */
-                                            <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`, transition: isDragging ? 'none' : 'transform 0.1s' }}>
-                                                <DetectionBox
-                                                    bbox={bbox}
-                                                    detection={{ ...currentDet, label: individual.display_name } as Detection}
-                                                    zoom={zoom}
-                                                    containerWidth={imgDims.displayed.width}
-                                                    containerHeight={imgDims.displayed.height}
-                                                    useLiquidGlass={useLiquidGlass}
-                                                    popupTitle="Individual Details"
-                                                    popupIcon={<Fingerprint size={18} weight="fill" color={individual.color} />}
-                                                    customPopupContent={
-                                                        <>
-                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                                                                <Fingerprint size={18} weight="fill" color={individual.color} />
-                                                                <Typography variant="subtitle2" fontWeight="700">Individual Details</Typography>
-                                                            </Box>
-                                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                                    <Typography variant="caption" color="text.secondary">Individual</Typography>
-                                                                    <Box sx={{ bgcolor: alpha(individual.color, 0.15), color: individual.color, px: 1, py: 0.2, borderRadius: 1, fontSize: '0.75rem', fontWeight: 600 }}>
-                                                                        {individual.display_name}
-                                                                    </Box>
-                                                                </Box>
-                                                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                                    <Typography variant="caption" color="text.secondary">Sightings</Typography>
-                                                                    <Typography variant="caption" fontWeight="600">{individual.member_count}</Typography>
-                                                                </Box>
-                                                            </Box>
-                                                        </>
-                                                    }
-                                                />
+                                            <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <Fingerprint size={32} weight="thin" color={theme.palette.text.disabled} />
                                             </Box>
-                                        )
-                                    )}
-                                </>
-                            ) : <CircularProgress />}
-                            {currentIndex > 0 && <IconButton onClick={() => setCurrentIndex(i => i - 1)} sx={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'white', bgcolor: 'rgba(0,0,0,0.4)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}><CaretLeft size={32} /></IconButton>}
-                            {currentIndex < detections.length - 1 && <IconButton onClick={() => setCurrentIndex(i => i + 1)} sx={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', color: 'white', bgcolor: 'rgba(0,0,0,0.4)', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}><CaretRight size={32} /></IconButton>}
-                            <Box sx={{ position: 'absolute', top: 16, right: 16, display: 'flex', gap: 1, bgcolor: 'rgba(0,0,0,0.4)', borderRadius: 3, p: 0.5 }}>
-                                <IconButton onClick={() => setZoom(z => Math.max(z - 0.5, 0.5))} size="small" sx={{ color: 'white' }}><MagnifyingGlassMinus size={20} /></IconButton>
-                                <IconButton onClick={() => setZoom(z => Math.min(z + 0.5, 5))} size="small" sx={{ color: 'white' }}><MagnifyingGlassPlus size={20} /></IconButton>
-                                <IconButton onClick={onClose} size="small" sx={{ color: 'white' }}><X size={20} /></IconButton>
-                            </Box>
-                            <Box sx={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', bgcolor: 'rgba(0,0,0,0.6)', color: 'white', px: 2, py: 0.5, borderRadius: 2, fontSize: '0.875rem' }}>{currentIndex + 1} / {detections.length}</Box>
-                        </Box>
-                    </Box>
-                    <Box sx={{ width: 320, borderLeft: `1px solid ${theme.palette.divider}`, display: 'flex', flexDirection: 'column' }}>
-                        <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}><Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: individual.color }} /><Typography variant="h6" fontWeight={600}>{individual.display_name}</Typography></Box>
-                            <Typography variant="body2" color="text.secondary">{individual.member_count} sighting{individual.member_count !== 1 ? 's' : ''}</Typography>
-                        </Box>
-                        <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-                            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1.5 }}>All Sightings</Typography>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                {detections.map((det, idx) => (
-                                    <Box key={det.id} onClick={() => setCurrentIndex(idx)} sx={{ display: 'flex', gap: 1.5, p: 1, borderRadius: 2, cursor: 'pointer', bgcolor: idx === currentIndex ? alpha(individual.color, 0.15) : 'transparent', border: `1px solid ${idx === currentIndex ? individual.color : 'transparent'}`, '&:hover': { bgcolor: alpha(individual.color, 0.1) } }}>
-                                        <Box sx={{ width: 56, height: 56, borderRadius: 1.5, overflow: 'hidden', bgcolor: theme.palette.mode === 'light' ? '#f0f0f0' : '#2a2a2a', flexShrink: 0 }}>
-                                            {imageUrls.get(det.image_preview_path || det.image_path) ? <Box component="img" src={imageUrls.get(det.image_preview_path || det.image_path)} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Fingerprint size={24} weight="thin" /></Box>}
-                                        </Box>
-                                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                                            <Typography variant="caption" noWrap sx={{ display: 'block' }}>{det.image_path.split(/[/\\]/).pop()}</Typography>
-                                            <Typography variant="caption" color="text.secondary">{det.label}</Typography>
-                                        </Box>
+                                        )}
                                     </Box>
-                                ))}
-                            </Box>
+                                );
+                            })}
                         </Box>
-                    </Box>
+                    );
+                }}
+            />
+
+            </Box>
+        </Box>
+
+        {/* Settings Menu - rendered at root level outside scrollable container */}
+        <Menu
+            open={Boolean(settingsMenuPos)}
+            onClose={() => setSettingsMenuPos(null)}
+            anchorReference="anchorPosition"
+            anchorPosition={settingsMenuPos ? { top: settingsMenuPos.top, left: settingsMenuPos.left } : undefined}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            slotProps={{
+                paper: {
+                    elevation: 0,
+                    sx: {
+                        backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(45, 45, 45, 0.95)',
+                        backdropFilter: 'blur(8px)',
+                        borderRadius: '12px',
+                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                        border: `1px solid ${theme.palette.divider}`,
+                        minWidth: '250px',
+                        p: 2,
+                        mt: 1
+                    }
+                }
+            }}
+        >
+            <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Grid Size
+                <Tooltip title="Reset to Default">
+                    <IconButton size="small" onClick={() => setGridItemSize(180)}>
+                        <ArrowCounterClockwise size={14} />
+                    </IconButton>
+                </Tooltip>
+            </Typography>
+            <Box sx={{ px: 1, mb: 2 }}>
+                <Slider
+                    size="small"
+                    value={gridItemSize}
+                    min={100}
+                    max={715}
+                    onChange={(_: Event, value: number | number[]) => setGridItemSize(value as number)}
+                    valueLabelDisplay="auto"
+                    valueLabelFormat={(value: number) => `${value}px`}
+                />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                    <Typography variant="caption" color="text.secondary">Small</Typography>
+                    <Typography variant="caption" color="text.secondary">Large</Typography>
                 </Box>
-            </Fade>
-        </Modal>
+            </Box>
+        </Menu>
+
+        {/* Image Modal - rendered at root level outside scrollable container */}
+        {(() => {
+            const isOpen = selectedImage !== null;
+            const imageUrl = selectedImage ? (fullImageUrls[selectedImage.id] || imageUrls[selectedImage.id]) : undefined;
+            const dets = selectedImage ? getDetectionsForImage(selectedImage.id) : [];
+            const file = selectedImage ? {
+                name: selectedImage.original_path.split('\\').pop() || selectedImage.original_path.split('/').pop() || 'unknown',
+                isDirectory: false,
+                path: selectedImage.original_path
+            } : undefined;
+            return (
+                <ImageModal
+                    open={isOpen}
+                    onClose={() => setSelectedImage(null)}
+                    imageUrl={imageUrl}
+                    file={file}
+                    detections={dets}
+                    onNext={hasNext ? goNext : undefined}
+                    onPrev={hasPrev ? goPrev : undefined}
+                    hasNext={hasNext}
+                    hasPrev={hasPrev}
+                    useLiquidGlass={useLiquidGlass}
+                    useRayTracedGlass={useRayTracedGlass}
+                />
+            );
+        })()}
+    </>
     );
 };
 
@@ -325,9 +528,7 @@ const ReIDPage: React.FC = () => {
     const [renameDialogOpen, setRenameDialogOpen] = useState(false);
     const [runToRename, setRunToRename] = useState<{ id: number; name: string } | null>(null);
     const [selectedIndividual, setSelectedIndividual] = useState<ReidIndividual | null>(null);
-    const [modalOpen, setModalOpen] = useState(false);
     const [imageUrls, setImageUrls] = useState<Map<string, string>>(new Map());
-    const [fullImageUrls, setFullImageUrls] = useState<Map<string, string>>(new Map());
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     
     // Read liquid glass settings from localStorage (shared with MediaExplorer and Settings page)
@@ -459,18 +660,12 @@ const ReIDPage: React.FC = () => {
         setLoadingMore(prev => new Map(prev).set(runId, false));
     };
 
-    const loadFullImage = (path: string) => {
-        if (!fullImageUrls.has(path)) {
-            loadImageByPath(path, setFullImageUrls);
-        }
-    };
-
     const handleMenuOpen = (e: React.MouseEvent<HTMLElement>, runId: number) => { setMenuAnchor(e.currentTarget); setSelectedRunId(runId); };
     const handleMenuClose = () => { setMenuAnchor(null); setSelectedRunId(null); };
     const handleRename = () => { const run = runs.find(r => r.id === selectedRunId); if (run) { setRunToRename({ id: run.id, name: run.name }); setRenameDialogOpen(true); } handleMenuClose(); };
     const handleConfirmRename = async (newName: string) => { if (runToRename) { await window.api.updateReidRunName(runToRename.id, newName); setRefreshTrigger(t => t + 1); } setRenameDialogOpen(false); setRunToRename(null); };
     const handleDelete = async () => { if (selectedRunId && window.confirm('Delete this ReID run?')) { await window.api.deleteReidRun(selectedRunId); setRefreshTrigger(t => t + 1); } handleMenuClose(); };
-    const handleIndividualClick = (ind: ReidIndividual) => { setSelectedIndividual(ind); setModalOpen(true); };
+    const handleIndividualClick = (ind: ReidIndividual) => { setSelectedIndividual(ind); };
 
     if (loading) return (
         <Box sx={{ pt: '64px', px: 3, pb: 3, minHeight: '100vh' }}>
@@ -514,6 +709,18 @@ const ReIDPage: React.FC = () => {
             ))}
         </Box>
     );
+
+    // If viewing an individual, show the detail view (full height, navbar spacer in header)
+    if (selectedIndividual) {
+        return (
+            <Box sx={{ height: '100vh', overflow: 'hidden' }}>
+                <IndividualDetailView
+                    individual={selectedIndividual}
+                    onBack={() => setSelectedIndividual(null)}
+                />
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{ pt: '64px', px: 3, pb: 3, minHeight: '100vh' }}>
@@ -659,8 +866,6 @@ const ReIDPage: React.FC = () => {
                     </Box>
                 )}
             </Menu>
-            
-            <IndividualModal open={modalOpen} onClose={() => setModalOpen(false)} individual={selectedIndividual} imageUrls={imageUrls} fullImageUrls={fullImageUrls} loadFullImage={loadFullImage} useLiquidGlass={useLiquidGlass} useRayTracedGlass={useRayTracedGlass} />
 
             {/* Floating Action Button - Back to Top */}
             <Box
