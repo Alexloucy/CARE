@@ -8,7 +8,6 @@ import {
     ListChecks,
     CaretLeft,
     CaretRight,
-    Gear,
     X,
     Minus,
     CornersOut,
@@ -270,20 +269,18 @@ export default function Navbar({
                     <Tooltip title={isDarkMode ? 'Light Mode' : 'Dark Mode'}>
                         <IconButton
                             color="inherit"
-                            size="small"
                             onClick={toggleColorMode}
-                            sx={{ fontSize: { xs: 18, sm: 20 } }}
+                            sx={{ padding: 1 }}
                         >
-                            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+                            {isDarkMode ? <Sun size={24} /> : <Moon size={24} />}
                         </IconButton>
                     </Tooltip>
 
                     <Tooltip title="Tasks">
                         <IconButton
                             color="inherit"
-                            size="small"
                             onClick={toggleRightSidebar}
-                            sx={{ fontSize: { xs: 18, sm: 20 } }}
+                            sx={{ padding: 1 }}
                         >
                             <Badge 
                                 badgeContent={activeJobsCount} 
@@ -301,19 +298,8 @@ export default function Navbar({
                                     } 
                                 }}
                             >
-                                <ListChecks size={20} />
+                                <ListChecks size={24} />
                             </Badge>
-                        </IconButton>
-                    </Tooltip>
-
-                    <Tooltip title="Settings">
-                        <IconButton
-                            color="inherit"
-                            size="small"
-                            onClick={() => navigate('/settings')}
-                            sx={{ fontSize: { xs: 18, sm: 20 } }}
-                        >
-                            <Gear size={20} />
                         </IconButton>
                     </Tooltip>
                     {inElectron && (
@@ -321,31 +307,28 @@ export default function Navbar({
                             <Tooltip title="Minimize">
                                 <IconButton
                                     color="inherit"
-                                    size="small"
                                     onClick={handleMinimize}
-                                    sx={{ fontSize: { xs: 16, sm: 18 }, WebkitAppRegion: 'no-drag', '&:hover': { backgroundColor: muiTheme.palette.action.hover } }}
+                                    sx={{ padding: 1, WebkitAppRegion: 'no-drag', '&:hover': { backgroundColor: muiTheme.palette.action.hover } }}
                                 >
-                                    <Minus size={16} />
+                                    <Minus size={18} />
                                 </IconButton>
                             </Tooltip>
                             <Tooltip title={isMaximized ? 'Restore' : 'Maximize'}>
                                 <IconButton
                                     color="inherit"
-                                    size="small"
                                     onClick={handleMaximize}
-                                    sx={{ fontSize: { xs: 16, sm: 18 }, WebkitAppRegion: 'no-drag', '&:hover': { backgroundColor: muiTheme.palette.action.hover } }}
+                                    sx={{ padding: 1, WebkitAppRegion: 'no-drag', '&:hover': { backgroundColor: muiTheme.palette.action.hover } }}
                                 >
-                                    {isMaximized ? <CornersIn size={16} /> : <CornersOut size={16} />}
+                                    {isMaximized ? <CornersIn size={18} /> : <CornersOut size={18} />}
                                 </IconButton>
                             </Tooltip>
                             <Tooltip title="Close">
                                 <IconButton
                                     color="inherit"
-                                    size="small"
                                     onClick={handleClose}
-                                    sx={{ fontSize: { xs: 16, sm: 18 }, WebkitAppRegion: 'no-drag', '&:hover': { backgroundColor: muiTheme.palette.error.main, color: muiTheme.palette.error.contrastText } }}
+                                    sx={{ padding: 1, WebkitAppRegion: 'no-drag', '&:hover': { backgroundColor: muiTheme.palette.error.main, color: muiTheme.palette.error.contrastText } }}
                                 >
-                                    <X size={16} />
+                                    <X size={18} />
                                 </IconButton>
                             </Tooltip>
                         </Box>
