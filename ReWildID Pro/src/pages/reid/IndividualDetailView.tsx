@@ -16,7 +16,6 @@ import { ReidIndividual } from './types';
 const IndividualDetailView: React.FC = () => {
     const theme = useTheme();
     const navigate = useNavigate();
-    const { runId, individualId } = useParams();
     const location = useLocation();
     
     // Try to get individual from state, otherwise we might need to fetch it (not implemented yet)
@@ -109,13 +108,18 @@ const IndividualDetailView: React.FC = () => {
             if (e.ctrlKey || e.metaKey) {
                 e.preventDefault();
                 const delta = e.deltaY * -2.5;
-                setGridItemSize(prev => Math.min(Math.max(prev + delta, 100), 715));
+                setGridItemSize(prev => {
+                    const newVal = prev + delta;
+                    return Math.min(Math.max(newVal, 100), 715);
+                });
             }
         };
 
-        node.addEventListener('wheel', handleWheel, { passive: false, capture: true });
-        return () => node.removeEventListener('wheel', handleWheel, { capture: true });
-    }, []);
+        node.addEventListener('wheel', handleWheel, { passive: false });
+        return () => {
+            node.removeEventListener('wheel', handleWheel);
+        };
+    }, [loading]);
 
     // Fetch DBImage objects for this individual's detections
     useEffect(() => {
