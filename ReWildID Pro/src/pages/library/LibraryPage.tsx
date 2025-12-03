@@ -561,17 +561,7 @@ const LibraryPage: React.FC = () => {
                     opacity: isScrolled ? 1 : 0,
                     transform: isScrolled ? 'translateX(0)' : 'translateX(calc(100% + 32px))',
                     transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, right 0.3s ease',
-                    pointerEvents: isScrolled ? 'auto' : 'none',
-                    '&::before': {
-                        content: '""',
-                        position: 'absolute',
-                        inset: 0,
-                        borderRadius: '24px',
-                        background: 'rgba(0,0,0,0.35)',
-                        filter: 'blur(30px)',
-                        zIndex: -1,
-                        pointerEvents: 'none'
-                    }
+                    pointerEvents: isScrolled ? 'auto' : 'none'
                 }}
             >
                     <Tooltip title="Filter">
