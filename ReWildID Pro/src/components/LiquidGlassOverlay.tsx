@@ -5,7 +5,7 @@
  * with smooth animations between positions when switching images.
  */
 
-import React, { useRef, useMemo, useEffect, useState } from 'react';
+import React, { useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Box, Paper, Typography, Fade, useTheme } from '@mui/material';
@@ -18,6 +18,16 @@ const persistentAnimatedBbox = {
   width: 300,
   height: 200,
   initialized: false
+};
+
+// Module-level drag offset - persists across remounts
+const dragState = {
+  offsetX: 0,
+  offsetY: 0,
+  velocityX: 0,
+  velocityY: 0,
+  scale: 1,
+  targetScale: 1
 };
 
 // Vertex shader
@@ -147,10 +157,12 @@ interface GlassRendererProps {
   targetBbox: BBox;
   containerWidth: number;
   containerHeight: number;
-  onAnimatedPosition: (pos: { x: number; y: number }) => void;
+  onAnimatedPosition: (pos: { x: number; y: number; scale: number }) => void;
+  isHovered: boolean;
+  isDragging: boolean;
 }
 
-function GlassRenderer({ imageUrl, targetBbox, containerWidth, containerHeight, onAnimatedPosition }: GlassRendererProps) {
+function GlassRenderer({ imageUrl, targetBbox, containerWidth, containerHeight, onAnimatedPosition, isHovered, isDragging }: GlassRendererProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const { viewport } = useThree();
   const textureRef = useRef<THREE.Texture | null>(null);
@@ -231,19 +243,66 @@ function GlassRenderer({ imageUrl, targetBbox, containerWidth, containerHeight, 
       persistentAnimatedBbox.height += (targetBbox.height - persistentAnimatedBbox.height) * lerp;
     }
     
-    // Report position for label
-    onAnimatedPosition({ x: persistentAnimatedBbox.x, y: persistentAnimatedBbox.y });
+    // Spring physics for drag offset when not dragging
+    if (!isDragging) {
+      // Spring back to origin with damped oscillation
+      const springStrength = 0.15;
+      const damping = 0.75;
+      
+      // Apply spring force toward origin
+      dragState.velocityX += -dragState.offsetX * springStrength;
+      dragState.velocityY += -dragState.offsetY * springStrength;
+      
+      // Apply damping
+      dragState.velocityX *= damping;
+      dragState.velocityY *= damping;
+      
+      // Update position
+      dragState.offsetX += dragState.velocityX;
+      dragState.offsetY += dragState.velocityY;
+      
+      // Snap to zero when close enough
+      if (Math.abs(dragState.offsetX) < 0.1 && Math.abs(dragState.velocityX) < 0.1) {
+        dragState.offsetX = 0;
+        dragState.velocityX = 0;
+      }
+      if (Math.abs(dragState.offsetY) < 0.1 && Math.abs(dragState.velocityY) < 0.1) {
+        dragState.offsetY = 0;
+        dragState.velocityY = 0;
+      }
+    }
     
-    // Update uniforms
+    // Bouncy scale animation on hover
+    dragState.targetScale = isHovered ? 1.05 : 1.0;
+    const scaleLerp = 0.12;
+    dragState.scale += (dragState.targetScale - dragState.scale) * scaleLerp;
+    
+    // Calculate final position with drag offset
+    const finalX = persistentAnimatedBbox.x + dragState.offsetX;
+    const finalY = persistentAnimatedBbox.y + dragState.offsetY;
+    const scaledWidth = persistentAnimatedBbox.width * dragState.scale;
+    const scaledHeight = persistentAnimatedBbox.height * dragState.scale;
+    // Adjust position to scale from center
+    const scaleOffsetX = (scaledWidth - persistentAnimatedBbox.width) / 2;
+    const scaleOffsetY = (scaledHeight - persistentAnimatedBbox.height) / 2;
+    
+    // Report position for label (use unscaled position for label placement)
+    onAnimatedPosition({ 
+      x: finalX, 
+      y: finalY,
+      scale: dragState.scale
+    });
+    
+    // Update uniforms with scaled dimensions
     material.uniforms.uTime.value = state.clock.elapsedTime;
     material.uniforms.uResolution.value.set(containerWidth, containerHeight);
     material.uniforms.uBbox.value.set(
-      persistentAnimatedBbox.x,
-      persistentAnimatedBbox.y,
-      persistentAnimatedBbox.width,
-      persistentAnimatedBbox.height
+      finalX - scaleOffsetX,
+      finalY - scaleOffsetY,
+      scaledWidth,
+      scaledHeight
     );
-    material.uniforms.uBorderRadius.value = Math.min(persistentAnimatedBbox.width, persistentAnimatedBbox.height) * 0.12;
+    material.uniforms.uBorderRadius.value = Math.min(scaledWidth, scaledHeight) * 0.12;
     
     // Always update texture from ref (it changes when image changes)
     if (textureRef.current) {
@@ -292,8 +351,10 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
   reidResults
 }) => {
   const theme = useTheme();
-  const [labelPosition, setLabelPosition] = useState({ x: containerWidth / 2, y: containerHeight / 2 });
+  const [labelPosition, setLabelPosition] = useState({ x: containerWidth / 2, y: containerHeight / 2, scale: 1 });
   const [isHovered, setIsHovered] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ mouseX: 0, mouseY: 0, offsetX: 0, offsetY: 0 });
 
   // Get first bbox as target (for now, single detection)
   // When bboxes is empty (during image loading), use 0-size target so animation freezes
@@ -303,6 +364,66 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
   
   // Edge offset matches shader (50px)
   const edgeOffset = 55;
+  
+  // Drag handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      offsetX: dragState.offsetX,
+      offsetY: dragState.offsetY
+    };
+    // Reset velocity when starting drag
+    dragState.velocityX = 0;
+    dragState.velocityY = 0;
+  }, []);
+  
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging) return;
+    const deltaX = e.clientX - dragStartRef.current.mouseX;
+    const deltaY = e.clientY - dragStartRef.current.mouseY;
+    
+    // Rubber-band effect for bottom only (positive Y = downward)
+    const rubberBand = (value: number, limit: number) => {
+      if (value <= limit) return value;
+      // Apply diminishing returns beyond the limit
+      const excess = value - limit;
+      const dampedExcess = limit * (1 - Math.exp(-excess / limit));
+      return limit + dampedExcess * 0.3;
+    };
+    
+    const maxDragDown = 120; // Soft limit for dragging down
+    const rawX = dragStartRef.current.offsetX + deltaX;
+    const rawY = dragStartRef.current.offsetY + deltaY;
+    
+    // Free movement for X and upward Y, rubber-band only for downward
+    dragState.offsetX = rawX;
+    dragState.offsetY = rawY > 0 ? rubberBand(rawY, maxDragDown) : rawY;
+  }, [isDragging]);
+  
+  const handleMouseUp = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false);
+      // Add some momentum based on final offset for bouncier return
+      dragState.velocityX = dragState.offsetX * 0.05;
+      dragState.velocityY = dragState.offsetY * 0.05;
+    }
+  }, [isDragging]);
+  
+  // Global mouse listeners for drag
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   return (
     <div
@@ -313,7 +434,8 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
         width: containerWidth,
         height: containerHeight,
         pointerEvents: 'none',
-        zIndex: 10
+        zIndex: 10,
+        overflow: 'visible'
       }}
     >
       {/* Single WebGL Canvas */}
@@ -325,7 +447,8 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
           top: 0,
           left: 0,
           width: '100%',
-          height: '100%'
+          height: '100%',
+          overflow: 'visible'
         }}
         gl={{ antialias: true, alpha: true, premultipliedAlpha: false }}
       >
@@ -335,6 +458,8 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
           containerWidth={containerWidth}
           containerHeight={containerHeight}
           onAnimatedPosition={setLabelPosition}
+          isHovered={isHovered}
+          isDragging={isDragging}
         />
       </Canvas>
 
@@ -342,27 +467,33 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
       {targetBbox.width > 0 && (
         <Box
           onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
+          onMouseLeave={() => !isDragging && setIsHovered(false)}
+          onMouseDown={handleMouseDown}
+          onDragStart={(e: React.DragEvent) => e.preventDefault()}
           sx={{
             position: 'absolute',
             left: labelPosition.x - edgeOffset,
             top: labelPosition.y - edgeOffset,
-            width: targetBbox.width + edgeOffset * 2,
-            height: targetBbox.height + edgeOffset * 2,
+            width: (targetBbox.width + edgeOffset * 2) * labelPosition.scale,
+            height: (targetBbox.height + edgeOffset * 2) * labelPosition.scale,
             pointerEvents: 'auto',
-            cursor: 'pointer',
+            cursor: isDragging ? 'grabbing' : 'grab',
             borderRadius: '30px',
+            transition: isHovered && !isDragging ? 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
+            transform: isHovered && !isDragging ? 'scale(1.02)' : 'scale(1)',
+            userSelect: 'none',
+            WebkitUserDrag: 'none',
           }}
         />
       )}
 
-      {/* Label rendered in HTML for crisp text - offset by edge expansion */}
+      {/* Label rendered in HTML for crisp text - fade out when dragging */}
       {label && (
         <div
           style={{
             position: 'absolute',
-            left: labelPosition.x - 42, // Adjust for 50px edge offset
-            top: labelPosition.y - 82, // Adjust for 50px edge offset
+            left: labelPosition.x - 42,
+            top: labelPosition.y - 82,
             padding: '4px 12px',
             background: 'rgba(255, 255, 255, 0.2)',
             backdropFilter: 'blur(12px)',
@@ -374,7 +505,11 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
             fontWeight: 600,
             whiteSpace: 'nowrap',
             boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-            pointerEvents: 'auto'
+            pointerEvents: isDragging ? 'none' : 'auto',
+            transform: `scale(${labelPosition.scale})`,
+            transformOrigin: 'bottom left',
+            opacity: isDragging ? 0 : 1,
+            transition: 'opacity 0.2s ease-out'
           }}
         >
           {label}
@@ -389,6 +524,8 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
               position: 'absolute',
               left: labelPosition.x + targetBbox.width + edgeOffset + 16,
               top: labelPosition.y - edgeOffset,
+              opacity: isDragging ? 0 : 1,
+              transition: 'opacity 0.2s ease-out',
               width: 240,
               p: 2,
               bgcolor: theme.palette.mode === 'dark' ? 'rgba(30, 30, 30, 0.85)' : 'rgba(255, 255, 255, 0.85)',
@@ -400,7 +537,7 @@ export const LiquidGlassOverlay: React.FC<LiquidGlassOverlayProps> = ({
               zIndex: 20,
             }}
             onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
+            onMouseLeave={() => !isDragging && setIsHovered(false)}
           >
             {customPopupContent ? customPopupContent : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
