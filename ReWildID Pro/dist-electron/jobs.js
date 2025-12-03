@@ -326,10 +326,18 @@ class JobManager {
                 this.addJob('detect', { selectedPaths });
             }
             else if (afterAction === 'reid' && species) {
-                job.message = `Imported ${processedCount} images. Starting ReID...`;
+                // Get paths for the imported images
+                const images = database_1.DatabaseService.getImagesByIds(importedImageIds);
+                const selectedPaths = images.map(img => img.original_path);
+                job.message = `Imported ${processedCount} images. Starting classification...`;
                 this.emitUpdate();
-                // Queue a reid job with the imported image IDs
-                this.addJob('reid', { imageIds: importedImageIds, species });
+                // Queue a detect job that will chain to reid
+                this.addJob('detect', {
+                    selectedPaths,
+                    chainToReid: true,
+                    imageIds: importedImageIds,
+                    species
+                });
             }
         }
     }
@@ -697,6 +705,14 @@ class JobManager {
                         console.error(`Failed to parse result for ${originalPath}`, e);
                     }
                 }
+            }
+            // Handle chained actions
+            const { chainToReid, imageIds, species } = job.payload;
+            if (chainToReid && imageIds && species && job.status !== 'cancelled') {
+                job.message = 'Classification complete. Starting ReID...';
+                this.emitUpdate();
+                // Queue the reid job
+                this.addJob('reid', { imageIds, species });
             }
         }
         finally {
