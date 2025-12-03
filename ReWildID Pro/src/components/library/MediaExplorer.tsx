@@ -124,6 +124,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     loadFullImage,
     activeFilter,
     onFilterChange,
+    searchQuery,
     onSearchChange,
     filterDialogOpen,
     setFilterDialogOpen,
@@ -494,7 +495,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                                 <Box sx={{ p: 3, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: theme.palette.background.default, zIndex: 10 }}>
                                     <Typography variant="h4" fontWeight="bold">{title}</Typography>
                                     <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                                        <LibrarySearchBar onSearch={onSearchChange} />
+                                        <LibrarySearchBar value={searchQuery} onSearch={onSearchChange} />
 
                                         <Tooltip title="Filter">
                                             <IconButton

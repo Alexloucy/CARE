@@ -555,7 +555,7 @@ const ReIDPage: React.FC = () => {
                             <Typography variant="body2" color="text.secondary">{runs.length} run{runs.length !== 1 ? 's' : ''}</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                            <LibrarySearchBar onSearch={setSearchQuery} />
+                            <LibrarySearchBar value={searchQuery} onSearch={setSearchQuery} />
                             
                             <Tooltip title="View Settings">
                                 <IconButton

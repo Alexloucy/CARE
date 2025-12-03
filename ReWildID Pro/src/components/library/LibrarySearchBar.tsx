@@ -1,23 +1,65 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, TextField, InputAdornment, IconButton, Tooltip, useTheme } from '@mui/material';
-import { MagnifyingGlass } from '@phosphor-icons/react';
+import { MagnifyingGlass, X } from '@phosphor-icons/react';
 
 interface LibrarySearchBarProps {
+    value?: string;
     onSearch: (query: string) => void;
 }
 
-export const LibrarySearchBar: React.FC<LibrarySearchBarProps> = ({ onSearch }) => {
+export const LibrarySearchBar: React.FC<LibrarySearchBarProps> = ({ value = '', onSearch }) => {
     const theme = useTheme();
-    const [inputValue, setInputValue] = useState('');
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [inputValue, setInputValue] = useState(value);
+    const [isExpanded, setIsExpanded] = useState(!!value);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Debounce logic
+    // Sync with controlled value
     useEffect(() => {
-        const timer = setTimeout(() => {
-            onSearch(inputValue);
+        setInputValue(value);
+        if (value) setIsExpanded(true);
+    }, [value]);
+
+    // Debounced search
+    const handleChange = useCallback((newValue: string) => {
+        setInputValue(newValue);
+        
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+        }
+        
+        debounceRef.current = setTimeout(() => {
+            onSearch(newValue);
         }, 300);
-        return () => clearTimeout(timer);
-    }, [inputValue, onSearch]);
+    }, [onSearch]);
+
+    // Cleanup debounce on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current) {
+                clearTimeout(debounceRef.current);
+            }
+        };
+    }, []);
+
+    const handleBlur = () => {
+        // Only collapse if empty
+        if (!inputValue.trim()) {
+            setIsExpanded(false);
+        }
+    };
+
+    const handleClear = () => {
+        setInputValue('');
+        onSearch('');
+        setIsExpanded(false);
+    };
+
+    const handleExpand = () => {
+        setIsExpanded(true);
+        // Focus after expansion animation
+        setTimeout(() => inputRef.current?.focus(), 50);
+    };
 
     return (
         <Box sx={{ 
@@ -29,31 +71,43 @@ export const LibrarySearchBar: React.FC<LibrarySearchBarProps> = ({ onSearch }) 
         }}>
             {isExpanded ? (
                 <TextField
+                    inputRef={inputRef}
                     autoFocus
                     placeholder="Search images..."
                     size="small"
                     value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onBlur={() => setIsExpanded(false)}
+                    onChange={(e) => handleChange(e.target.value)}
+                    onBlur={handleBlur}
                     InputProps={{
                         startAdornment: (
                             <InputAdornment position="start">
                                 <MagnifyingGlass size={18} color={theme.palette.text.secondary} />
                             </InputAdornment>
                         ),
+                        endAdornment: inputValue ? (
+                            <InputAdornment position="end">
+                                <IconButton 
+                                    size="small" 
+                                    onMouseDown={(e: React.MouseEvent) => e.preventDefault()} // Prevent blur before click
+                                    onClick={handleClear}
+                                    sx={{ p: 0.5 }}
+                                >
+                                    <X size={14} />
+                                </IconButton>
+                            </InputAdornment>
+                        ) : null,
                         sx: {
                             borderRadius: 2,
-                            bgcolor: theme.palette.background.paper,
+                            bgcolor: theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)',
                             width: '100%',
-                            '& fieldset': { border: 'none' },
-                            boxShadow: theme.palette.mode === 'dark' ? '0 0 0 1px rgba(255,255,255,0.1)' : '0 0 0 1px rgba(0,0,0,0.05)'
+                            '& fieldset': { border: 'none' }
                         }
                     }}
                 />
             ) : (
                 <Tooltip title={inputValue ? `Search: ${inputValue}` : "Search"}>
                     <IconButton 
-                        onClick={() => setIsExpanded(true)}
+                        onClick={handleExpand}
                         color={inputValue ? 'inherit' : 'default'}
                         sx={{ 
                             bgcolor: inputValue ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
