@@ -3,7 +3,8 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
     Box, Typography, IconButton, Menu, MenuItem,
     Chip, alpha, useTheme, Collapse, Skeleton, Button,
-    Switch, Tooltip, Slider
+    Switch, Tooltip, Slider, Divider,
+    ToggleButton, ToggleButtonGroup
 } from '@mui/material';
 import { Virtuoso } from 'react-virtuoso';
 import {
@@ -40,9 +41,9 @@ const IndividualCard: React.FC<{ individual: ReidIndividual; onClick: () => void
     const firstDet = individual.detections[0];
     const thumbUrl = firstDet ? imageUrls.get(firstDet.image_preview_path || firstDet.image_path) : undefined;
     return (
-        <Box onClick={onClick} sx={{ cursor: 'pointer', borderRadius: 2, overflow: 'hidden', transition: 'all 0.15s', border: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.mode === 'light' ? '#F7F9FB' : theme.palette.background.paper, '&:hover': { borderColor: individual.color } }}>
+        <Box onClick={onClick} onDragStart={(e: React.DragEvent) => e.preventDefault()} sx={{ cursor: 'pointer', borderRadius: 2, overflow: 'hidden', transition: 'all 0.15s', border: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.mode === 'light' ? '#F7F9FB' : theme.palette.background.paper, userSelect: 'none', '&:hover': { borderColor: individual.color } }}>
             <Box sx={{ width: '100%', height: 130, bgcolor: theme.palette.mode === 'light' ? '#f0f0f0' : '#0a0a0a', position: 'relative', overflow: 'hidden' }}>
-                {thumbUrl ? <Box component="img" src={thumbUrl} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Fingerprint size={40} weight="thin" color={theme.palette.text.disabled} /></Box>}
+                {thumbUrl ? <Box component="img" src={thumbUrl} draggable={false} sx={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', WebkitUserDrag: 'none', pointerEvents: 'none' }} /> : <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Fingerprint size={40} weight="thin" color={theme.palette.text.disabled} /></Box>}
                 <Box sx={{ position: 'absolute', top: 8, left: 8, width: 12, height: 12, borderRadius: '50%', bgcolor: individual.color, border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
                 <Box sx={{ position: 'absolute', bottom: 6, right: 6, display: 'flex', alignItems: 'center', gap: 0.4, bgcolor: 'rgba(0,0,0,0.6)', color: 'white', px: 0.8, py: 0.3, borderRadius: 1, fontSize: '12px' }}>
                     <ImagesIcon size={14} />{individual.member_count}
@@ -133,6 +134,13 @@ const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({
         const saved = localStorage.getItem('mediaExplorer_gridSize');
         return saved ? parseInt(saved, 10) : 180;
     });
+    const [showFileNames, setShowFileNames] = useState(() => {
+        const saved = localStorage.getItem('mediaExplorer_showNames');
+        return saved === 'true';
+    });
+    const [aspectRatio, setAspectRatio] = useState(() => {
+        return localStorage.getItem('mediaExplorer_aspectRatio') || '1.618/1';
+    });
     const [useLiquidGlass] = useState(() => {
         const saved = localStorage.getItem('mediaExplorer_useLiquidGlass');
         return saved === null ? true : saved === 'true';
@@ -141,9 +149,44 @@ const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({
         const saved = localStorage.getItem('mediaExplorer_useRayTracedGlass');
         return saved === null ? true : saved === 'true';
     });
+    const [showBoundingBoxes, setShowBoundingBoxes] = useState(() => {
+        const saved = localStorage.getItem('mediaExplorer_showBoundingBoxes');
+        return saved === null ? true : saved === 'true';
+    });
     const [containerWidth, setContainerWidth] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
     const [settingsMenuPos, setSettingsMenuPos] = useState<{ top: number; left: number } | null>(null);
+
+    // Persist settings similar to MediaExplorer
+    useEffect(() => {
+        localStorage.setItem('mediaExplorer_gridSize', gridItemSize.toString());
+        localStorage.setItem('mediaExplorer_showNames', showFileNames.toString());
+        localStorage.setItem('mediaExplorer_aspectRatio', aspectRatio);
+        localStorage.setItem('mediaExplorer_showBoundingBoxes', showBoundingBoxes.toString());
+    }, [gridItemSize, showFileNames, aspectRatio, showBoundingBoxes]);
+
+    // Listen for settings updates triggered elsewhere (Settings page / MediaExplorer)
+    useEffect(() => {
+        const handleStorageChange = (e: StorageEvent) => {
+            if (!e.key?.startsWith('mediaExplorer_') || e.newValue === null) return;
+            switch (e.key) {
+                case 'mediaExplorer_gridSize':
+                    setGridItemSize(parseInt(e.newValue, 10));
+                    break;
+                case 'mediaExplorer_showNames':
+                    setShowFileNames(e.newValue === 'true');
+                    break;
+                case 'mediaExplorer_aspectRatio':
+                    setAspectRatio(e.newValue);
+                    break;
+                case 'mediaExplorer_showBoundingBoxes':
+                    setShowBoundingBoxes(e.newValue === 'true');
+                    break;
+            }
+        };
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
 
     // Zoom Handler - Callback ref ensures listener is attached immediately when node exists
     const zoomRef = useCallback((node: HTMLDivElement | null) => {
@@ -241,12 +284,13 @@ const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({
     const columns = availableWidth > 0 ? Math.max(1, Math.floor((availableWidth + gap) / (gridItemSize + gap))) : 1;
     const actualItemWidth = columns > 0 ? (availableWidth - (gap * (columns - 1))) / columns : gridItemSize;
 
-    // Row height calculation (copied from DateGroupList)
-    const aspectRatio = '1.618/1';
+    // Row height calculation - file names are now overlays inside card (like ImageCard)
     const getRowHeight = useCallback(() => {
-        const [w, h] = aspectRatio.split('/').map(Number);
-        return actualItemWidth * (h / w) + 16;
-    }, [actualItemWidth]);
+        const [wRaw, hRaw] = aspectRatio.split('/').map(Number);
+        const w = isNaN(wRaw) || wRaw === 0 ? 1 : wRaw;
+        const h = isNaN(hRaw) ? 1 : hRaw;
+        return actualItemWidth * (h / w);
+    }, [aspectRatio, actualItemWidth]);
 
     // Flatten images into rows
     const imageRows = useMemo(() => {
@@ -393,36 +437,79 @@ const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({
                         }}>
                             {row.map(img => {
                                 const url = imageUrls[img.id];
+                                const fileName = img.original_path.split(/[\\/]/).pop() || 'image';
+                                
                                 return (
                                     <Box
                                         key={img.id}
                                         onClick={() => handleImageClick(img)}
+                                        onDragStart={(e: React.DragEvent) => e.preventDefault()}
                                         sx={{
                                             minWidth: 0,
-                                            height: 'fit-content',
-                                            aspectRatio,
-                                            borderRadius: 1.5,
-                                            overflow: 'hidden',
                                             cursor: 'pointer',
-                                            bgcolor: theme.palette.mode === 'light' ? '#f5f5f5' : '#1a1a1a',
-                                            transition: 'transform 0.15s, box-shadow 0.15s',
-                                            '&:hover': {
-                                                transform: 'scale(1.02)',
-                                                boxShadow: 3
-                                            }
+                                            userSelect: 'none'
                                         }}
                                     >
-                                        {url ? (
-                                            <Box
-                                                component="img"
-                                                src={url}
-                                                sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                            />
-                                        ) : (
-                                            <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                <Fingerprint size={32} weight="thin" color={theme.palette.text.disabled} />
-                                            </Box>
-                                        )}
+                                        <Box
+                                            sx={{
+                                                width: '100%',
+                                                aspectRatio,
+                                                borderRadius: 3,
+                                                overflow: 'hidden',
+                                                position: 'relative',
+                                                bgcolor: theme.palette.mode === 'light' ? '#f5f5f5' : '#1a1a1a',
+                                                transition: 'all 0.15s ease-in-out',
+                                                '&:hover': {
+                                                    transform: 'translateY(-2px)',
+                                                    boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
+                                                }
+                                            }}
+                                        >
+                                            {url ? (
+                                                <Box
+                                                    component="img"
+                                                    src={url}
+                                                    draggable={false}
+                                                    sx={{ 
+                                                        width: '100%', 
+                                                        height: '100%', 
+                                                        objectFit: 'cover',
+                                                        userSelect: 'none',
+                                                        WebkitUserDrag: 'none',
+                                                        pointerEvents: 'none'
+                                                    }}
+                                                />
+                                            ) : (
+                                                <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <Fingerprint size={32} weight="thin" color={theme.palette.text.disabled} />
+                                                </Box>
+                                            )}
+                                            
+                                            {/* Gradient overlays for file name */}
+                                            {showFileNames && (
+                                                <Box sx={{
+                                                    position: 'absolute',
+                                                    bottom: 0,
+                                                    left: 0,
+                                                    right: 0,
+                                                    p: 1.5,
+                                                    background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
+                                                    color: 'white',
+                                                    pointerEvents: 'none'
+                                                }}>
+                                                    <Typography
+                                                        variant="body2"
+                                                        noWrap
+                                                        sx={{
+                                                            fontWeight: 500,
+                                                            textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+                                                        }}
+                                                    >
+                                                        {fileName}
+                                                    </Typography>
+                                                </Box>
+                                            )}
+                                        </Box>
                                     </Box>
                                 );
                             })}
@@ -480,6 +567,55 @@ const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({
                     <Typography variant="caption" color="text.secondary">Large</Typography>
                 </Box>
             </Box>
+
+            <Divider sx={{ my: 1 }} />
+
+            <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Aspect Ratio
+                <Tooltip title="Reset to Default">
+                    <IconButton size="small" onClick={() => setAspectRatio('1.618/1')}>
+                        <ArrowCounterClockwise size={14} />
+                    </IconButton>
+                </Tooltip>
+            </Typography>
+            <ToggleButtonGroup
+                value={aspectRatio}
+                exclusive
+                onChange={(_: React.MouseEvent<HTMLElement>, value: string | null) => value && setAspectRatio(value)}
+                size="small"
+                fullWidth
+                sx={{ mb: 2, display: 'flex' }}
+            >
+                <ToggleButton value="1/1" sx={{ flexGrow: 1, py: 0.5 }}>1:1</ToggleButton>
+                <ToggleButton value="4/3" sx={{ flexGrow: 1, py: 0.5 }}>4:3</ToggleButton>
+                <ToggleButton value="16/9" sx={{ flexGrow: 1, py: 0.5 }}>16:9</ToggleButton>
+                <ToggleButton value="9/16" sx={{ flexGrow: 1, py: 0.5 }}>9:16</ToggleButton>
+                <ToggleButton value="1.618/1" sx={{ flexGrow: 1, py: 0.5 }}>Φ</ToggleButton>
+                <ToggleButton value="1/1.618" sx={{ flexGrow: 1, py: 0.5 }}>Φ</ToggleButton>
+            </ToggleButtonGroup>
+
+            <Divider sx={{ my: 1 }} />
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                <Typography variant="subtitle2" fontWeight="600">
+                    Show File Names
+                </Typography>
+                <Switch
+                    size="small"
+                    checked={showFileNames}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowFileNames(e.target.checked)}
+                />
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                <Typography variant="subtitle2" fontWeight="600">
+                    Show Bounding Boxes
+                </Typography>
+                <Switch
+                    size="small"
+                    checked={showBoundingBoxes}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowBoundingBoxes(e.target.checked)}
+                />
+            </Box>
         </Menu>
 
         {/* Image Modal - rendered at root level outside scrollable container */}
@@ -498,7 +634,7 @@ const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({
                     onClose={() => setSelectedImage(null)}
                     imageUrl={imageUrl}
                     file={file}
-                    detections={dets}
+                    detections={showBoundingBoxes ? dets : []}
                     onNext={hasNext ? goNext : undefined}
                     onPrev={hasPrev ? goPrev : undefined}
                     hasNext={hasNext}
