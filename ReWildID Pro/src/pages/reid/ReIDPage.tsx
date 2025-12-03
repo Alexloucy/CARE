@@ -196,8 +196,11 @@ const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({
         return () => window.removeEventListener('storage', handleStorageChange);
     }, []);
 
-    // Zoom Handler - Callback ref ensures listener is attached immediately when node exists
-    const zoomRef = useCallback((node: HTMLDivElement | null) => {
+    // Zoom Handler
+    const zoomContainerRef = useRef<HTMLDivElement>(null);
+    
+    useEffect(() => {
+        const node = zoomContainerRef.current;
         if (!node) return;
 
         const handleWheel = (e: WheelEvent) => {
@@ -209,11 +212,7 @@ const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({
         };
 
         node.addEventListener('wheel', handleWheel, { passive: false });
-        
-        // Cleanup listener when node changes or unmounts
-        return () => {
-            node.removeEventListener('wheel', handleWheel);
-        };
+        return () => node.removeEventListener('wheel', handleWheel);
     }, []);
 
     // Fetch DBImage objects for this individual's detections
@@ -416,7 +415,7 @@ const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({
     return (
         <>
         <Box
-            ref={zoomRef}
+            ref={zoomContainerRef}
             sx={{
                 flex: 1,
                 overflow: 'hidden',
@@ -687,6 +686,7 @@ const ReIDPage: React.FC = () => {
     const [selectedIndividual, setSelectedIndividual] = useState<ReidIndividual | null>(null);
     const [imageUrls, setImageUrls] = useState<Map<string, string>>(new Map());
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const scrollPositionRef = useRef(0);
     
     // Read liquid glass settings from localStorage (shared with MediaExplorer and Settings page)
     const [useLiquidGlass, setUseLiquidGlass] = useState(() => {
@@ -828,7 +828,13 @@ const ReIDPage: React.FC = () => {
     const handleRename = () => { const run = runs.find(r => r.id === selectedRunId); if (run) { setRunToRename({ id: run.id, name: run.name }); setRenameDialogOpen(true); } handleMenuClose(); };
     const handleConfirmRename = async (newName: string) => { if (runToRename) { await window.api.updateReidRunName(runToRename.id, newName); setRefreshTrigger(t => t + 1); } setRenameDialogOpen(false); setRunToRename(null); };
     const handleDelete = async () => { if (selectedRunId && window.confirm('Delete this ReID run?')) { await window.api.deleteReidRun(selectedRunId); setRefreshTrigger(t => t + 1); } handleMenuClose(); };
-    const handleIndividualClick = (ind: ReidIndividual) => { setSelectedIndividual(ind); };
+    const handleIndividualClick = (ind: ReidIndividual) => { 
+        const mainEl = document.querySelector('main');
+        const scrollY = mainEl?.scrollTop ?? 0;
+        console.log('[ReID] Saving scroll position:', scrollY);
+        scrollPositionRef.current = scrollY;
+        setSelectedIndividual(ind); 
+    };
 
     if (loading) return (
         <Box sx={{ pt: '64px', px: 3, pb: 3, minHeight: '100vh' }}>
@@ -879,7 +885,20 @@ const ReIDPage: React.FC = () => {
             <Box sx={{ height: '100vh', overflow: 'hidden' }}>
                 <IndividualDetailView
                     individual={selectedIndividual}
-                    onBack={() => setSelectedIndividual(null)}
+                    onBack={() => {
+                        const savedPosition = scrollPositionRef.current;
+                        console.log('[ReID] Restoring scroll position:', savedPosition);
+                        setSelectedIndividual(null);
+                        // Restore scroll position after component re-renders - needs delay for DOM to be ready
+                        setTimeout(() => {
+                            const mainEl = document.querySelector('main');
+                            console.log('[ReID] Attempting scrollTo:', savedPosition, 'mainEl:', mainEl);
+                            if (mainEl) {
+                                mainEl.scrollTop = savedPosition;
+                                console.log('[ReID] After scrollTo, scrollTop:', mainEl.scrollTop);
+                            }
+                        }, 50);
+                    }}
                 />
             </Box>
         );
