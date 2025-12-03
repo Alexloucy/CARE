@@ -129,7 +129,7 @@ const DetectionPage: React.FC = () => {
                     const sections: DateSection[] = Array.from(sectionsMap.entries())
                         .map(([date, groups]) => ({
                             date,
-                            groups: groups.sort((a, b) => b.name.localeCompare(a.name))
+                            groups: groups.sort((a, b) => (b.created_at || 0) - (a.created_at || 0)) // Sort groups new to old
                         }))
                         .sort((a, b) => b.date.localeCompare(a.date));
 

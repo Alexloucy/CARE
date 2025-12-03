@@ -411,11 +411,13 @@ const ReIDPage: React.FC = () => {
             try {
                 const runsRes = await window.api.getReidRuns();
                 if (runsRes.ok && runsRes.runs) {
-                    setRuns(runsRes.runs);
+                    // Sort runs by created_at descending (new to old)
+                    const sortedRuns = runsRes.runs.sort((a, b) => b.created_at - a.created_at);
+                    setRuns(sortedRuns);
                     const newIndividuals = new Map<number, ReidIndividual[]>();
                     const newPagination = new Map<number, { page: number; hasMore: boolean }>();
                     
-                    for (const run of runsRes.runs) {
+                    for (const run of sortedRuns) {
                         const res = await window.api.getReidResults({ runId: run.id, page: 1, pageSize: PAGE_SIZE });
                         if (res.ok && res.result) {
                             newIndividuals.set(run.id, res.result.individuals);
