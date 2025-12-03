@@ -435,10 +435,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
             return (
                 <Box id={`group-${group.id}`} sx={{
                     height: 78, // Fixed height prevents scroll jumps (+24 for bottom margin)
-                    display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', px: 4, pt: 2,
-                    '&:hover .collapse-arrow': { opacity: 1, transform: 'translateX(0)' },
-                    '&:hover .group-menu-button': { opacity: 1 },
-                    '&:hover .group-select-button': { opacity: 1 },
+                    display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', px: 4, pt: 2
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative' }}>
                         <Box sx={{ position: 'absolute', left: -29, display: 'flex', alignItems: 'center', height: '100%' }}>
@@ -446,7 +443,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                                 className="collapse-arrow"
                                 size="small"
                                 onClick={() => toggleGroup(group.id)}
-                                sx={{ padding: 0.5, opacity: 0, transition: 'all 0.2s ease' }}
+                                sx={{ padding: 0.5, opacity: 1 }}
                             >
                                 {isCollapsed ? <CaretRight size={20} /> : <CaretDown size={20} />}
                             </IconButton>
@@ -460,7 +457,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                                 className="group-select-button"
                                 size="small"
                                 onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleSelectGroup(group.images); }}
-                                sx={{ opacity: isAllSelected ? 1 : 0, transition: 'opacity 0.2s ease', color: isAllSelected ? 'primary.main' : 'text.secondary' }}
+                                sx={{ opacity: 1, color: isAllSelected ? 'primary.main' : 'text.secondary' }}
                             >
                                 <CheckIcon size={20} weight={isAllSelected ? "bold" : "regular"} />
                             </IconButton>
@@ -469,7 +466,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                             className="group-menu-button"
                             size="small"
                             onClick={(e: React.MouseEvent<HTMLButtonElement>) => onMenuOpen(e, group.id)}
-                            sx={{ opacity: 0, transition: 'opacity 0.2s ease' }}
+                            sx={{ opacity: 1 }}
                         >
                             <DotsThreeVertical size={20} />
                         </IconButton>
