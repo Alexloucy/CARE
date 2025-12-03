@@ -129,6 +129,12 @@ export default function Navbar({
     let customBreadcrumbItems;
     if (location.pathname === '/') {
         customBreadcrumbItems = undefined;
+    } else if (location.pathname.match(/^\/reid\/run\/\d+\/individual\/\d+$/)) {
+        const individualName = (location.state as any)?.individual?.display_name || `Individual ${location.pathname.split('/').pop()}`;
+        customBreadcrumbItems = [
+            { label: 'ReID', path: '/reid' },
+            { label: individualName, path: location.pathname }
+        ];
     } else {
         customBreadcrumbItems = undefined;
     }

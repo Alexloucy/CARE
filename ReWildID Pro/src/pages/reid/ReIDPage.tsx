@@ -1,26 +1,19 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
     Box, Typography, IconButton, Menu, MenuItem,
     Chip, alpha, useTheme, Collapse, Skeleton, Button,
-    Switch, Tooltip, Slider, Divider,
-    ToggleButton, ToggleButtonGroup
+    Switch, Tooltip, Divider
 } from '@mui/material';
-import { Virtuoso } from 'react-virtuoso';
 import {
     ArrowLineUp, Fingerprint, DotsThreeVertical, PencilSimple, Trash, CaretDown, CaretRight,
-    Images as ImagesIcon, CaretLeft, Sparkle, Gear, ArrowCounterClockwise
+    Images as ImagesIcon, Sparkle, Gear
 } from '@phosphor-icons/react';
 import { LiquidGlassButton } from '../../components/LiquidGlassButton';
 import { GroupNameDialog } from '../../components/GroupNameDialog';
 import { LibrarySearchBar } from '../../components/library/LibrarySearchBar';
-import ImageModal from '../../components/ImageModal';
 import { RefreshNotification } from '../../components/RefreshNotification';
-import { Detection, DBImage } from '../../types/electron';
-
-interface ReidRun { id: number; name: string; species: string; created_at: number; individual_count: number; detection_count: number; }
-interface ReidDetection { id: number; image_id: number; label: string; confidence: number; detection_confidence: number; x1: number; y1: number; x2: number; y2: number; source: string; batch_id: number; created_at: number; image_path: string; image_preview_path?: string; }
-interface ReidIndividual { id: number; run_id: number; name: string; display_name: string; color: string; created_at: number; member_count: number; detections: ReidDetection[]; }
+import { ReidIndividual, ReidRun } from './types';
 
 // Skeleton Card for loading state
 const SkeletonCard: React.FC = () => {
@@ -115,559 +108,6 @@ const RunGroup: React.FC<RunGroupProps> = ({ run, individuals, imageUrls, onIndi
     );
 };
 
-// Detail view for viewing an individual's images - copies DateGroupList structure exactly
-interface IndividualDetailViewProps {
-    individual: ReidIndividual;
-    onBack: () => void;
-}
-
-const IndividualDetailView: React.FC<IndividualDetailViewProps> = ({ 
-    individual, 
-    onBack
-}) => {
-    const theme = useTheme();
-    const [loading, setLoading] = useState(true);
-    const [dbImages, setDbImages] = useState<DBImage[]>([]);
-    const [imageUrls, setImageUrls] = useState<Record<number, string>>({});
-    const [fullImageUrls, setFullImageUrls] = useState<Record<number, string>>({});
-    const [selectedImage, setSelectedImage] = useState<DBImage | null>(null);
-    const [gridItemSize, setGridItemSize] = useState(() => {
-        const saved = localStorage.getItem('mediaExplorer_gridSize');
-        return saved ? parseInt(saved, 10) : 180;
-    });
-    const [showFileNames, setShowFileNames] = useState(() => {
-        const saved = localStorage.getItem('mediaExplorer_showNames');
-        return saved === 'true';
-    });
-    const [aspectRatio, setAspectRatio] = useState(() => {
-        return localStorage.getItem('mediaExplorer_aspectRatio') || '1.618/1';
-    });
-    const [useLiquidGlass] = useState(() => {
-        const saved = localStorage.getItem('mediaExplorer_useLiquidGlass');
-        return saved === null ? true : saved === 'true';
-    });
-    const [useRayTracedGlass] = useState(() => {
-        const saved = localStorage.getItem('mediaExplorer_useRayTracedGlass');
-        return saved === null ? true : saved === 'true';
-    });
-    const [showBoundingBoxes, setShowBoundingBoxes] = useState(() => {
-        const saved = localStorage.getItem('mediaExplorer_showBoundingBoxes');
-        return saved === null ? true : saved === 'true';
-    });
-    const [showColors, setShowColors] = useState(() => {
-        const saved = localStorage.getItem('reid_showColors');
-        return saved === 'true'; // default false
-    });
-    const [containerWidth, setContainerWidth] = useState(0);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [settingsMenuPos, setSettingsMenuPos] = useState<{ top: number; left: number } | null>(null);
-
-    // Persist settings similar to MediaExplorer
-    useEffect(() => {
-        localStorage.setItem('mediaExplorer_gridSize', gridItemSize.toString());
-        localStorage.setItem('mediaExplorer_showNames', showFileNames.toString());
-        localStorage.setItem('mediaExplorer_aspectRatio', aspectRatio);
-        localStorage.setItem('mediaExplorer_showBoundingBoxes', showBoundingBoxes.toString());
-    }, [gridItemSize, showFileNames, aspectRatio, showBoundingBoxes]);
-
-    // Listen for settings updates triggered elsewhere (Settings page / MediaExplorer)
-    useEffect(() => {
-        const handleStorageChange = (e: StorageEvent) => {
-            if (!e.key?.startsWith('mediaExplorer_') || e.newValue === null) return;
-            switch (e.key) {
-                case 'mediaExplorer_gridSize':
-                    setGridItemSize(parseInt(e.newValue, 10));
-                    break;
-                case 'mediaExplorer_showNames':
-                    setShowFileNames(e.newValue === 'true');
-                    break;
-                case 'mediaExplorer_aspectRatio':
-                    setAspectRatio(e.newValue);
-                    break;
-                case 'mediaExplorer_showBoundingBoxes':
-                    setShowBoundingBoxes(e.newValue === 'true');
-                    break;
-            }
-            if (e.key === 'reid_showColors' && e.newValue !== null) {
-                setShowColors(e.newValue === 'true');
-            }
-        };
-        window.addEventListener('storage', handleStorageChange);
-        return () => window.removeEventListener('storage', handleStorageChange);
-    }, []);
-
-    // Zoom Handler
-    const zoomContainerRef = useRef<HTMLDivElement>(null);
-    
-    useEffect(() => {
-        const node = zoomContainerRef.current;
-        if (!node) return;
-
-        const handleWheel = (e: WheelEvent) => {
-            if (e.ctrlKey || e.metaKey) {
-                e.preventDefault();
-                const delta = e.deltaY * -2.5;
-                setGridItemSize(prev => Math.min(Math.max(prev + delta, 100), 715));
-            }
-        };
-
-        node.addEventListener('wheel', handleWheel, { passive: false });
-        return () => node.removeEventListener('wheel', handleWheel);
-    }, []);
-
-    // Fetch DBImage objects for this individual's detections
-    useEffect(() => {
-        const fetchImages = async () => {
-            setLoading(true);
-            const imageIds = [...new Set(individual.detections.map(d => d.image_id))];
-            if (imageIds.length > 0) {
-                try {
-                    const result = await window.api.getImagesByIds(imageIds);
-                    if (result.ok && result.images) {
-                        setDbImages(result.images);
-                    }
-                } catch (error) {
-                    console.error('[IndividualDetailView] Error fetching images:', error);
-                }
-            }
-            setLoading(false);
-        };
-        fetchImages();
-    }, [individual.id]);
-
-    // Measure container width (same as DateGroupList)
-    // Re-run when loading changes because containerRef is only available after loading
-    useEffect(() => {
-        const container = containerRef.current;
-        if (!container) return;
-        const observer = new ResizeObserver(entries => {
-            for (const entry of entries) {
-                setContainerWidth(entry.contentRect.width);
-            }
-        });
-        observer.observe(container);
-        return () => observer.disconnect();
-    }, [loading]);
-
-    // Load thumbnails
-    useEffect(() => {
-        const loadThumbnails = async () => {
-            for (const img of dbImages) {
-                if (!imageUrls[img.id]) {
-                    const path = img.preview_path || img.original_path;
-                    try {
-                        const response = await window.api.viewImage(path);
-                        if (response.ok && response.data) {
-                            const blob = new Blob([response.data as unknown as BlobPart], { type: 'image/jpeg' });
-                            const url = URL.createObjectURL(blob);
-                            setImageUrls(prev => ({ ...prev, [img.id]: url }));
-                        }
-                    } catch (e) { /* ignore */ }
-                }
-            }
-        };
-        if (dbImages.length > 0) loadThumbnails();
-    }, [dbImages]);
-
-    // Load full image for modal
-    const loadFullImage = useCallback(async (img: DBImage) => {
-        if (!fullImageUrls[img.id]) {
-            try {
-                const response = await window.api.viewImage(img.original_path);
-                if (response.ok && response.data) {
-                    const blob = new Blob([response.data as unknown as BlobPart], { type: 'image/jpeg' });
-                    const url = URL.createObjectURL(blob);
-                    setFullImageUrls(prev => ({ ...prev, [img.id]: url }));
-                }
-            } catch (e) { /* ignore */ }
-        }
-    }, [fullImageUrls]);
-
-
-    // Column calculation (copied exactly from DateGroupList)
-    const horizontalPadding = 64; // px: 4 = 32px * 2
-    const gap = 16; // theme spacing 2
-    const availableWidth = containerWidth - horizontalPadding;
-    const columns = availableWidth > 0 ? Math.max(1, Math.floor((availableWidth + gap) / (gridItemSize + gap))) : 1;
-    const actualItemWidth = columns > 0 ? (availableWidth - (gap * (columns - 1))) / columns : gridItemSize;
-
-    // Row height calculation - file names are now overlays inside card (like ImageCard)
-    const getRowHeight = useCallback(() => {
-        const [wRaw, hRaw] = aspectRatio.split('/').map(Number);
-        const w = isNaN(wRaw) || wRaw === 0 ? 1 : wRaw;
-        const h = isNaN(hRaw) ? 1 : hRaw;
-        return actualItemWidth * (h / w);
-    }, [aspectRatio, actualItemWidth]);
-
-    // Flatten images into rows
-    const imageRows = useMemo(() => {
-        if (columns === 0) return [];
-        const rows: DBImage[][] = [];
-        for (let i = 0; i < dbImages.length; i += columns) {
-            rows.push(dbImages.slice(i, i + columns));
-        }
-        return rows;
-    }, [dbImages, columns]);
-
-    // Get detection for current image
-    const getDetectionsForImage = useCallback((imgId: number): Detection[] => {
-        return individual.detections
-            .filter(d => d.image_id === imgId)
-            .map(d => ({
-                id: d.id,
-                image_id: d.image_id,
-                label: individual.display_name,
-                confidence: d.confidence,
-                detection_confidence: d.detection_confidence,
-                x1: d.x1,
-                y1: d.y1,
-                x2: d.x2,
-                y2: d.y2,
-                source: d.source,
-                batch_id: d.batch_id,
-                created_at: d.created_at
-            } as Detection));
-    }, [individual]);
-
-    // Navigation in modal
-    const currentIndex = selectedImage ? dbImages.findIndex(img => img.id === selectedImage.id) : -1;
-    const hasNext = currentIndex >= 0 && currentIndex < dbImages.length - 1;
-    const hasPrev = currentIndex > 0;
-    const goNext = useCallback(() => { 
-        if (hasNext) { 
-            const nextImg = dbImages[currentIndex + 1]; 
-            setSelectedImage(nextImg); 
-            loadFullImage(nextImg); 
-        } 
-    }, [hasNext, currentIndex, dbImages, loadFullImage]);
-    const goPrev = useCallback(() => { 
-        if (hasPrev) { 
-            const prevImg = dbImages[currentIndex - 1]; 
-            setSelectedImage(prevImg); 
-            loadFullImage(prevImg); 
-        } 
-    }, [hasPrev, currentIndex, dbImages, loadFullImage]);
-
-    // Handle image click
-    const handleImageClick = useCallback((img: DBImage) => {
-        setSelectedImage(img);
-        loadFullImage(img);
-    }, [loadFullImage]);
-
-    // Preload nearby images when modal is open
-    useEffect(() => {
-        if (selectedImage && currentIndex !== -1) {
-            for (let offset = 1; offset <= 3; offset++) {
-                if (currentIndex + offset < dbImages.length) loadFullImage(dbImages[currentIndex + offset]);
-                if (currentIndex - offset >= 0) loadFullImage(dbImages[currentIndex - offset]);
-            }
-        }
-    }, [selectedImage, currentIndex, dbImages, loadFullImage]);
-
-    // Header component that scrolls with content (via Virtuoso)
-    // Includes navbar spacer (64px) like MediaExplorer
-    const headerContent = useMemo(() => (
-        <Box>
-            {/* Navbar spacer */}
-            <Box sx={{ height: 64 }} />
-            {/* Individual header */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 2, px: 4 }}>
-                <IconButton onClick={onBack} sx={{ bgcolor: alpha(theme.palette.text.primary, 0.05), '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.1) } }}>
-                    <CaretLeft size={20} />
-                </IconButton>
-                {showColors && <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: individual.color, border: '2px solid', borderColor: theme.palette.background.paper, boxShadow: 1 }} />}
-                <Box sx={{ flex: 1 }}>
-                    <Typography variant="h5" fontWeight={600}>{individual.display_name}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        {individual.member_count} sighting{individual.member_count !== 1 ? 's' : ''} • {dbImages.length} image{dbImages.length !== 1 ? 's' : ''}
-                    </Typography>
-                </Box>
-                <Tooltip title="View Settings">
-                    <IconButton
-                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            setSettingsMenuPos({ top: rect.bottom, left: rect.right });
-                        }}
-                        sx={{ '&:hover': { bgcolor: theme.palette.action.hover } }}
-                    >
-                        <Gear weight="regular" />
-                    </IconButton>
-                </Tooltip>
-            </Box>
-        </Box>
-    ), [individual, dbImages.length, onBack, theme, setSettingsMenuPos, showColors]);
-
-    // Virtuoso components with Header (scrolls with content)
-    const virtuosoComponents = useMemo(() => ({
-        Header: () => headerContent
-    }), [headerContent]);
-
-    if (loading) {
-        return (
-            <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', pt: '64px' }}>
-                <Typography color="text.secondary">Loading images...</Typography>
-            </Box>
-        );
-    }
-
-    const rowHeight = getRowHeight() + 24; // +24 for bottom margin (pb: 3)
-
-    return (
-        <>
-        <Box
-            ref={zoomContainerRef}
-            sx={{
-                flex: 1,
-                overflow: 'hidden',
-                height: '100%',
-                width: '100%'
-            }}
-        >
-            <Box ref={containerRef} sx={{ height: '100%', width: '100%' }}>
-                <Virtuoso
-                style={{ height: '100%' }}
-                totalCount={imageRows.length}
-                defaultItemHeight={rowHeight}
-                components={virtuosoComponents}
-                itemContent={(rowIndex: number) => {
-                    const row = imageRows[rowIndex];
-                    return (
-                        <Box sx={{ 
-                            height: rowHeight,
-                            display: 'grid', 
-                            gridTemplateColumns: `repeat(${columns}, 1fr)`,
-                            gap: 2,
-                            pb: 3,
-                            px: 4,
-                            overflow: 'hidden',
-                            alignItems: 'start'
-                        }}>
-                            {row.map(img => {
-                                const url = imageUrls[img.id];
-                                const fileName = img.original_path.split(/[\\/]/).pop() || 'image';
-                                
-                                return (
-                                    <Box
-                                        key={img.id}
-                                        onClick={() => handleImageClick(img)}
-                                        onDragStart={(e: React.DragEvent) => e.preventDefault()}
-                                        sx={{
-                                            minWidth: 0,
-                                            cursor: 'pointer',
-                                            userSelect: 'none'
-                                        }}
-                                    >
-                                        <Box
-                                            sx={{
-                                                width: '100%',
-                                                aspectRatio,
-                                                borderRadius: 3,
-                                                overflow: 'hidden',
-                                                position: 'relative',
-                                                bgcolor: theme.palette.mode === 'light' ? '#f5f5f5' : '#1a1a1a',
-                                                transition: 'all 0.15s ease-in-out',
-                                                '&:hover': {
-                                                    transform: 'translateY(-2px)',
-                                                    boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
-                                                }
-                                            }}
-                                        >
-                                            {url ? (
-                                                <Box
-                                                    component="img"
-                                                    src={url}
-                                                    draggable={false}
-                                                    sx={{ 
-                                                        width: '100%', 
-                                                        height: '100%', 
-                                                        objectFit: 'cover',
-                                                        userSelect: 'none',
-                                                        WebkitUserDrag: 'none',
-                                                        pointerEvents: 'none'
-                                                    }}
-                                                />
-                                            ) : (
-                                                <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                    <Fingerprint size={32} weight="thin" color={theme.palette.text.disabled} />
-                                                </Box>
-                                            )}
-                                            
-                                            {/* Gradient overlays for file name */}
-                                            {showFileNames && (
-                                                <Box sx={{
-                                                    position: 'absolute',
-                                                    bottom: 0,
-                                                    left: 0,
-                                                    right: 0,
-                                                    p: 1.5,
-                                                    background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
-                                                    color: 'white',
-                                                    pointerEvents: 'none'
-                                                }}>
-                                                    <Typography
-                                                        variant="body2"
-                                                        noWrap
-                                                        sx={{
-                                                            fontWeight: 500,
-                                                            textShadow: '0 1px 2px rgba(0,0,0,0.5)'
-                                                        }}
-                                                    >
-                                                        {fileName}
-                                                    </Typography>
-                                                </Box>
-                                            )}
-                                        </Box>
-                                    </Box>
-                                );
-                            })}
-                        </Box>
-                    );
-                }}
-            />
-
-            </Box>
-        </Box>
-
-        {/* Settings Menu - rendered at root level outside scrollable container */}
-        <Menu
-            open={Boolean(settingsMenuPos)}
-            onClose={() => setSettingsMenuPos(null)}
-            anchorReference="anchorPosition"
-            anchorPosition={settingsMenuPos ? { top: settingsMenuPos.top, left: settingsMenuPos.left } : undefined}
-            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-            slotProps={{
-                paper: {
-                    elevation: 0,
-                    sx: {
-                        backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(45, 45, 45, 0.95)',
-                        backdropFilter: 'blur(8px)',
-                        borderRadius: '12px',
-                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-                        border: `1px solid ${theme.palette.divider}`,
-                        minWidth: '250px',
-                        p: 2,
-                        mt: 1
-                    }
-                }
-            }}
-        >
-            <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                Grid Size
-                <Tooltip title="Reset to Default">
-                    <IconButton size="small" onClick={() => setGridItemSize(180)}>
-                        <ArrowCounterClockwise size={14} />
-                    </IconButton>
-                </Tooltip>
-            </Typography>
-            <Box sx={{ px: 1, mb: 2 }}>
-                <Slider
-                    size="small"
-                    value={gridItemSize}
-                    min={100}
-                    max={715}
-                    onChange={(_: Event, value: number | number[]) => setGridItemSize(value as number)}
-                    valueLabelDisplay="auto"
-                    valueLabelFormat={(value: number) => `${value}px`}
-                />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                    <Typography variant="caption" color="text.secondary">Small</Typography>
-                    <Typography variant="caption" color="text.secondary">Large</Typography>
-                </Box>
-            </Box>
-
-            <Divider sx={{ my: 1 }} />
-
-            <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                Aspect Ratio
-                <Tooltip title="Reset to Default">
-                    <IconButton size="small" onClick={() => setAspectRatio('1.618/1')}>
-                        <ArrowCounterClockwise size={14} />
-                    </IconButton>
-                </Tooltip>
-            </Typography>
-            <ToggleButtonGroup
-                value={aspectRatio}
-                exclusive
-                onChange={(_: React.MouseEvent<HTMLElement>, value: string | null) => value && setAspectRatio(value)}
-                size="small"
-                fullWidth
-                sx={{ mb: 2, display: 'flex' }}
-            >
-                <ToggleButton value="1/1" sx={{ flexGrow: 1, py: 0.5 }}>1:1</ToggleButton>
-                <ToggleButton value="4/3" sx={{ flexGrow: 1, py: 0.5 }}>4:3</ToggleButton>
-                <ToggleButton value="16/9" sx={{ flexGrow: 1, py: 0.5 }}>16:9</ToggleButton>
-                <ToggleButton value="9/16" sx={{ flexGrow: 1, py: 0.5 }}>9:16</ToggleButton>
-                <ToggleButton value="1.618/1" sx={{ flexGrow: 1, py: 0.5 }}>Φ</ToggleButton>
-                <ToggleButton value="1/1.618" sx={{ flexGrow: 1, py: 0.5 }}>Φ</ToggleButton>
-            </ToggleButtonGroup>
-
-            <Divider sx={{ my: 1 }} />
-
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
-                <Typography variant="subtitle2" fontWeight="600">
-                    Show File Names
-                </Typography>
-                <Switch
-                    size="small"
-                    checked={showFileNames}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowFileNames(e.target.checked)}
-                />
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
-                <Typography variant="subtitle2" fontWeight="600">
-                    Show Bounding Boxes
-                </Typography>
-                <Switch
-                    size="small"
-                    checked={showBoundingBoxes}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowBoundingBoxes(e.target.checked)}
-                />
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
-                <Typography variant="subtitle2" fontWeight="600">
-                    Show ID Colors
-                </Typography>
-                <Switch
-                    size="small"
-                    checked={showColors}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                        setShowColors(e.target.checked);
-                        localStorage.setItem('reid_showColors', e.target.checked.toString());
-                    }}
-                />
-            </Box>
-        </Menu>
-
-        {/* Image Modal - rendered at root level outside scrollable container */}
-        {(() => {
-            const isOpen = selectedImage !== null;
-            const imageUrl = selectedImage ? (fullImageUrls[selectedImage.id] || imageUrls[selectedImage.id]) : undefined;
-            const dets = selectedImage ? getDetectionsForImage(selectedImage.id) : [];
-            const file = selectedImage ? {
-                name: selectedImage.original_path.split('\\').pop() || selectedImage.original_path.split('/').pop() || 'unknown',
-                isDirectory: false,
-                path: selectedImage.original_path
-            } : undefined;
-            return (
-                <ImageModal
-                    open={isOpen}
-                    onClose={() => setSelectedImage(null)}
-                    imageUrl={imageUrl}
-                    file={file}
-                    detections={showBoundingBoxes ? dets : []}
-                    onNext={hasNext ? goNext : undefined}
-                    onPrev={hasPrev ? goPrev : undefined}
-                    hasNext={hasNext}
-                    hasPrev={hasPrev}
-                    useLiquidGlass={useLiquidGlass}
-                    useRayTracedGlass={useRayTracedGlass}
-                />
-            );
-        })()}
-    </>
-    );
-};
-
 const PAGE_SIZE = 12;
 
 const ReIDPage: React.FC = () => {
@@ -683,10 +123,8 @@ const ReIDPage: React.FC = () => {
     const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
     const [renameDialogOpen, setRenameDialogOpen] = useState(false);
     const [runToRename, setRunToRename] = useState<{ id: number; name: string } | null>(null);
-    const [selectedIndividual, setSelectedIndividual] = useState<ReidIndividual | null>(null);
     const [imageUrls, setImageUrls] = useState<Map<string, string>>(new Map());
     const [refreshTrigger, setRefreshTrigger] = useState(0);
-    const scrollPositionRef = useRef(0);
     
     // Read liquid glass settings from localStorage (shared with MediaExplorer and Settings page)
     const [useLiquidGlass, setUseLiquidGlass] = useState(() => {
@@ -768,6 +206,18 @@ const ReIDPage: React.FC = () => {
         }
     };
 
+    // Restore scroll position on mount
+    useEffect(() => {
+        const savedPosition = sessionStorage.getItem('reid_scroll_position');
+        if (savedPosition) {
+            // Short delay to ensure content is rendered (especially if data is loaded from cache or fast fetch)
+            // If data loading takes time, we might need to restore after data load.
+            // But runs are loaded in useEffect. 
+            // We can just store the position and let the data loading effect trigger the scroll?
+            // Or just try to scroll after a delay.
+        }
+    }, []);
+
     // Initial load - fetch runs and first page of each
     useEffect(() => {
         const loadData = async () => {
@@ -791,6 +241,18 @@ const ReIDPage: React.FC = () => {
                     }
                     setIndividuals(newIndividuals);
                     setPagination(newPagination);
+
+                    // Restore scroll position after data is loaded
+                    const savedPosition = sessionStorage.getItem('reid_scroll_position');
+                    if (savedPosition) {
+                        setTimeout(() => {
+                            const mainEl = document.querySelector('main');
+                            if (mainEl) {
+                                mainEl.scrollTop = parseInt(savedPosition, 10);
+                                sessionStorage.removeItem('reid_scroll_position');
+                            }
+                        }, 100);
+                    }
                 }
             } catch (e) { console.error('Failed to load ReID data:', e); }
             setLoading(false);
@@ -830,10 +292,10 @@ const ReIDPage: React.FC = () => {
     const handleDelete = async () => { if (selectedRunId && window.confirm('Delete this ReID run?')) { await window.api.deleteReidRun(selectedRunId); setRefreshTrigger(t => t + 1); } handleMenuClose(); };
     const handleIndividualClick = (ind: ReidIndividual) => { 
         const mainEl = document.querySelector('main');
-        const scrollY = mainEl?.scrollTop ?? 0;
-        console.log('[ReID] Saving scroll position:', scrollY);
-        scrollPositionRef.current = scrollY;
-        setSelectedIndividual(ind); 
+        if (mainEl) {
+            sessionStorage.setItem('reid_scroll_position', mainEl.scrollTop.toString());
+        }
+        navigate(`/reid/run/${ind.run_id}/individual/${ind.id}`, { state: { individual: ind } });
     };
 
     if (loading) return (
@@ -880,29 +342,7 @@ const ReIDPage: React.FC = () => {
     );
 
     // If viewing an individual, show the detail view (full height, navbar spacer in header)
-    if (selectedIndividual) {
-        return (
-            <Box sx={{ height: '100vh', overflow: 'hidden' }}>
-                <IndividualDetailView
-                    individual={selectedIndividual}
-                    onBack={() => {
-                        const savedPosition = scrollPositionRef.current;
-                        console.log('[ReID] Restoring scroll position:', savedPosition);
-                        setSelectedIndividual(null);
-                        // Restore scroll position after component re-renders - needs delay for DOM to be ready
-                        setTimeout(() => {
-                            const mainEl = document.querySelector('main');
-                            console.log('[ReID] Attempting scrollTo:', savedPosition, 'mainEl:', mainEl);
-                            if (mainEl) {
-                                mainEl.scrollTop = savedPosition;
-                                console.log('[ReID] After scrollTo, scrollTop:', mainEl.scrollTop);
-                            }
-                        }, 50);
-                    }}
-                />
-            </Box>
-        );
-    }
+    // Logic moved to routing (App.tsx + IndividualDetailView.tsx)
 
     return (
         <Box sx={{ pt: '64px', px: 3, pb: 3, minHeight: '100vh' }}>
