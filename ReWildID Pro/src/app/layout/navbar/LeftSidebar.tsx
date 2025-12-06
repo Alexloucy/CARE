@@ -46,7 +46,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
     const navigate = useNavigate();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-    const hasGradient = colorTheme.gradient !== 'none';
+    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special;
 
     const navItems = [
         { key: 'dashboard', label: 'Dashboard', path: '/', icon: <House weight="regular" size={20} /> },

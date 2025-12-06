@@ -160,7 +160,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
 }) => {
     const theme = useTheme();
     const { colorTheme } = useColorMode();
-    const hasGradient = colorTheme.gradient !== 'none';
+    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special;
     // Local View State
     const [activeId, setActiveId] = useState<string>('');
     const [gridItemSize, setGridItemSize] = useState(() => {

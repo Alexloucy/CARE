@@ -9,6 +9,7 @@ export interface ColorTheme {
     mode: 'light' | 'dark';
     gradient: string;
     previewGradient: string; // For the swatch in settings
+    special?: 'prismatic-burst'; // For animated WebGL backgrounds
 }
 
 export const COLOR_THEMES: ColorTheme[] = [
@@ -76,6 +77,15 @@ export const COLOR_THEMES: ColorTheme[] = [
         mode: 'dark',
         gradient: 'linear-gradient(to left, #243B55, #141E30)',
         previewGradient: 'linear-gradient(to left, #243B55, #141E30)',
+    },
+    // Special animated themes
+    {
+        id: 'prismatic-burst',
+        name: 'Prismatic',
+        mode: 'dark',
+        gradient: 'none', // Handled specially by Layout
+        previewGradient: 'linear-gradient(135deg, #ff007a 0%, #4d3dff 50%, #00ffff 100%)',
+        special: 'prismatic-burst',
     },
     // Light themes
     {

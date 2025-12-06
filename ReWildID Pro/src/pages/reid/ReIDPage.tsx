@@ -145,7 +145,7 @@ const PAGE_SIZE = 12;
 const ReIDPage: React.FC = () => {
     const theme = useTheme();
     const { colorTheme } = useColorMode();
-    const hasGradient = colorTheme.gradient !== 'none';
+    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special;
     const navigate = useNavigate();
     useOutletContext<{ leftSidebarOpen: boolean; rightSidebarOpen: boolean }>();
     const [loading, setLoading] = useState(true);

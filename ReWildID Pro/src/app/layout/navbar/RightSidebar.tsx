@@ -29,7 +29,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
     const { colorTheme } = useColorMode();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-    const hasGradient = colorTheme.gradient !== 'none';
+    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special;
 
     return (
         <Drawer

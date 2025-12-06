@@ -8,6 +8,7 @@ import TaskPanel from '../../components/TaskPanel';
 import { DragDropOverlay } from '../../components/library/DragDropOverlay';
 import { UploadActionDialog } from '../../components/UploadActionDialog';
 import { useColorMode } from '../../features/theme/ThemeContext';
+import PrismaticBurst from '../../components/backgrounds/PrismaticBurst';
 
 export default function Layout() {
     const location = useLocation();
@@ -127,12 +128,37 @@ export default function Layout() {
         return removeListener;
     }, []);
 
-    const hasGradient = colorTheme.gradient !== 'none';
+    const hasGradient = colorTheme.gradient !== 'none' || colorTheme.special === 'prismatic-burst';
 
     return (
         <Box sx={{ position: 'relative', height: '100vh', overflow: 'hidden' }}>
-            {/* Gradient Background Layer */}
-            {hasGradient && (
+            {/* Background Layer - Gradient or Special Animated */}
+            {colorTheme.special === 'prismatic-burst' ? (
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 0,
+                        bgcolor: '#0a0a0a',
+                    }}
+                >
+                    <PrismaticBurst
+                        animationType="rotate3d"
+                        intensity={2}
+                        speed={0.5}
+                        distort={1.0}
+                        paused={false}
+                        offset={{ x: 0, y: 0 }}
+                        hoverDampness={0.25}
+                        rayCount={24}
+                        mixBlendMode="lighten"
+                        colors={['#ff007a', '#4d3dff', '#ffffff']}
+                    />
+                </Box>
+            ) : hasGradient && (
                 <Box
                     sx={{
                         position: 'absolute',
