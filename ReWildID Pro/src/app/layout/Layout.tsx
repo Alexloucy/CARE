@@ -9,6 +9,7 @@ import { DragDropOverlay } from '../../components/library/DragDropOverlay';
 import { UploadActionDialog } from '../../components/UploadActionDialog';
 import { useColorMode } from '../../features/theme/ThemeContext';
 import PrismaticBurst from '../../components/backgrounds/PrismaticBurst';
+import ColorBends from '../../components/backgrounds/ColorBends';
 
 export default function Layout() {
     const location = useLocation();
@@ -128,7 +129,7 @@ export default function Layout() {
         return removeListener;
     }, []);
 
-    const hasGradient = colorTheme.gradient !== 'none' || colorTheme.special === 'prismatic-burst';
+    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special;
 
     return (
         <Box sx={{ position: 'relative', height: '100vh', overflow: 'hidden' }}>
@@ -156,6 +157,31 @@ export default function Layout() {
                         rayCount={24}
                         mixBlendMode="lighten"
                         colors={['#ff007a', '#4d3dff', '#ffffff']}
+                    />
+                </Box>
+            ) : colorTheme.special === 'color-bends' ? (
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 0,
+                        bgcolor: '#0a0a0a',
+                    }}
+                >
+                    <ColorBends
+                        colors={['#ff5c7a', '#8a5cff', '#00ffd1']}
+                        rotation={30}
+                        speed={0.3}
+                        scale={1.2}
+                        frequency={1.4}
+                        warpStrength={1.2}
+                        mouseInfluence={0.8}
+                        parallax={0.6}
+                        noise={0.08}
+                        transparent={false}
                     />
                 </Box>
             ) : hasGradient && (

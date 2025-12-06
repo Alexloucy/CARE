@@ -9,7 +9,7 @@ export interface ColorTheme {
     mode: 'light' | 'dark';
     gradient: string;
     previewGradient: string; // For the swatch in settings
-    special?: 'prismatic-burst'; // For animated WebGL backgrounds
+    special?: 'prismatic-burst' | 'color-bends'; // For animated WebGL backgrounds
 }
 
 export const COLOR_THEMES: ColorTheme[] = [
@@ -86,6 +86,14 @@ export const COLOR_THEMES: ColorTheme[] = [
         gradient: 'none', // Handled specially by Layout
         previewGradient: 'linear-gradient(135deg, #ff007a 0%, #4d3dff 50%, #00ffff 100%)',
         special: 'prismatic-burst',
+    },
+    {
+        id: 'color-bends',
+        name: 'Color Bends',
+        mode: 'dark',
+        gradient: 'none', // Handled specially by Layout
+        previewGradient: 'linear-gradient(135deg, #ff5c7a 0%, #8a5cff 50%, #00ffd1 100%)',
+        special: 'color-bends',
     },
     // Light themes
     {
