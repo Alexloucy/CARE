@@ -16,7 +16,8 @@ import {
     ToggleButtonGroup,
     IconButton,
     Tooltip,
-    useTheme
+    useTheme,
+    alpha
 } from '@mui/material';
 import {
     CaretDown,
@@ -31,10 +32,15 @@ import {
     TextT,
     Drop,
     BoundingBox,
-    Lightbulb
+    Lightbulb,
+    PaintBrush,
+    Check,
+    Sun,
+    Moon
 } from '@phosphor-icons/react';
 import StyledSwitch from '../../components/StyledSwitch';
 import { resetAllTours } from '../../components/OnboardingTour';
+import { useColorMode, COLOR_THEMES, ColorTheme } from '../../features/theme/ThemeContext';
 
 // Settings item interface
 interface SettingsItem {
@@ -154,8 +160,92 @@ const sections = [
     },
 ];
 
+// Theme swatch component
+const ThemeSwatch: React.FC<{
+    themeOption: ColorTheme;
+    isSelected: boolean;
+    onClick: () => void;
+}> = ({ themeOption, isSelected, onClick }) => {
+    const muiTheme = useTheme();
+
+    return (
+        <Tooltip title={`${themeOption.name} (${themeOption.mode === 'dark' ? 'Dark' : 'Light'})`}>
+            <Box
+                onClick={onClick}
+                sx={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 2,
+                    background: themeOption.previewGradient,
+                    cursor: 'pointer',
+                    position: 'relative',
+                    border: isSelected
+                        ? `3px solid ${muiTheme.palette.primary.main}`
+                        : `2px solid ${alpha(muiTheme.palette.divider, 0.3)}`,
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    '&:hover': {
+                        transform: 'scale(1.05)',
+                        borderColor: muiTheme.palette.primary.main,
+                    },
+                }}
+            >
+                {/* Mode indicator */}
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        bottom: 4,
+                        right: 4,
+                        width: 18,
+                        height: 18,
+                        borderRadius: '50%',
+                        backgroundColor: themeOption.mode === 'dark'
+                            ? 'rgba(0,0,0,0.7)'
+                            : 'rgba(255,255,255,0.9)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: `1px solid ${themeOption.mode === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}`,
+                    }}
+                >
+                    {themeOption.mode === 'dark' ? (
+                        <Moon size={10} weight="fill" color="#fff" />
+                    ) : (
+                        <Sun size={10} weight="fill" color="#000" />
+                    )}
+                </Box>
+
+                {/* Selected checkmark */}
+                {isSelected && (
+                    <Box
+                        sx={{
+                            position: 'absolute',
+                            top: 4,
+                            left: 4,
+                            width: 20,
+                            height: 20,
+                            borderRadius: '50%',
+                            backgroundColor: muiTheme.palette.primary.main,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    >
+                        <Check size={12} weight="bold" color="#fff" />
+                    </Box>
+                )}
+            </Box>
+        </Tooltip>
+    );
+};
+
 const SettingsPage: React.FC = () => {
     const theme = useTheme();
+    const { colorTheme, setColorTheme } = useColorMode();
 
     // Load all settings from localStorage
     const [settings, setSettings] = useState<Record<string, any>>(() => {
@@ -255,11 +345,11 @@ const SettingsPage: React.FC = () => {
                                 size="small"
                             >
                                 {item.options?.map(opt => (
-                                    <ToggleButton 
-                                        key={opt} 
-                                        value={opt} 
-                                        sx={{ 
-                                            py: 0.5, 
+                                    <ToggleButton
+                                        key={opt}
+                                        value={opt}
+                                        sx={{
+                                            py: 0.5,
                                             px: 1.5,
                                             fontSize: '0.75rem'
                                         }}
@@ -287,6 +377,68 @@ const SettingsPage: React.FC = () => {
                 <Typography variant="h4" fontWeight="bold" sx={{ mb: 3 }}>
                     Settings
                 </Typography>
+
+                {/* Theme Section */}
+                <Accordion
+                    defaultExpanded
+                    disableGutters
+                    square
+                    elevation={0}
+                    sx={{
+                        mb: 2,
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: 2.5,
+                        '&:before': { display: 'none' },
+                        overflow: 'hidden'
+                    }}
+                >
+                    <AccordionSummary
+                        expandIcon={<CaretDown size={20} />}
+                        sx={{
+                            px: 2,
+                            minHeight: '56px',
+                            '& .MuiAccordionSummary-content': {
+                                my: '12px'
+                            },
+                            '&.Mui-expanded': {
+                                minHeight: '56px',
+                                borderBottom: `1px solid ${theme.palette.divider}`
+                            }
+                        }}
+                    >
+                        <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', pr: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <PaintBrush size={20} />
+                                <Typography variant="h6" fontWeight="600">
+                                    Theme
+                                </Typography>
+                            </Box>
+                            <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ mt: 0, lineHeight: 1.3, ml: 3.5 }}
+                            >
+                                Choose a color theme for the application
+                            </Typography>
+                        </Box>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ pt: 2, px: 2, pb: 2 }}>
+                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                            {COLOR_THEMES.map((themeOption) => (
+                                <Box key={themeOption.id} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                                    <ThemeSwatch
+                                        themeOption={themeOption}
+                                        isSelected={colorTheme.id === themeOption.id}
+                                        onClick={() => setColorTheme(themeOption.id)}
+                                    />
+                                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                                        {themeOption.name}
+                                    </Typography>
+                                </Box>
+                            ))}
+                        </Box>
+                    </AccordionDetails>
+                </Accordion>
 
                 {/* Settings Sections */}
                 {sections.map(({ id, title, description }) => (
@@ -369,12 +521,12 @@ const SettingsPage: React.FC = () => {
                         </Box>
                     </Box>
                     <Tooltip title="Reset Tours">
-                        <IconButton 
+                        <IconButton
                             onClick={() => {
                                 resetAllTours();
                                 alert('Tours have been reset! You will see them again when visiting each page.');
                             }}
-                            sx={{ 
+                            sx={{
                                 bgcolor: theme.palette.action.hover,
                                 '&:hover': { bgcolor: theme.palette.action.selected }
                             }}

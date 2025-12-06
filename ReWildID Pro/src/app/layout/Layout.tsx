@@ -7,11 +7,13 @@ import { RightSidebar } from './navbar/RightSidebar';
 import TaskPanel from '../../components/TaskPanel';
 import { DragDropOverlay } from '../../components/library/DragDropOverlay';
 import { UploadActionDialog } from '../../components/UploadActionDialog';
+import { useColorMode } from '../../features/theme/ThemeContext';
 
 export default function Layout() {
     const location = useLocation();
     const navigate = useNavigate();
     const theme = useTheme();
+    const { colorTheme } = useColorMode();
     const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
 
     const [leftSidebarOpen, setLeftSidebarOpen] = useState(isDesktop);
@@ -52,10 +54,10 @@ export default function Layout() {
         e.preventDefault();
         dragCounter.current = 0;
         setIsDragging(false);
-        
+
         const files = Array.from(e.dataTransfer.files);
         if (files.length === 0) return;
-        
+
         const paths = files.map(file => window.api.getPathForFile(file));
         setPendingFiles(paths);
         setUploadDialogOpen(true);
@@ -79,8 +81,8 @@ export default function Layout() {
 
     // Handle upload confirmation from dialog
     const handleUploadConfirm = useCallback(async (
-        action: 'library' | 'classify' | 'reid', 
-        groupName?: string, 
+        action: 'library' | 'classify' | 'reid',
+        groupName?: string,
         species?: string
     ) => {
         try {
@@ -88,7 +90,7 @@ export default function Layout() {
             const afterAction = action === 'library' ? undefined : action;
             await window.api.uploadPaths(pendingFiles, groupName, afterAction, species);
             setPendingFiles([]);
-            
+
             // Navigate to appropriate page based on action
             if (action === 'classify') {
                 navigate('/classification');
@@ -114,111 +116,137 @@ export default function Layout() {
     useEffect(() => {
         const removeListener = window.api.onJobUpdate((jobs) => {
             if (jobs.length > lastJobCount.current) {
-                 // New job added!
-                 const latestJob = jobs[0]; 
-                 if (latestJob.status === 'running' || latestJob.status === 'pending') {
-                     setRightSidebarOpen(true);
-                 }
+                // New job added!
+                const latestJob = jobs[0];
+                if (latestJob.status === 'running' || latestJob.status === 'pending') {
+                    setRightSidebarOpen(true);
+                }
             }
             lastJobCount.current = jobs.length;
         });
         return removeListener;
     }, []);
 
+    const hasGradient = colorTheme.gradient !== 'none';
+
     return (
-        <Box 
-            sx={{ display: 'flex', height: '100vh'}}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-        >
-            <LeftSidebar open={leftSidebarOpen} onClose={() => setLeftSidebarOpen(false)} />
-
-            <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                flexGrow: 1,
-                overflow: 'hidden',
-                width: {
-                    xs: '100%',
-                    md: `calc(100% - ${leftSidebarOpen ? 212 : 0}px - ${rightSidebarOpen ? 300 : 0}px)`
-                },
-                height: '100vh',
-                ml: { xs: 0, md: leftSidebarOpen ? 0 : 0 },
-                transition: (theme: import('@mui/material').Theme) => theme.transitions.create(['width', 'margin'], {
-                    easing: theme.transitions.easing.sharp,
-                    duration: theme.transitions.duration.enteringScreen,
-                })
-            }}>
-                <Navbar
-                    toggleLeftSidebar={() => setLeftSidebarOpen(!leftSidebarOpen)}
-                    toggleRightSidebar={() => setRightSidebarOpen(!rightSidebarOpen)}
-                    leftSidebarOpen={leftSidebarOpen}
-                    rightSidebarOpen={rightSidebarOpen}
-                    agentIconShow={!location.pathname.startsWith('/agent')}
-                />
-
+        <Box sx={{ position: 'relative', height: '100vh', overflow: 'hidden' }}>
+            {/* Gradient Background Layer */}
+            {hasGradient && (
                 <Box
-                    component="main"
                     sx={{
-                        mt: getPageMargin(),
-                        mb: getPageMargin(),
-                        flexGrow: 1,
-                        overflow: 'auto',
-                        paddingLeft: { xs: location.pathname === '/chat' ? 0 : 2, sm: 0 },
-                        paddingRight: { xs: location.pathname === '/chat' ? 0 : 2, sm: 0 },
-                        paddingTop: 0,
-                        paddingBottom: 0,
-                        // Modern thin scrollbar
-                        '&::-webkit-scrollbar': {
-                            width: '6px',
-                        },
-                        '&::-webkit-scrollbar-track': {
-                            background: 'transparent',
-                        },
-                        '&::-webkit-scrollbar-thumb': {
-                            background: theme.palette.mode === 'dark' 
-                                ? 'rgba(255, 255, 255, 0.2)' 
-                                : 'rgba(0, 0, 0, 0.2)',
-                            borderRadius: '3px',
-                            '&:hover': {
-                                background: theme.palette.mode === 'dark' 
-                                    ? 'rgba(255, 255, 255, 0.3)' 
-                                    : 'rgba(0, 0, 0, 0.3)',
-                            },
-                        },
-                        scrollbarWidth: 'thin',
-                        scrollbarColor: theme.palette.mode === 'dark' 
-                            ? 'rgba(255, 255, 255, 0.2) transparent' 
-                            : 'rgba(0, 0, 0, 0.2) transparent',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: colorTheme.gradient,
+                        zIndex: 0,
+                        transition: 'background 0.3s ease-in-out',
                     }}
-                >
-                    <Outlet context={{ leftSidebarOpen, rightSidebarOpen }} />
-                </Box>
-            </Box>
+                />
+            )}
 
-            <RightSidebar
-                open={rightSidebarOpen}
-                onClose={() => setRightSidebarOpen(false)}
-                title="Tasks"
-            >
-                <TaskPanel />
-            </RightSidebar>
-
-            {/* Global Drag & Drop Overlay */}
-            <DragDropOverlay isDragging={isDragging} />
-
-            {/* Upload Action Dialog - handles both action selection and group naming */}
-            <UploadActionDialog
-                open={uploadDialogOpen}
-                onClose={() => {
-                    setUploadDialogOpen(false);
-                    setPendingFiles([]);
+            {/* Main Content Layer */}
+            <Box
+                sx={{
+                    display: 'flex',
+                    height: '100vh',
+                    position: 'relative',
+                    zIndex: 1,
                 }}
-                filePaths={pendingFiles}
-                onConfirm={handleUploadConfirm}
-            />
-        </Box>
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+            >
+                <LeftSidebar open={leftSidebarOpen} onClose={() => setLeftSidebarOpen(false)} />
+
+                <Box sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    flexGrow: 1,
+                    overflow: 'hidden',
+                    width: {
+                        xs: '100%',
+                        md: `calc(100% - ${leftSidebarOpen ? 212 : 0}px - ${rightSidebarOpen ? 300 : 0}px)`
+                    },
+                    height: '100vh',
+                    ml: { xs: 0, md: leftSidebarOpen ? 0 : 0 },
+                    transition: (theme: import('@mui/material').Theme) => theme.transitions.create(['width', 'margin'], {
+                        easing: theme.transitions.easing.sharp,
+                        duration: theme.transitions.duration.enteringScreen,
+                    })
+                }}>
+                    <Navbar
+                        toggleLeftSidebar={() => setLeftSidebarOpen(!leftSidebarOpen)}
+                        toggleRightSidebar={() => setRightSidebarOpen(!rightSidebarOpen)}
+                        leftSidebarOpen={leftSidebarOpen}
+                        rightSidebarOpen={rightSidebarOpen}
+                        agentIconShow={!location.pathname.startsWith('/agent')}
+                    />
+
+                    <Box
+                        component="main"
+                        sx={{
+                            mt: getPageMargin(),
+                            mb: getPageMargin(),
+                            flexGrow: 1,
+                            overflow: 'auto',
+                            paddingLeft: { xs: location.pathname === '/chat' ? 0 : 2, sm: 0 },
+                            paddingRight: { xs: location.pathname === '/chat' ? 0 : 2, sm: 0 },
+                            paddingTop: 0,
+                            paddingBottom: 0,
+                            // Modern thin scrollbar
+                            '&::-webkit-scrollbar': {
+                                width: '6px',
+                            },
+                            '&::-webkit-scrollbar-track': {
+                                background: 'transparent',
+                            },
+                            '&::-webkit-scrollbar-thumb': {
+                                background: theme.palette.mode === 'dark'
+                                    ? 'rgba(255, 255, 255, 0.2)'
+                                    : 'rgba(0, 0, 0, 0.2)',
+                                borderRadius: '3px',
+                                '&:hover': {
+                                    background: theme.palette.mode === 'dark'
+                                        ? 'rgba(255, 255, 255, 0.3)'
+                                        : 'rgba(0, 0, 0, 0.3)',
+                                },
+                            },
+                            scrollbarWidth: 'thin',
+                            scrollbarColor: theme.palette.mode === 'dark'
+                                ? 'rgba(255, 255, 255, 0.2) transparent'
+                                : 'rgba(0, 0, 0, 0.2) transparent',
+                        }}
+                    >
+                        <Outlet context={{ leftSidebarOpen, rightSidebarOpen }} />
+                    </Box>
+                </Box>
+
+                <RightSidebar
+                    open={rightSidebarOpen}
+                    onClose={() => setRightSidebarOpen(false)}
+                    title="Tasks"
+                >
+                    <TaskPanel />
+                </RightSidebar>
+
+                {/* Global Drag & Drop Overlay */}
+                <DragDropOverlay isDragging={isDragging} />
+
+                {/* Upload Action Dialog - handles both action selection and group naming */}
+                <UploadActionDialog
+                    open={uploadDialogOpen}
+                    onClose={() => {
+                        setUploadDialogOpen(false);
+                        setPendingFiles([]);
+                    }}
+                    filePaths={pendingFiles}
+                    onConfirm={handleUploadConfirm}
+                />
+            </Box>
+        </Box >
     );
 }

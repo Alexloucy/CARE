@@ -8,6 +8,7 @@ import {
     IconButton
 } from '@mui/material';
 import { X } from '@phosphor-icons/react';
+import { useColorMode } from '../../../features/theme/ThemeContext';
 
 interface RightSidebarProps {
     open: boolean;
@@ -25,7 +26,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
     children
 }) => {
     const theme = useTheme();
+    const { colorTheme } = useColorMode();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+    const hasGradient = colorTheme.gradient !== 'none';
 
     return (
         <Drawer
@@ -40,9 +44,16 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     width: DRAWER_WIDTH,
                     boxSizing: 'border-box',
                     borderLeft: '1px solid',
-                    borderColor: 'divider',
-                    backgroundColor: theme.palette.mode === 'dark' ? '#121212' : '#F9F9F9',
-                    transition: theme.transitions.create('width', {
+                    borderColor: hasGradient
+                        ? (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')
+                        : 'divider',
+                    // Background styling - transparent with blur when gradient active
+                    backgroundColor: hasGradient
+                        ? (theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.4)' : 'rgba(255, 255, 255, 0.4)')
+                        : (theme.palette.mode === 'dark' ? '#121212' : '#F9F9F9'),
+                    backdropFilter: hasGradient ? 'blur(20px)' : 'none',
+                    WebkitBackdropFilter: hasGradient ? 'blur(20px)' : 'none',
+                    transition: theme.transitions.create(['width', 'background-color'], {
                         easing: theme.transitions.easing.sharp,
                         duration: theme.transitions.duration.shorter,
                     }),
@@ -59,7 +70,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     px: 2,
-                    backgroundColor: theme.palette.mode === 'dark' ? '#121212' : '#F9F9F9',
+                    // No background here - inherit from drawer paper
                 }}
             >
                 <Typography variant="h6" sx={{ fontWeight: 500 }}>
@@ -76,8 +87,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
             </Box>
             <Box sx={{
                 p: 2,
-                backgroundColor: theme.palette.mode === 'dark' ? '#121212' : '#F9F9F9',
-                height: '100%'
+                height: '100%',
+                // No background here - inherit from drawer paper
             }}>
                 {children || (
                     <Typography color="text.secondary">

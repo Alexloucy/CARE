@@ -44,7 +44,7 @@ export default function Navbar({
     rightSidebarOpen,
 }: NavbarProps) {
     const muiTheme = useMuiTheme();
-    const { toggleColorMode } = useColorMode();
+    const { toggleColorMode, colorTheme } = useColorMode();
     const isDarkMode = muiTheme.palette.mode === 'dark';
     const location = useLocation();
     const navigate = useNavigate();
@@ -55,6 +55,8 @@ export default function Navbar({
 
     const { jobs } = useJobs();
     const activeJobsCount = jobs.filter(j => ['pending', 'running'].includes(j.status)).length;
+
+    const hasGradient = colorTheme.gradient !== 'none';
 
     useEffect(() => {
         // Function to update navigation state based on history
@@ -142,18 +144,36 @@ export default function Navbar({
     const leftSidebarWidth = leftSidebarOpen ? 212 : 0;
     const rightSidebarWidth = rightSidebarOpen ? 212 : 0;
 
+    // Background styling based on gradient theme
+    const getBackgroundStyle = () => {
+        if (hasGradient) {
+            return {
+                backgroundColor: isDarkMode
+                    ? 'rgba(0, 0, 0, 0.4)'
+                    : 'rgba(255, 255, 255, 0.4)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+            };
+        }
+        return {
+            backgroundColor: isDarkMode
+                ? 'rgba(18, 18, 18, 0.8)'
+                : 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(15px)',
+            WebkitBackdropFilter: 'blur(15px)',
+        };
+    };
+
     return (
         <AppBar
             position="fixed"
             color="default"
             sx={{
                 boxShadow: 'none',
-                borderBottom: `1px solid ${muiTheme.palette.divider}`,
-                backgroundColor: muiTheme.palette.mode === 'light'
-                    ? 'rgba(255, 255, 255, 0.3)'
-                    : 'rgba(18, 18, 18, 0.3)',
-                backdropFilter: 'blur(15px)',
-                WebkitBackdropFilter: 'blur(15px)',
+                borderBottom: hasGradient
+                    ? `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`
+                    : `1px solid ${muiTheme.palette.divider}`,
+                ...getBackgroundStyle(),
                 ...(inElectron && {
                     WebkitAppRegion: 'drag',
                     userSelect: 'none',
@@ -165,7 +185,7 @@ export default function Navbar({
                     xs: '100%',
                     md: `calc(100% - ${leftSidebarWidth}px - ${rightSidebarWidth}px)`
                 },
-                transition: (theme: any) => theme.transitions.create(['width', 'left', 'right'], {
+                transition: (theme: any) => theme.transitions.create(['width', 'left', 'right', 'background-color'], {
                     easing: theme.transitions.easing.sharp,
                     duration: theme.transitions.duration.enteringScreen,
                 }),
@@ -288,20 +308,20 @@ export default function Navbar({
                             onClick={toggleRightSidebar}
                             sx={{ padding: 1 }}
                         >
-                            <Badge 
-                                badgeContent={activeJobsCount} 
+                            <Badge
+                                badgeContent={activeJobsCount}
                                 color="error"
                                 max={99}
                                 invisible={activeJobsCount === 0}
-                                sx={{ 
-                                    '& .MuiBadge-badge': { 
-                                        bgcolor: isDarkMode ? 'white' : 'black', 
+                                sx={{
+                                    '& .MuiBadge-badge': {
+                                        bgcolor: isDarkMode ? 'white' : 'black',
                                         color: isDarkMode ? 'black' : 'white',
                                         fontWeight: 'bold',
                                         fontSize: '0.65rem',
                                         height: 18,
                                         minWidth: 18,
-                                    } 
+                                    }
                                 }}
                             >
                                 <ListChecks size={24} />

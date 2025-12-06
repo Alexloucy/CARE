@@ -22,6 +22,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { alpha } from '@mui/material/styles';
 import StoatIconWhiteBg from '../../../assets/stoat_icon_white_bg_v3.png';
 import StoatIconDarkBg from '../../../assets/stoat_icon_dark_bg_v3.png';
+import { useColorMode } from '../../../features/theme/ThemeContext';
 
 interface LeftSidebarProps {
     open: boolean;
@@ -40,9 +41,12 @@ const isElectron = () => {
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
     const theme = useTheme();
+    const { colorTheme } = useColorMode();
     const location = useLocation();
     const navigate = useNavigate();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+    const hasGradient = colorTheme.gradient !== 'none';
 
     const navItems = [
         { key: 'dashboard', label: 'Dashboard', path: '/', icon: <House weight="regular" size={20} /> },
@@ -62,6 +66,22 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
         if (isMobile) onClose();
     };
 
+    // Background styles based on gradient theme
+    const getBackgroundStyle = () => {
+        if (hasGradient) {
+            return {
+                bgcolor: theme.palette.mode === 'dark'
+                    ? 'rgba(0, 0, 0, 0.4)'
+                    : 'rgba(255, 255, 255, 0.4)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+            };
+        }
+        return {
+            bgcolor: theme.palette.mode === 'light' ? '#F9F9F9' : theme.palette.background.paper,
+        };
+    };
+
     return (
         <Drawer
             variant={isMobile ? 'temporary' : 'persistent'}
@@ -76,14 +96,16 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
                     width: DRAWER_WIDTH,
                     boxSizing: 'border-box',
                     borderRight: isMobile ? 'none' : '1px solid',
-                    borderColor: 'divider',
-                    bgcolor: theme.palette.mode === 'light' ? '#F9F9F9' : theme.palette.background.paper,
+                    borderColor: hasGradient
+                        ? (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')
+                        : 'divider',
+                    ...getBackgroundStyle(),
                     height: '100%',
                     display: 'flex',
                     flexDirection: 'column',
                     padding: '16px',
                     gap: '8px',
-                    transition: theme.transitions.create('width', {
+                    transition: theme.transitions.create(['width', 'background-color'], {
                         easing: theme.transitions.easing.sharp,
                         duration: theme.transitions.duration.enteringScreen,
                     }),

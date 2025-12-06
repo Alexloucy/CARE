@@ -26,6 +26,7 @@ import { NAVBAR_HEIGHT } from '../../app/layout/navbar/Navbar';
 import { AiModeContext } from '../../contexts/AiModeContext';
 import { DBImage } from '../../types/electron';
 import { DateSection } from '../../types/library';
+import { useColorMode } from '../../features/theme/ThemeContext';
 
 // Components
 import ImageModal from '../ImageModal';
@@ -98,15 +99,15 @@ interface MediaExplorerProps {
 
     // AI Analysis support
     aiButtonMode?: 'detect' | 'reid' | 'analyse';
-    
+
     // ReID Run Filter - only show ReID tags when a specific run is selected
     selectedReidRunId?: number | null;
     onReID?: (images: DBImage[], species: string) => void;
     onClassify?: (images: DBImage[]) => void;
-    
+
     // Empty state action
     onUpload?: () => void;
-    
+
     // Scroll state callback
     onScrollStateChange?: (isScrolled: boolean) => void;
 }
@@ -158,7 +159,8 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
     onScrollStateChange
 }) => {
     const theme = useTheme();
-
+    const { colorTheme } = useColorMode();
+    const hasGradient = colorTheme.gradient !== 'none';
     // Local View State
     const [activeId, setActiveId] = useState<string>('');
     const [gridItemSize, setGridItemSize] = useState(() => {
@@ -192,7 +194,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
         const saved = localStorage.getItem('mediaExplorer_showBoundingBoxes');
         return saved === null ? true : saved === 'true';
     });
-    
+
     const [settingsMenuPos, setSettingsMenuPos] = useState<{ top: number; left: number } | null>(null);
     const [selectedImage, setSelectedImage] = useState<{ image: DBImage, url: string } | null>(null);
     const dateGroupListRef = useRef<DateGroupListHandle>(null);
@@ -315,12 +317,12 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
 
     // Image Modal Logic - Sliding window preloading
     const PRELOAD_WINDOW = 3; // Preload 3 images before and after current
-    
+
     useEffect(() => {
         if (selectedImage) {
             // Load current image
             loadFullImage(selectedImage.image);
-            
+
             // Sliding window preload: load nearby images
             const currentIndex = allImages.findIndex(img => img.id === selectedImage.image.id);
             if (currentIndex !== -1) {
@@ -400,348 +402,360 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                 }} />
                 <DragDropOverlay isDragging={isDragging} />
 
-            {!loading && dateSections.length > 0 && (
-                <Timeline
-                    dateSections={dateSections}
-                    onDateClick={handleDateClick}
-                    onGroupClick={handleGroupClick}
-                    activeId={activeId}
-                    rightSidebarOpen={rightSidebarOpen}
-                />
-            )}
-
-            {/* Content */}
-            <Box
-                ref={zoomContainerRef}
-                data-tour="library-grid"
-                sx={{
-                    flex: 1,
-                    overflow: 'hidden', // Virtualized list handles scrolling
-                    p: 0, // Remove padding here, let list items handle it
-                    pt: 0,
-                }}
-            >
-                {loading ? (
-                    <Box sx={{ height: '100%', overflow: 'hidden' }}>
-                        {/* Header skeleton */}
-                        <Box sx={{ height: `${NAVBAR_HEIGHT}px` }} />
-                        <Box sx={{ p: 3, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Skeleton variant="text" sx={{ fontSize: '2rem', width: 180 }} />
-                            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                                <Skeleton variant="rounded" width={36} height={36} sx={{ borderRadius: 2 }} />
-                                <Skeleton variant="circular" width={36} height={36} />
-                                <Skeleton variant="circular" width={36} height={36} />
-                                <Skeleton variant="circular" width={36} height={36} />
-                            </Box>
-                        </Box>
-                        
-                        {/* Content skeleton */}
-                        <Box sx={{ px: 4, pt: 2 }}>
-                            {/* Date header skeleton */}
-                            <Skeleton variant="text" sx={{ fontSize: '0.875rem', width: 140, mb: 2 }} />
-                            
-                            {/* Group header skeleton */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                                <Skeleton variant="text" sx={{ fontSize: '1.25rem', width: 200 }} />
-                                <Skeleton variant="rounded" width={40} height={24} sx={{ borderRadius: 1 }} />
-                            </Box>
-                            
-                            {/* Grid skeleton */}
-                            <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${gridItemSize}px, 1fr))`, gap: 2 }}>
-                                {[...Array(12)].map((_, i) => (
-                                    <Card key={i} sx={{ aspectRatio: aspectRatio, width: '100%', borderRadius: 3, boxShadow: 'none', overflow: 'hidden' }}>
-                                        <Skeleton variant="rectangular" width="100%" height="100%" animation="wave" />
-                                    </Card>
-                                ))}
-                            </Box>
-                        </Box>
-                    </Box>
-                ) : (
-                    <DateGroupList
-                        ref={dateGroupListRef}
+                {!loading && dateSections.length > 0 && (
+                    <Timeline
                         dateSections={dateSections}
-                        imageUrls={imageUrls}
-                        loadImage={loadImage}
-                        isSelectionMode={isSelectionMode}
-                        selectedImageIds={selectedImageIds}
-                        onToggleSelection={toggleImageSelection}
-                        onSetSelection={setSelection}
-                        onEnableSelectionMode={() => setIsSelectionMode(true)}
-                        onExitSelectionMode={() => setIsSelectionMode(false)}
-                        allImages={allImages}
-                        onImageClick={(img) => {
-                            if (isSelectionMode) toggleImageSelection(img.id);
-                            else if (imageUrls[img.id]) setSelectedImage({ image: img, url: imageUrls[img.id] });
-                        }}
-                        onMenuOpen={(e, id) => onGroupMenuOpen && onGroupMenuOpen(e, id)}
-                        gridItemSize={gridItemSize}
-                        showNames={showFileNames}
-                        aspectRatio={aspectRatio}
-                        fullImageUrls={fullImageUrls}
-                        loadFullImage={loadFullImage}
-                        onActiveItemChange={setActiveId}
-                        aiButtonMode={aiButtonMode}
-                        onReID={onReID}
-                        onClassify={onClassify}
-                        availableSpecies={availableSpecies}
-                        onUpload={onUpload}
-                        sortBy={sortBy}
-                        showSpeciesTags={showSpeciesTags}
-                        showReidTags={showReidTags && selectedReidRunId !== null}
-                        onScrollStateChange={onScrollStateChange}
-                        headerContent={
-                            <>
-                                <Box sx={{ height: `${NAVBAR_HEIGHT}px` }} />
-                                <Box sx={{ p: 3, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: theme.palette.background.default, zIndex: 10 }}>
-                                    <Typography variant="h4" fontWeight="bold">{title}</Typography>
-                                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                                        <LibrarySearchBar value={searchQuery} onSearch={onSearchChange} />
-
-                                        <Tooltip title="Filter">
-                                            <IconButton
-                                                data-tour="library-filter"
-                                                onClick={() => setFilterDialogOpen(true)}
-                                                color={activeFilter ? 'inherit' : 'default'}
-                                                sx={{
-                                                    bgcolor: activeFilter ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
-                                                    '&:hover': { bgcolor: activeFilter ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.20)') : theme.palette.action.hover }
-                                                }}
-                                            >
-                                                <Funnel weight={activeFilter ? "fill" : "regular"} />
-                                            </IconButton>
-                                        </Tooltip>
-
-                                        <Tooltip title="View Settings">
-                                            <IconButton
-                                                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                                    const rect = e.currentTarget.getBoundingClientRect();
-                                                    setSettingsMenuPos({ top: rect.bottom, left: rect.right });
-                                                }}
-                                                sx={{ '&:hover': { bgcolor: theme.palette.action.hover } }}
-                                            >
-                                                <Gear weight="regular" />
-                                            </IconButton>
-                                        </Tooltip>
-
-                                        <Tooltip title={isSelectionMode ? "Cancel Selection" : "Select Items"}>
-                                            <IconButton
-                                                data-tour="library-select"
-                                                onClick={toggleSelectionMode}
-                                                color={isSelectionMode ? "inherit" : "default"}
-                                                sx={{
-                                                    bgcolor: isSelectionMode ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
-                                                    '&:hover': { bgcolor: isSelectionMode ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.20)') : theme.palette.action.hover }
-                                                }}
-                                            >
-                                                {isSelectionMode ? <X weight="bold" /> : <CheckSquare weight={isSelectionMode ? "fill" : "regular"} />}
-                                            </IconButton>
-                                        </Tooltip>
-
-                                        {headerActions}
-                                    </Box>
-                                </Box>
-                            </>
-                        }
+                        onDateClick={handleDateClick}
+                        onGroupClick={handleGroupClick}
+                        activeId={activeId}
+                        rightSidebarOpen={rightSidebarOpen}
                     />
                 )}
-            </Box>
 
-            <LibraryFilterDialog
-                open={filterDialogOpen}
-                onClose={() => setFilterDialogOpen(false)}
-                dateSections={fullDateSections}
-                currentFilter={activeFilter}
-                onApply={onFilterChange}
-                availableSpecies={availableSpecies}
-            />
-
-            {/* Settings Menu - rendered at root level to avoid re-renders */}
-            <Menu
-                open={Boolean(settingsMenuPos)}
-                onClose={() => setSettingsMenuPos(null)}
-                anchorReference="anchorPosition"
-                anchorPosition={settingsMenuPos ? { top: settingsMenuPos.top, left: settingsMenuPos.left } : undefined}
-                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                slotProps={{
-                    paper: {
-                        elevation: 0,
-                        sx: {
-                            backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(45, 45, 45, 0.95)',
-                            backdropFilter: 'blur(8px)',
-                            borderRadius: '12px',
-                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-                            border: `1px solid ${theme.palette.divider}`,
-                            minWidth: '250px',
-                            p: 2,
-                            mt: 1
-                        }
-                    }
-                }}
-            >
-                <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    Grid Size
-                    <Tooltip title="Reset to Default">
-                        <IconButton size="small" onClick={handleResetView}>
-                            <ArrowCounterClockwise size={14} />
-                        </IconButton>
-                    </Tooltip>
-                </Typography>
-                <Box sx={{ px: 1, mb: 2 }}>
-                    <Slider
-                        size="small"
-                        value={gridItemSize}
-                        min={100}
-                        max={715}
-                        onChange={(_: Event, value: number | number[]) => setGridItemSize(value as number)}
-                        valueLabelDisplay="auto"
-                        valueLabelFormat={(value: number) => `${value}px`}
-                    />
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                        <Typography variant="caption" color="text.secondary">Small</Typography>
-                        <Typography variant="caption" color="text.secondary">Large</Typography>
-                    </Box>
-                </Box>
-
-                <Divider sx={{ my: 1 }} />
-
-                <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    Aspect Ratio
-                    <Tooltip title="Reset to Default">
-                        <IconButton size="small" onClick={() => setAspectRatio('1.618/1')}>
-                            <ArrowCounterClockwise size={14} />
-                        </IconButton>
-                    </Tooltip>
-                </Typography>
-                <ToggleButtonGroup
-                    value={aspectRatio}
-                    exclusive
-                    onChange={(_: React.MouseEvent<HTMLElement>, value: string | null) => value && setAspectRatio(value)}
-                    size="small"
-                    fullWidth
-                    sx={{ mb: 2, display: 'flex' }}
+                {/* Content */}
+                <Box
+                    ref={zoomContainerRef}
+                    data-tour="library-grid"
+                    sx={{
+                        flex: 1,
+                        overflow: 'hidden', // Virtualized list handles scrolling
+                        p: 0, // Remove padding here, let list items handle it
+                        pt: 0,
+                    }}
                 >
-                    <ToggleButton value="1/1" sx={{ flexGrow: 1, py: 0.5 }}>1:1</ToggleButton>
-                    <ToggleButton value="4/3" sx={{ flexGrow: 1, py: 0.5 }}>4:3</ToggleButton>
-                    <ToggleButton value="16/9" sx={{ flexGrow: 1, py: 0.5 }}>16:9</ToggleButton>
-                    <ToggleButton value="9/16" sx={{ flexGrow: 1, py: 0.5 }}>9:16</ToggleButton>
-                    <ToggleButton value="1.618/1" sx={{ flexGrow: 1, py: 0.5 }}>Φ</ToggleButton>
-                    <ToggleButton value="1/1.618" sx={{ flexGrow: 1, py: 0.5 }}>Φ</ToggleButton>
-                </ToggleButtonGroup>
+                    {loading ? (
+                        <Box sx={{ height: '100%', overflow: 'hidden' }}>
+                            {/* Header skeleton */}
+                            <Box sx={{ height: `${NAVBAR_HEIGHT}px` }} />
+                            <Box sx={{ p: 3, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Skeleton variant="text" sx={{ fontSize: '2rem', width: 180 }} />
+                                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                                    <Skeleton variant="rounded" width={36} height={36} sx={{ borderRadius: 2 }} />
+                                    <Skeleton variant="circular" width={36} height={36} />
+                                    <Skeleton variant="circular" width={36} height={36} />
+                                    <Skeleton variant="circular" width={36} height={36} />
+                                </Box>
+                            </Box>
 
-                <Divider sx={{ my: 1 }} />
+                            {/* Content skeleton */}
+                            <Box sx={{ px: 4, pt: 2 }}>
+                                {/* Date header skeleton */}
+                                <Skeleton variant="text" sx={{ fontSize: '0.875rem', width: 140, mb: 2 }} />
 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
-                    <Typography variant="subtitle2" fontWeight="600">
-                        Show File Names
-                    </Typography>
-                    <Switch
-                        size="small"
-                        checked={showFileNames}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowFileNames(e.target.checked)}
-                    />
+                                {/* Group header skeleton */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                                    <Skeleton variant="text" sx={{ fontSize: '1.25rem', width: 200 }} />
+                                    <Skeleton variant="rounded" width={40} height={24} sx={{ borderRadius: 1 }} />
+                                </Box>
+
+                                {/* Grid skeleton */}
+                                <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${gridItemSize}px, 1fr))`, gap: 2 }}>
+                                    {[...Array(12)].map((_, i) => (
+                                        <Card key={i} sx={{ aspectRatio: aspectRatio, width: '100%', borderRadius: 3, boxShadow: 'none', overflow: 'hidden' }}>
+                                            <Skeleton variant="rectangular" width="100%" height="100%" animation="wave" />
+                                        </Card>
+                                    ))}
+                                </Box>
+                            </Box>
+                        </Box>
+                    ) : (
+                        <DateGroupList
+                            ref={dateGroupListRef}
+                            dateSections={dateSections}
+                            imageUrls={imageUrls}
+                            loadImage={loadImage}
+                            isSelectionMode={isSelectionMode}
+                            selectedImageIds={selectedImageIds}
+                            onToggleSelection={toggleImageSelection}
+                            onSetSelection={setSelection}
+                            onEnableSelectionMode={() => setIsSelectionMode(true)}
+                            onExitSelectionMode={() => setIsSelectionMode(false)}
+                            allImages={allImages}
+                            onImageClick={(img) => {
+                                if (isSelectionMode) toggleImageSelection(img.id);
+                                else if (imageUrls[img.id]) setSelectedImage({ image: img, url: imageUrls[img.id] });
+                            }}
+                            onMenuOpen={(e, id) => onGroupMenuOpen && onGroupMenuOpen(e, id)}
+                            gridItemSize={gridItemSize}
+                            showNames={showFileNames}
+                            aspectRatio={aspectRatio}
+                            fullImageUrls={fullImageUrls}
+                            loadFullImage={loadFullImage}
+                            onActiveItemChange={setActiveId}
+                            aiButtonMode={aiButtonMode}
+                            onReID={onReID}
+                            onClassify={onClassify}
+                            availableSpecies={availableSpecies}
+                            onUpload={onUpload}
+                            sortBy={sortBy}
+                            showSpeciesTags={showSpeciesTags}
+                            showReidTags={showReidTags && selectedReidRunId !== null}
+                            onScrollStateChange={onScrollStateChange}
+                            headerContent={
+                                <>
+                                    <Box sx={{ height: `${NAVBAR_HEIGHT}px` }} />
+                                    <Box sx={{
+                                        p: 3,
+                                        px: 4,
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        bgcolor: hasGradient
+                                            ? "transparent"
+                                            : theme.palette.background.default,
+                                        backdropFilter: hasGradient ? 'blur(20px)' : 'none',
+                                        WebkitBackdropFilter: hasGradient ? 'blur(20px)' : 'none',
+                                        zIndex: 10
+                                    }}>
+                                        <Typography variant="h4" fontWeight="bold">{title}</Typography>
+                                        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                                            <LibrarySearchBar value={searchQuery} onSearch={onSearchChange} />
+
+                                            <Tooltip title="Filter">
+                                                <IconButton
+                                                    data-tour="library-filter"
+                                                    onClick={() => setFilterDialogOpen(true)}
+                                                    color={activeFilter ? 'inherit' : 'default'}
+                                                    sx={{
+                                                        bgcolor: activeFilter ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
+                                                        '&:hover': { bgcolor: activeFilter ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.20)') : theme.palette.action.hover }
+                                                    }}
+                                                >
+                                                    <Funnel weight={activeFilter ? "fill" : "regular"} />
+                                                </IconButton>
+                                            </Tooltip>
+
+                                            <Tooltip title="View Settings">
+                                                <IconButton
+                                                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        setSettingsMenuPos({ top: rect.bottom, left: rect.right });
+                                                    }}
+                                                    sx={{ '&:hover': { bgcolor: theme.palette.action.hover } }}
+                                                >
+                                                    <Gear weight="regular" />
+                                                </IconButton>
+                                            </Tooltip>
+
+                                            <Tooltip title={isSelectionMode ? "Cancel Selection" : "Select Items"}>
+                                                <IconButton
+                                                    data-tour="library-select"
+                                                    onClick={toggleSelectionMode}
+                                                    color={isSelectionMode ? "inherit" : "default"}
+                                                    sx={{
+                                                        bgcolor: isSelectionMode ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)') : 'transparent',
+                                                        '&:hover': { bgcolor: isSelectionMode ? (theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.20)') : theme.palette.action.hover }
+                                                    }}
+                                                >
+                                                    {isSelectionMode ? <X weight="bold" /> : <CheckSquare weight={isSelectionMode ? "fill" : "regular"} />}
+                                                </IconButton>
+                                            </Tooltip>
+
+                                            {headerActions}
+                                        </Box>
+                                    </Box>
+                                </>
+                            }
+                        />
+                    )}
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
-                    <Typography variant="subtitle2" fontWeight="600">
-                        Liquid Glass BBox
+
+                <LibraryFilterDialog
+                    open={filterDialogOpen}
+                    onClose={() => setFilterDialogOpen(false)}
+                    dateSections={fullDateSections}
+                    currentFilter={activeFilter}
+                    onApply={onFilterChange}
+                    availableSpecies={availableSpecies}
+                />
+
+                {/* Settings Menu - rendered at root level to avoid re-renders */}
+                <Menu
+                    open={Boolean(settingsMenuPos)}
+                    onClose={() => setSettingsMenuPos(null)}
+                    anchorReference="anchorPosition"
+                    anchorPosition={settingsMenuPos ? { top: settingsMenuPos.top, left: settingsMenuPos.left } : undefined}
+                    transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                    slotProps={{
+                        paper: {
+                            elevation: 0,
+                            sx: {
+                                backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(45, 45, 45, 0.95)',
+                                backdropFilter: 'blur(8px)',
+                                borderRadius: '12px',
+                                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                                border: `1px solid ${theme.palette.divider}`,
+                                minWidth: '250px',
+                                p: 2,
+                                mt: 1
+                            }
+                        }
+                    }}
+                >
+                    <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        Grid Size
+                        <Tooltip title="Reset to Default">
+                            <IconButton size="small" onClick={handleResetView}>
+                                <ArrowCounterClockwise size={14} />
+                            </IconButton>
+                        </Tooltip>
                     </Typography>
-                    <Switch
+                    <Box sx={{ px: 1, mb: 2 }}>
+                        <Slider
+                            size="small"
+                            value={gridItemSize}
+                            min={100}
+                            max={715}
+                            onChange={(_: Event, value: number | number[]) => setGridItemSize(value as number)}
+                            valueLabelDisplay="auto"
+                            valueLabelFormat={(value: number) => `${value}px`}
+                        />
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                            <Typography variant="caption" color="text.secondary">Small</Typography>
+                            <Typography variant="caption" color="text.secondary">Large</Typography>
+                        </Box>
+                    </Box>
+
+                    <Divider sx={{ my: 1 }} />
+
+                    <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        Aspect Ratio
+                        <Tooltip title="Reset to Default">
+                            <IconButton size="small" onClick={() => setAspectRatio('1.618/1')}>
+                                <ArrowCounterClockwise size={14} />
+                            </IconButton>
+                        </Tooltip>
+                    </Typography>
+                    <ToggleButtonGroup
+                        value={aspectRatio}
+                        exclusive
+                        onChange={(_: React.MouseEvent<HTMLElement>, value: string | null) => value && setAspectRatio(value)}
                         size="small"
-                        checked={useLiquidGlass}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUseLiquidGlass(e.target.checked)}
-                    />
-                </Box>
-                {useLiquidGlass && (
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, pl: 2 }}>
-                        <Typography variant="caption" color="text.secondary">
-                            Ray-traced Glass
+                        fullWidth
+                        sx={{ mb: 2, display: 'flex' }}
+                    >
+                        <ToggleButton value="1/1" sx={{ flexGrow: 1, py: 0.5 }}>1:1</ToggleButton>
+                        <ToggleButton value="4/3" sx={{ flexGrow: 1, py: 0.5 }}>4:3</ToggleButton>
+                        <ToggleButton value="16/9" sx={{ flexGrow: 1, py: 0.5 }}>16:9</ToggleButton>
+                        <ToggleButton value="9/16" sx={{ flexGrow: 1, py: 0.5 }}>9:16</ToggleButton>
+                        <ToggleButton value="1.618/1" sx={{ flexGrow: 1, py: 0.5 }}>Φ</ToggleButton>
+                        <ToggleButton value="1/1.618" sx={{ flexGrow: 1, py: 0.5 }}>Φ</ToggleButton>
+                    </ToggleButtonGroup>
+
+                    <Divider sx={{ my: 1 }} />
+
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                        <Typography variant="subtitle2" fontWeight="600">
+                            Show File Names
                         </Typography>
                         <Switch
                             size="small"
-                            checked={useRayTracedGlass}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUseRayTracedGlass(e.target.checked)}
+                            checked={showFileNames}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowFileNames(e.target.checked)}
                         />
                     </Box>
-                )}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                        <Typography variant="subtitle2" fontWeight="600">
+                            Liquid Glass BBox
+                        </Typography>
+                        <Switch
+                            size="small"
+                            checked={useLiquidGlass}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUseLiquidGlass(e.target.checked)}
+                        />
+                    </Box>
+                    {useLiquidGlass && (
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, pl: 2 }}>
+                            <Typography variant="caption" color="text.secondary">
+                                Ray-traced Glass
+                            </Typography>
+                            <Switch
+                                size="small"
+                                checked={useRayTracedGlass}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUseRayTracedGlass(e.target.checked)}
+                            />
+                        </Box>
+                    )}
 
-                <Divider sx={{ my: 1 }} />
+                    <Divider sx={{ my: 1 }} />
 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
-                    <Typography variant="subtitle2" fontWeight="600">
-                        Show Species Tags
-                    </Typography>
-                    <Switch
-                        size="small"
-                        checked={showSpeciesTags}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowSpeciesTags(e.target.checked)}
-                    />
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
-                    <Typography variant="subtitle2" fontWeight="600">
-                        Show Individual Tags
-                    </Typography>
-                    <Switch
-                        size="small"
-                        checked={showReidTags}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowReidTags(e.target.checked)}
-                    />
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
-                    <Typography variant="subtitle2" fontWeight="600">
-                        Show Bounding Boxes
-                    </Typography>
-                    <Switch
-                        size="small"
-                        checked={showBoundingBoxes}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowBoundingBoxes(e.target.checked)}
-                    />
-                </Box>
-            </Menu>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                        <Typography variant="subtitle2" fontWeight="600">
+                            Show Species Tags
+                        </Typography>
+                        <Switch
+                            size="small"
+                            checked={showSpeciesTags}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowSpeciesTags(e.target.checked)}
+                        />
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                        <Typography variant="subtitle2" fontWeight="600">
+                            Show Individual Tags
+                        </Typography>
+                        <Switch
+                            size="small"
+                            checked={showReidTags}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowReidTags(e.target.checked)}
+                        />
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+                        <Typography variant="subtitle2" fontWeight="600">
+                            Show Bounding Boxes
+                        </Typography>
+                        <Switch
+                            size="small"
+                            checked={showBoundingBoxes}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShowBoundingBoxes(e.target.checked)}
+                        />
+                    </Box>
+                </Menu>
 
-            <ImageModal
-                open={!!selectedImage}
-                onClose={() => setSelectedImage(null)}
-                imageUrl={selectedImage?.url}
-                file={selectedImage ? {
-                    name: selectedImage.image.original_path.split(/[\\/]/).pop() || 'image.jpg',
-                    path: selectedImage.image.original_path,
-                    isDirectory: false
-                } : undefined}
-                onNext={handleNext}
-                onPrev={handlePrev}
-                hasNext={selectedImage ? allImages.findIndex(img => img.id === selectedImage.image.id) < allImages.length - 1 : false}
-                hasPrev={selectedImage ? allImages.findIndex(img => img.id === selectedImage.image.id) > 0 : false}
-                onDelete={async () => {
-                    if (selectedImage) {
-                        await onDeleteImage(selectedImage.image);
-                        setSelectedImage(null);
-                    }
-                }}
-                detections={showBoundingBoxes ? selectedImage?.image.detections : []}
-                reidResults={selectedImage?.image.reidResults}
-                useLiquidGlass={useLiquidGlass}
-                useRayTracedGlass={useRayTracedGlass}
-                onDeleteDetection={onDeleteDetection}
-            />
-
-            {groupMenu}
-
-            {isSelectionMode && (
-                <LibrarySelectionBar
-                    selectedCount={selectedImageIds.size}
-                    onClose={() => {
-                        setIsSelectionMode(false);
-                        clearSelection();
+                <ImageModal
+                    open={!!selectedImage}
+                    onClose={() => setSelectedImage(null)}
+                    imageUrl={selectedImage?.url}
+                    file={selectedImage ? {
+                        name: selectedImage.image.original_path.split(/[\\/]/).pop() || 'image.jpg',
+                        path: selectedImage.image.original_path,
+                        isDirectory: false
+                    } : undefined}
+                    onNext={handleNext}
+                    onPrev={handlePrev}
+                    hasNext={selectedImage ? allImages.findIndex(img => img.id === selectedImage.image.id) < allImages.length - 1 : false}
+                    hasPrev={selectedImage ? allImages.findIndex(img => img.id === selectedImage.image.id) > 0 : false}
+                    onDelete={async () => {
+                        if (selectedImage) {
+                            await onDeleteImage(selectedImage.image);
+                            setSelectedImage(null);
+                        }
                     }}
-                    onDelete={onBatchDelete}
-                    onClassify={onBatchDetect}
-                    onReID={onBatchReID || (() => {})}
-                    onSave={onBatchSave}
-                    leftSidebarOpen={leftSidebarOpen}
-                    rightSidebarOpen={rightSidebarOpen}
-                    availableSpecies={availableSpecies}
+                    detections={showBoundingBoxes ? selectedImage?.image.detections : []}
+                    reidResults={selectedImage?.image.reidResults}
+                    useLiquidGlass={useLiquidGlass}
+                    useRayTracedGlass={useRayTracedGlass}
+                    onDeleteDetection={onDeleteDetection}
                 />
-            )}
-        </Box>
-    </AiModeContext.Provider>
+
+                {groupMenu}
+
+                {isSelectionMode && (
+                    <LibrarySelectionBar
+                        selectedCount={selectedImageIds.size}
+                        onClose={() => {
+                            setIsSelectionMode(false);
+                            clearSelection();
+                        }}
+                        onDelete={onBatchDelete}
+                        onClassify={onBatchDetect}
+                        onReID={onBatchReID || (() => { })}
+                        onSave={onBatchSave}
+                        leftSidebarOpen={leftSidebarOpen}
+                        rightSidebarOpen={rightSidebarOpen}
+                        availableSpecies={availableSpecies}
+                    />
+                )}
+            </Box>
+        </AiModeContext.Provider>
     );
 };
