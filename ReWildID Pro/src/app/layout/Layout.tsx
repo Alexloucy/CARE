@@ -10,6 +10,9 @@ import { UploadActionDialog } from '../../components/UploadActionDialog';
 import { useColorMode } from '../../features/theme/ThemeContext';
 import PrismaticBurst from '../../components/backgrounds/PrismaticBurst';
 import ColorBends from '../../components/backgrounds/ColorBends';
+import FloatingLines from '../../components/backgrounds/FloatingLines';
+import Galaxy from '../../components/backgrounds/Galaxy';
+import LightPillar from '../../components/backgrounds/LightPillar';
 
 export default function Layout() {
     const location = useLocation();
@@ -149,7 +152,7 @@ export default function Layout() {
                     <PrismaticBurst
                         animationType="rotate3d"
                         intensity={2}
-                        speed={0.5}
+                        speed={0.15}
                         distort={1.0}
                         paused={false}
                         offset={{ x: 0, y: 0 }}
@@ -175,13 +178,85 @@ export default function Layout() {
                         colors={['#ff5c7a', '#8a5cff', '#00ffd1']}
                         rotation={30}
                         speed={0.3}
-                        scale={1.2}
+                        scale={1}
                         frequency={1.4}
                         warpStrength={1.2}
                         mouseInfluence={0.8}
                         parallax={0.6}
                         noise={0.08}
                         transparent={false}
+                    />
+                </Box>
+            ) : colorTheme.special === 'floating-lines' ? (
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 0,
+                        bgcolor: '#0a0a0a',
+                    }}
+                >
+                    <FloatingLines
+                        enabledWaves={['top', 'middle', 'bottom']}
+                        lineCount={[10, 15, 20]}
+                        lineDistance={[8, 6, 4]}
+                        bendRadius={5.0}
+                        bendStrength={-0.5}
+                        interactive={true}
+                        parallax={true}
+                    />
+                </Box>
+            ) : colorTheme.special === 'galaxy' ? (
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 0,
+                        bgcolor: '#0a0a0a',
+                    }}
+                >
+                    <Galaxy
+                        mouseRepulsion={true}
+                        mouseInteraction={true}
+                        density={1.5}
+                        glowIntensity={0.5}
+                        saturation={0.8}
+                        hueShift={240}
+                        speed={0.3}
+                        rotationSpeed={0.02}
+                        transparent={false}
+                    />
+                </Box>
+            ) : colorTheme.special === 'light-pillar' ? (
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 0,
+                        bgcolor: '#0a0a0a',
+                    }}
+                >
+                    <LightPillar
+                        topColor="#5227FF"
+                        bottomColor="#FF9FFC"
+                        intensity={1.0}
+                        rotationSpeed={0.15}
+                        glowAmount={0.005}
+                        pillarWidth={3.0}
+                        pillarHeight={0.4}
+                        noiseIntensity={0.5}
+                        pillarRotation={0}
+                        interactive={false}
+                        mixBlendMode="normal"
                     />
                 </Box>
             ) : hasGradient && (

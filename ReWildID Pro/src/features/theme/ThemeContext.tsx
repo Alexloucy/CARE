@@ -9,7 +9,7 @@ export interface ColorTheme {
     mode: 'light' | 'dark';
     gradient: string;
     previewGradient: string; // For the swatch in settings
-    special?: 'prismatic-burst' | 'color-bends'; // For animated WebGL backgrounds
+    special?: 'prismatic-burst' | 'color-bends' | 'floating-lines' | 'galaxy' | 'light-pillar'; // For animated WebGL backgrounds
 }
 
 export const COLOR_THEMES: ColorTheme[] = [
@@ -94,6 +94,30 @@ export const COLOR_THEMES: ColorTheme[] = [
         gradient: 'none', // Handled specially by Layout
         previewGradient: 'linear-gradient(135deg, #ff5c7a 0%, #8a5cff 50%, #00ffd1 100%)',
         special: 'color-bends',
+    },
+    {
+        id: 'floating-lines',
+        name: 'Floating Lines',
+        mode: 'dark',
+        gradient: 'none', // Handled specially by Layout
+        previewGradient: 'linear-gradient(135deg, #e947f5 0%, #2f4ba2 50%, #000000 100%)',
+        special: 'floating-lines',
+    },
+    {
+        id: 'galaxy',
+        name: 'Galaxy',
+        mode: 'dark',
+        gradient: 'none', // Handled specially by Layout
+        previewGradient: 'radial-gradient(circle, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)',
+        special: 'galaxy',
+    },
+    {
+        id: 'light-pillar',
+        name: 'Light Pillar',
+        mode: 'dark',
+        gradient: 'none', // Handled specially by Layout
+        previewGradient: 'linear-gradient(180deg, #5227FF 0%, #FF9FFC 100%)',
+        special: 'light-pillar',
     },
     // Light themes
     {
