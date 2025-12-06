@@ -12,6 +12,7 @@ export interface ColorTheme {
 }
 
 export const COLOR_THEMES: ColorTheme[] = [
+    // Default themes (no gradient)
     {
         id: 'default-dark',
         name: 'Default Dark',
@@ -26,23 +27,177 @@ export const COLOR_THEMES: ColorTheme[] = [
         gradient: 'none',
         previewGradient: 'linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%)',
     },
+    // Dark themes
     {
         id: 'aurora-green',
-        name: 'Aurora Green',
+        name: 'Aurora',
         mode: 'dark',
-        gradient: `
-            linear-gradient(135deg, 
-                #1a1b26 0%, 
-                #1e2a3a 15%,
-                #1a3a35 30%,
-                #0f3a2f 45%,
-                #1a4035 55%,
-                #152a30 70%,
-                #1a2535 85%,
-                #151a25 100%
-            )
-        `,
+        gradient: 'linear-gradient(135deg, #1a1b26 0%, #1e2a3a 15%, #1a3a35 30%, #0f3a2f 45%, #1a4035 55%, #152a30 70%, #1a2535 85%, #151a25 100%)',
         previewGradient: 'linear-gradient(135deg, #1a1b26 0%, #1a3a35 50%, #151a25 100%)',
+    },
+    {
+        id: 'megatron',
+        name: 'MegaTron',
+        mode: 'dark',
+        gradient: 'linear-gradient(to right, #2C5364, #203A43, #0F2027)',
+        previewGradient: 'linear-gradient(to right, #2C5364, #203A43, #0F2027)',
+    },
+    {
+        id: 'forest',
+        name: 'Forest',
+        mode: 'dark',
+        gradient: 'linear-gradient(to left, #2C7744, #5A3F37)',
+        previewGradient: 'linear-gradient(to left, #2C7744, #5A3F37)',
+    },
+    {
+        id: 'frost',
+        name: 'Frost',
+        mode: 'dark',
+        gradient: 'linear-gradient(to left, #004e92, #000428)',
+        previewGradient: 'linear-gradient(to left, #004e92, #000428)',
+    },
+    {
+        id: 'lawrencium',
+        name: 'Lawrencium',
+        mode: 'dark',
+        gradient: 'linear-gradient(to left, #24243e, #302b63, #0f0c29)',
+        previewGradient: 'linear-gradient(to left, #24243e, #302b63, #0f0c29)',
+    },
+    {
+        id: 'midnight-city',
+        name: 'Midnight City',
+        mode: 'dark',
+        gradient: 'linear-gradient(to left, #414345, #232526)',
+        previewGradient: 'linear-gradient(to left, #414345, #232526)',
+    },
+    {
+        id: 'royal',
+        name: 'Royal',
+        mode: 'dark',
+        gradient: 'linear-gradient(to left, #243B55, #141E30)',
+        previewGradient: 'linear-gradient(to left, #243B55, #141E30)',
+    },
+    // Light themes
+    {
+        id: 'moonlit-asteroid',
+        name: 'Moonlit',
+        mode: 'light',
+        gradient: 'linear-gradient(to right, #78ffd6, #a8ff78)',
+        previewGradient: 'linear-gradient(to right, #78ffd6, #a8ff78)',
+    },
+    {
+        id: 'summer-dog',
+        name: 'Summer',
+        mode: 'light',
+        gradient: 'linear-gradient(to right, #FAFFD1, #A1FFCE)',
+        previewGradient: 'linear-gradient(to right, #FAFFD1, #A1FFCE)',
+    },
+    {
+        id: 'limade',
+        name: 'Limade',
+        mode: 'light',
+        gradient: 'linear-gradient(to left, #ED8F03, #FFB75E)',
+        previewGradient: 'linear-gradient(to left, #ED8F03, #FFB75E)',
+    },
+    {
+        id: 'cool-sky',
+        name: 'Cool Sky',
+        mode: 'light',
+        gradient: 'linear-gradient(to right, #FFFFFF, #6DD5FA, #2980B9)',
+        previewGradient: 'linear-gradient(to right, #FFFFFF, #6DD5FA, #2980B9)',
+    },
+    {
+        id: 'margo',
+        name: 'Margo',
+        mode: 'light',
+        gradient: 'linear-gradient(to left, #FFFFFF, #FFEFBA)',
+        previewGradient: 'linear-gradient(to left, #FFFFFF, #FFEFBA)',
+    },
+    {
+        id: 'dance-to-forget',
+        name: 'Dance',
+        mode: 'light',
+        gradient: 'linear-gradient(to left, #F9D423, #FF4E50)',
+        previewGradient: 'linear-gradient(to left, #F9D423, #FF4E50)',
+    },
+    {
+        id: 'megatron-light',
+        name: 'MegaTron',
+        mode: 'light',
+        gradient: 'linear-gradient(to right, #f7797d, #FBD786, #C6FFDD)',
+        previewGradient: 'linear-gradient(to right, #f7797d, #FBD786, #C6FFDD)',
+    },
+    // More dark themes
+    {
+        id: 'moss',
+        name: 'Moss',
+        mode: 'dark',
+        gradient: 'linear-gradient(to left, #71B280, #134E5E)',
+        previewGradient: 'linear-gradient(to left, #71B280, #134E5E)',
+    },
+    {
+        id: 'meridan',
+        name: 'Meridan',
+        mode: 'dark',
+        gradient: 'linear-gradient(to left, #45a247, #283c86)',
+        previewGradient: 'linear-gradient(to left, #45a247, #283c86)',
+    },
+    {
+        id: 'army',
+        name: 'Army',
+        mode: 'dark',
+        gradient: 'linear-gradient(to left, #727a17, #414d0b)',
+        previewGradient: 'linear-gradient(to left, #727a17, #414d0b)',
+    },
+    // More light themes
+    {
+        id: 'lush',
+        name: 'Lush',
+        mode: 'light',
+        gradient: 'linear-gradient(to left, #a8e063, #56ab2f)',
+        previewGradient: 'linear-gradient(to left, #a8e063, #56ab2f)',
+    },
+    {
+        id: 'mojito',
+        name: 'Mojito',
+        mode: 'light',
+        gradient: 'linear-gradient(to left, #93F9B9, #1D976C)',
+        previewGradient: 'linear-gradient(to left, #93F9B9, #1D976C)',
+    },
+    {
+        id: 'sherbert',
+        name: 'Sherbert',
+        mode: 'light',
+        gradient: 'linear-gradient(to left, #64f38c, #f79d00)',
+        previewGradient: 'linear-gradient(to left, #64f38c, #f79d00)',
+    },
+    {
+        id: 'emerald-water',
+        name: 'Emerald Water',
+        mode: 'light',
+        gradient: 'linear-gradient(to left, #56B4D3, #348F50)',
+        previewGradient: 'linear-gradient(to left, #56B4D3, #348F50)',
+    },
+    {
+        id: 'easy-med',
+        name: 'Easy Med',
+        mode: 'light',
+        gradient: 'linear-gradient(to left, #45B649, #DCE35B)',
+        previewGradient: 'linear-gradient(to left, #45B649, #DCE35B)',
+    },
+    {
+        id: 'kyoo-pal',
+        name: 'Kyoo Pal',
+        mode: 'light',
+        gradient: 'linear-gradient(to left, #6be585, #dd3e54)',
+        previewGradient: 'linear-gradient(to left, #6be585, #dd3e54)',
+    },
+    {
+        id: 'honey-dew',
+        name: 'Honey Dew',
+        mode: 'light',
+        gradient: 'linear-gradient(to left, #F8FFAE, #43C6AC)',
+        previewGradient: 'linear-gradient(to left, #F8FFAE, #43C6AC)',
     },
 ];
 
