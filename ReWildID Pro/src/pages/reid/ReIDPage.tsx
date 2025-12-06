@@ -14,12 +14,26 @@ import { GroupNameDialog } from '../../components/GroupNameDialog';
 import { LibrarySearchBar } from '../../components/library/LibrarySearchBar';
 import { RefreshNotification } from '../../components/RefreshNotification';
 import { ReidIndividual, ReidRun } from './types';
+import { useColorMode } from '../../features/theme/ThemeContext';
 
 // Skeleton Card for loading state
-const SkeletonCard: React.FC = () => {
+const SkeletonCard: React.FC<{ hasGradient?: boolean }> = ({ hasGradient }) => {
     const theme = useTheme();
+    const getBgColor = () => {
+        if (hasGradient) {
+            return theme.palette.mode === 'dark' ? 'rgba(30, 30, 36, 0.75)' : 'rgba(247, 249, 251, 0.75)';
+        }
+        return theme.palette.mode === 'light' ? '#F7F9FB' : theme.palette.background.paper;
+    };
     return (
-        <Box sx={{ borderRadius: 2, overflow: 'hidden', border: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.mode === 'light' ? '#F7F9FB' : theme.palette.background.paper }}>
+        <Box sx={{
+            borderRadius: 2,
+            overflow: 'hidden',
+            border: `1px solid ${theme.palette.divider}`,
+            bgcolor: getBgColor(),
+            backdropFilter: hasGradient ? 'blur(12px)' : 'none',
+            WebkitBackdropFilter: hasGradient ? 'blur(12px)' : 'none',
+        }}>
             <Skeleton variant="rectangular" width="100%" height={130} animation="wave" />
             <Box sx={{ p: 1.25 }}>
                 <Skeleton variant="text" width="70%" height={20} animation="wave" />
@@ -29,12 +43,29 @@ const SkeletonCard: React.FC = () => {
     );
 };
 
-const IndividualCard: React.FC<{ individual: ReidIndividual; onClick: () => void; imageUrls: Map<string, string>; showColors?: boolean }> = ({ individual, onClick, imageUrls, showColors = false }) => {
+const IndividualCard: React.FC<{ individual: ReidIndividual; onClick: () => void; imageUrls: Map<string, string>; showColors?: boolean; hasGradient?: boolean }> = ({ individual, onClick, imageUrls, showColors = false, hasGradient }) => {
     const theme = useTheme();
     const firstDet = individual.detections[0];
     const thumbUrl = firstDet ? imageUrls.get(firstDet.image_preview_path || firstDet.image_path) : undefined;
+    const getBgColor = () => {
+        if (hasGradient) {
+            return theme.palette.mode === 'dark' ? 'rgba(30, 30, 36, 0.75)' : 'rgba(247, 249, 251, 0.75)';
+        }
+        return theme.palette.mode === 'light' ? '#F7F9FB' : theme.palette.background.paper;
+    };
     return (
-        <Box onClick={onClick} onDragStart={(e: React.DragEvent) => e.preventDefault()} sx={{ cursor: 'pointer', borderRadius: 2, overflow: 'hidden', transition: 'all 0.15s', border: `1px solid ${theme.palette.divider}`, bgcolor: theme.palette.mode === 'light' ? '#F7F9FB' : theme.palette.background.paper, userSelect: 'none', '&:hover': { borderColor: showColors ? individual.color : theme.palette.primary.main } }}>
+        <Box onClick={onClick} onDragStart={(e: React.DragEvent) => e.preventDefault()} sx={{
+            cursor: 'pointer',
+            borderRadius: 2,
+            overflow: 'hidden',
+            transition: 'all 0.15s',
+            border: `1px solid ${theme.palette.divider}`,
+            bgcolor: getBgColor(),
+            backdropFilter: hasGradient ? 'blur(12px)' : 'none',
+            WebkitBackdropFilter: hasGradient ? 'blur(12px)' : 'none',
+            userSelect: 'none',
+            '&:hover': { borderColor: showColors ? individual.color : theme.palette.primary.main }
+        }}>
             <Box sx={{ width: '100%', height: 130, bgcolor: theme.palette.mode === 'light' ? '#f0f0f0' : '#0a0a0a', position: 'relative', overflow: 'hidden' }}>
                 {thumbUrl ? <Box component="img" src={thumbUrl} draggable={false} sx={{ width: '100%', height: '100%', objectFit: 'cover', userSelect: 'none', WebkitUserDrag: 'none', pointerEvents: 'none' }} /> : <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Fingerprint size={40} weight="thin" color={theme.palette.text.disabled} /></Box>}
                 {showColors && <Box sx={{ position: 'absolute', top: 8, left: 8, width: 12, height: 12, borderRadius: '50%', bgcolor: individual.color, border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />}
@@ -60,9 +91,10 @@ interface RunGroupProps {
     loadingMore: boolean;
     onLoadMore: () => void;
     showColors: boolean;
+    hasGradient: boolean;
 }
 
-const RunGroup: React.FC<RunGroupProps> = ({ run, individuals, imageUrls, onIndividualClick, onMenuOpen, hasMore, loadingMore, onLoadMore, showColors }) => {
+const RunGroup: React.FC<RunGroupProps> = ({ run, individuals, imageUrls, onIndividualClick, onMenuOpen, hasMore, loadingMore, onLoadMore, showColors, hasGradient }) => {
     const theme = useTheme();
     const [expanded, setExpanded] = useState(true);
     const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -71,7 +103,7 @@ const RunGroup: React.FC<RunGroupProps> = ({ run, individuals, imageUrls, onIndi
     // Intersection observer for infinite scroll
     useEffect(() => {
         if (!expanded || !hasMore || loadingMore) return;
-        
+
         const observer = new IntersectionObserver(
             (entries) => {
                 if (entries[0].isIntersecting && hasMore && !loadingMore) {
@@ -80,7 +112,7 @@ const RunGroup: React.FC<RunGroupProps> = ({ run, individuals, imageUrls, onIndi
             },
             { threshold: 0.1 }
         );
-        
+
         if (loadMoreRef.current) observer.observe(loadMoreRef.current);
         return () => observer.disconnect();
     }, [expanded, hasMore, loadingMore, onLoadMore]);
@@ -99,8 +131,8 @@ const RunGroup: React.FC<RunGroupProps> = ({ run, individuals, imageUrls, onIndi
             </Box>
             <Collapse in={expanded}>
                 <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 2, pl: 4 }}>
-                    {individuals.map((ind) => <IndividualCard key={ind.id} individual={ind} onClick={() => onIndividualClick(ind)} imageUrls={imageUrls} showColors={showColors} />)}
-                    {loadingMore && Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={`skeleton-${i}`} />)}
+                    {individuals.map((ind) => <IndividualCard key={ind.id} individual={ind} onClick={() => onIndividualClick(ind)} imageUrls={imageUrls} showColors={showColors} hasGradient={hasGradient} />)}
+                    {loadingMore && Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={`skeleton-${i}`} hasGradient={hasGradient} />)}
                 </Box>
                 {hasMore && <Box ref={loadMoreRef} sx={{ height: 20, mt: 2 }} />}
             </Collapse>
@@ -112,6 +144,8 @@ const PAGE_SIZE = 12;
 
 const ReIDPage: React.FC = () => {
     const theme = useTheme();
+    const { colorTheme } = useColorMode();
+    const hasGradient = colorTheme.gradient !== 'none';
     const navigate = useNavigate();
     useOutletContext<{ leftSidebarOpen: boolean; rightSidebarOpen: boolean }>();
     const [loading, setLoading] = useState(true);
@@ -125,7 +159,7 @@ const ReIDPage: React.FC = () => {
     const [runToRename, setRunToRename] = useState<{ id: number; name: string } | null>(null);
     const [imageUrls, setImageUrls] = useState<Map<string, string>>(new Map());
     const [refreshTrigger, setRefreshTrigger] = useState(0);
-    
+
     // Read liquid glass settings from localStorage (shared with MediaExplorer and Settings page)
     const [useLiquidGlass, setUseLiquidGlass] = useState(() => {
         const saved = localStorage.getItem('mediaExplorer_useLiquidGlass');
@@ -154,7 +188,7 @@ const ReIDPage: React.FC = () => {
         window.addEventListener('storage', handleStorageChange);
         return () => window.removeEventListener('storage', handleStorageChange);
     }, []);
-    
+
     // Search and settings menu
     const [searchQuery, setSearchQuery] = useState('');
     const [settingsMenuPos, setSettingsMenuPos] = useState<{ top: number; left: number } | null>(null);
@@ -230,7 +264,7 @@ const ReIDPage: React.FC = () => {
                     setRuns(sortedRuns);
                     const newIndividuals = new Map<number, ReidIndividual[]>();
                     const newPagination = new Map<number, { page: number; hasMore: boolean }>();
-                    
+
                     for (const run of sortedRuns) {
                         const res = await window.api.getReidResults({ runId: run.id, page: 1, pageSize: PAGE_SIZE });
                         if (res.ok && res.result) {
@@ -266,11 +300,11 @@ const ReIDPage: React.FC = () => {
         if (!currentPagination || !currentPagination.hasMore || loadingMore.get(runId)) return;
 
         setLoadingMore(prev => new Map(prev).set(runId, true));
-        
+
         try {
             const nextPage = currentPagination.page + 1;
             const res = await window.api.getReidResults({ runId, page: nextPage, pageSize: PAGE_SIZE });
-            
+
             if (res.ok && res.result) {
                 const result = res.result;
                 setIndividuals(prev => {
@@ -281,7 +315,7 @@ const ReIDPage: React.FC = () => {
                 loadImagesForIndividuals(res.result.individuals);
             }
         } catch (e) { console.error('Failed to load more:', e); }
-        
+
         setLoadingMore(prev => new Map(prev).set(runId, false));
     };
 
@@ -290,7 +324,7 @@ const ReIDPage: React.FC = () => {
     const handleRename = () => { const run = runs.find(r => r.id === selectedRunId); if (run) { setRunToRename({ id: run.id, name: run.name }); setRenameDialogOpen(true); } handleMenuClose(); };
     const handleConfirmRename = async (newName: string) => { if (runToRename) { await window.api.updateReidRunName(runToRename.id, newName); setRefreshTrigger(t => t + 1); } setRenameDialogOpen(false); setRunToRename(null); };
     const handleDelete = async () => { if (selectedRunId && window.confirm('Delete this ReID run?')) { await window.api.deleteReidRun(selectedRunId); setRefreshTrigger(t => t + 1); } handleMenuClose(); };
-    const handleIndividualClick = (ind: ReidIndividual) => { 
+    const handleIndividualClick = (ind: ReidIndividual) => {
         const mainEl = document.querySelector('main');
         if (mainEl) {
             sessionStorage.setItem('reid_scroll_position', mainEl.scrollTop.toString());
@@ -312,7 +346,7 @@ const ReIDPage: React.FC = () => {
                     <Skeleton variant="circular" width={36} height={36} />
                 </Box>
             </Box>
-            
+
             {/* Run group skeleton */}
             {[1, 2].map((groupIdx) => (
                 <Box key={groupIdx} sx={{ mb: 3 }}>
@@ -323,7 +357,7 @@ const ReIDPage: React.FC = () => {
                         <Skeleton variant="rounded" width={80} height={24} sx={{ borderRadius: 1 }} />
                         <Skeleton variant="rounded" width={100} height={24} sx={{ borderRadius: 1 }} />
                     </Box>
-                    
+
                     {/* Individual cards skeleton */}
                     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 2, pl: 4 }}>
                         {[...Array(6)].map((_, i) => (
@@ -346,7 +380,7 @@ const ReIDPage: React.FC = () => {
 
     return (
         <Box sx={{ pt: '64px', px: 3, pb: 3, minHeight: '100vh' }}>
-            <RefreshNotification 
+            <RefreshNotification
                 watchJobTypes={['reid']}
                 onRefresh={refreshData}
                 message="Re-identification completed"
@@ -385,7 +419,7 @@ const ReIDPage: React.FC = () => {
                         </Box>
                         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
                             <LibrarySearchBar value={searchQuery} onSearch={setSearchQuery} />
-                            
+
                             <Tooltip title="View Settings">
                                 <IconButton
                                     onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
@@ -404,24 +438,25 @@ const ReIDPage: React.FC = () => {
                         const q = searchQuery.toLowerCase();
                         const runIndividuals = individuals.get(run.id) || [];
                         return run.name.toLowerCase().includes(q) ||
-                               run.species.toLowerCase().includes(q) ||
-                               runIndividuals.some(ind => ind.display_name.toLowerCase().includes(q));
+                            run.species.toLowerCase().includes(q) ||
+                            runIndividuals.some(ind => ind.display_name.toLowerCase().includes(q));
                     }).map(run => {
                         const runIndividuals = individuals.get(run.id) || [];
                         const runPagination = pagination.get(run.id);
                         const isLoadingMore = loadingMore.get(run.id) || false;
                         return (
-                            <RunGroup 
-                                key={run.id} 
-                                run={run} 
-                                individuals={runIndividuals} 
-                                imageUrls={imageUrls} 
-                                onIndividualClick={handleIndividualClick} 
+                            <RunGroup
+                                key={run.id}
+                                run={run}
+                                individuals={runIndividuals}
+                                imageUrls={imageUrls}
+                                onIndividualClick={handleIndividualClick}
                                 onMenuOpen={handleMenuOpen}
                                 hasMore={runPagination?.hasMore || false}
                                 loadingMore={isLoadingMore}
                                 onLoadMore={() => loadMoreForRun(run.id)}
                                 showColors={showColors}
+                                hasGradient={hasGradient}
                             />
                         );
                     })}
@@ -432,7 +467,7 @@ const ReIDPage: React.FC = () => {
                 <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}><Trash size={18} style={{ marginRight: 8 }} /> Delete</MenuItem>
             </Menu>
             <GroupNameDialog open={renameDialogOpen} onClose={() => { setRenameDialogOpen(false); setRunToRename(null); }} onConfirm={handleConfirmRename} title="Rename ReID Run" initialValue={runToRename?.name || ''} />
-            
+
             {/* Settings Menu */}
             <Menu
                 open={Boolean(settingsMenuPos)}
@@ -459,7 +494,7 @@ const ReIDPage: React.FC = () => {
                 <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1.5 }}>
                     Display Settings
                 </Typography>
-                
+
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
                     <Typography variant="body2">
                         Liquid Glass BBox

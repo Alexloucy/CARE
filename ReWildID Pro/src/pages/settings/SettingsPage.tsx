@@ -246,6 +246,7 @@ const ThemeSwatch: React.FC<{
 const SettingsPage: React.FC = () => {
     const theme = useTheme();
     const { colorTheme, setColorTheme } = useColorMode();
+    const hasGradient = colorTheme.gradient !== 'none';
 
     // Load all settings from localStorage
     const [settings, setSettings] = useState<Record<string, any>>(() => {
@@ -389,7 +390,12 @@ const SettingsPage: React.FC = () => {
                         border: `1px solid ${theme.palette.divider}`,
                         borderRadius: 2.5,
                         '&:before': { display: 'none' },
-                        overflow: 'hidden'
+                        overflow: 'hidden',
+                        bgcolor: hasGradient
+                            ? (theme.palette.mode === 'dark' ? 'rgba(30, 30, 36, 0.75)' : 'rgba(247, 249, 251, 0.75)')
+                            : 'background.paper',
+                        backdropFilter: hasGradient ? 'blur(12px)' : 'none',
+                        WebkitBackdropFilter: hasGradient ? 'blur(12px)' : 'none',
                     }}
                 >
                     <AccordionSummary
@@ -453,7 +459,12 @@ const SettingsPage: React.FC = () => {
                             border: `1px solid ${theme.palette.divider}`,
                             borderRadius: 2.5,
                             '&:before': { display: 'none' },
-                            overflow: 'hidden'
+                            overflow: 'hidden',
+                            bgcolor: hasGradient
+                                ? (theme.palette.mode === 'dark' ? 'rgba(30, 30, 36, 0.75)' : 'rgba(247, 249, 251, 0.75)')
+                                : 'background.paper',
+                            backdropFilter: hasGradient ? 'blur(12px)' : 'none',
+                            WebkitBackdropFilter: hasGradient ? 'blur(12px)' : 'none',
                         }}
                     >
                         <AccordionSummary
@@ -508,7 +519,12 @@ const SettingsPage: React.FC = () => {
                         borderRadius: 2.5,
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between'
+                        justifyContent: 'space-between',
+                        bgcolor: hasGradient
+                            ? (theme.palette.mode === 'dark' ? 'rgba(30, 30, 36, 0.75)' : 'rgba(247, 249, 251, 0.75)')
+                            : 'transparent',
+                        backdropFilter: hasGradient ? 'blur(12px)' : 'none',
+                        WebkitBackdropFilter: hasGradient ? 'blur(12px)' : 'none',
                     }}
                 >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

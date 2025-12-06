@@ -1,12 +1,13 @@
 import { Box, Typography, alpha, useTheme, Skeleton, Tooltip } from '@mui/material';
 import { useState, useEffect, useMemo } from 'react';
-import { 
+import {
     Sparkle, Fingerprint, Clock, FolderOpen, ChartDonut, TrendUp, CalendarBlank, Users
 } from '@phosphor-icons/react';
 import { triggerUpload } from '../../utils/navigationEvents';
 import AiModeButton from '../../components/AiModeButton';
 import { AiModeContext } from '../../contexts/AiModeContext';
 import { OnboardingTour } from '../../components/OnboardingTour';
+import { useColorMode } from '../../features/theme/ThemeContext';
 
 interface DashboardStats {
     totalImages: number;
@@ -25,23 +26,36 @@ interface DashboardStats {
 // Card backgrounds from neurolink theme
 const CARD_BG_LIGHT = '#F7F9FB';
 const CARD_BG_DARK = '#1e1e24';
+// Transparent versions for gradient themes
+const CARD_BG_LIGHT_TRANSPARENT = 'rgba(247, 249, 251, 0.75)';
+const CARD_BG_DARK_TRANSPARENT = 'rgba(30, 30, 36, 0.75)';
 
 // Clean Stat Card - compact design
-const StatCard = ({ 
-    title, 
-    value, 
-    loading 
-}: { 
-    title: string; 
-    value: number | string; 
+const StatCard = ({
+    title,
+    value,
+    loading,
+    hasGradient
+}: {
+    title: string;
+    value: number | string;
     loading?: boolean;
+    hasGradient?: boolean;
 }) => {
     const theme = useTheme();
+    const getBgColor = () => {
+        if (hasGradient) {
+            return theme.palette.mode === 'dark' ? CARD_BG_DARK_TRANSPARENT : CARD_BG_LIGHT_TRANSPARENT;
+        }
+        return theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT;
+    };
     return (
-        <Box sx={{ 
+        <Box sx={{
             p: 2,
             borderRadius: '16px',
-            bgcolor: theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT,
+            bgcolor: getBgColor(),
+            backdropFilter: hasGradient ? 'blur(12px)' : 'none',
+            WebkitBackdropFilter: hasGradient ? 'blur(12px)' : 'none',
             transition: 'background-color 0.2s',
         }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5, fontWeight: 500 }}>
@@ -59,11 +73,11 @@ const StatCard = ({
 };
 
 // Custom Ring/Donut Chart Component with hover effects
-const RingChart = ({ 
-    data, 
+const RingChart = ({
+    data,
     size = 180,
-    loading 
-}: { 
+    loading
+}: {
     data: { label: string; count: number; color: string }[];
     size?: number;
     loading?: boolean;
@@ -71,25 +85,25 @@ const RingChart = ({
     const theme = useTheme();
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
     const [animationProgress, setAnimationProgress] = useState(0);
-    
+
     const total = data.reduce((sum, d) => sum + d.count, 0);
     const strokeWidth = 24;
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
-    
+
     // Animation on mount
     useEffect(() => {
         const timer = setTimeout(() => setAnimationProgress(1), 100);
         return () => clearTimeout(timer);
     }, [data]);
-    
+
     if (loading || total === 0) {
         return (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                <Box sx={{ 
-                    width: size, 
-                    height: size, 
-                    borderRadius: '50%', 
+                <Box sx={{
+                    width: size,
+                    height: size,
+                    borderRadius: '50%',
                     border: `${strokeWidth}px solid ${alpha(theme.palette.text.primary, 0.05)}`,
                     display: 'flex',
                     alignItems: 'center',
@@ -104,7 +118,7 @@ const RingChart = ({
             </Box>
         );
     }
-    
+
     let currentOffset = 0;
     const segments = data.map((segment, idx) => {
         const segmentLength = (segment.count / total) * circumference * animationProgress;
@@ -112,9 +126,9 @@ const RingChart = ({
         currentOffset += segmentLength;
         return { ...segment, segmentLength, offset, idx };
     });
-    
+
     const hoveredData = hoveredIndex !== null ? data[hoveredIndex] : null;
-    
+
     return (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, overflow: 'visible' }}>
             <Box sx={{ position: 'relative', width: size + 12, height: size + 12, p: '6px', overflow: 'visible' }}>
@@ -131,7 +145,7 @@ const RingChart = ({
                             strokeDasharray={`${segment.segmentLength} ${circumference - segment.segmentLength}`}
                             strokeDashoffset={-segment.offset}
                             strokeLinecap="round"
-                            style={{ 
+                            style={{
                                 transition: 'stroke-dasharray 0.8s ease-out, stroke-width 0.2s ease',
                                 cursor: 'pointer',
                                 opacity: hoveredIndex !== null && hoveredIndex !== segment.idx ? 0.4 : 1,
@@ -142,10 +156,10 @@ const RingChart = ({
                         />
                     ))}
                 </svg>
-                <Box sx={{ 
-                    position: 'absolute', 
-                    top: '50%', 
-                    left: '50%', 
+                <Box sx={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
                     transform: 'translate(-50%, -50%)',
                     textAlign: 'center',
                     transition: 'all 0.2s ease'
@@ -153,8 +167,8 @@ const RingChart = ({
                     {hoveredData ? (
                         <>
                             <Typography variant="h5" fontWeight={600}>{hoveredData.count}</Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ 
-                                maxWidth: 80, 
+                            <Typography variant="caption" color="text.secondary" sx={{
+                                maxWidth: 80,
                                 display: 'block',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
@@ -171,15 +185,15 @@ const RingChart = ({
                     )}
                 </Box>
             </Box>
-            
+
             {/* Legend */}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {data.slice(0, 6).map((item, idx) => (
-                    <Box 
-                        key={idx} 
-                        sx={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
+                    <Box
+                        key={idx}
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
                             gap: 1.5,
                             p: 0.5,
                             borderRadius: 1,
@@ -191,11 +205,11 @@ const RingChart = ({
                         onMouseEnter={() => setHoveredIndex(idx)}
                         onMouseLeave={() => setHoveredIndex(null)}
                     >
-                        <Box sx={{ 
-                            width: 10, 
-                            height: 10, 
-                            borderRadius: '50%', 
-                            bgcolor: item.color, 
+                        <Box sx={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            bgcolor: item.color,
                             flexShrink: 0,
                             transition: 'transform 0.2s ease',
                             transform: hoveredIndex === idx ? 'scale(1.3)' : 'scale(1)'
@@ -214,10 +228,10 @@ const RingChart = ({
 };
 
 // Animated Bar Chart (horizontal) with hover effects
-const BarChart = ({ 
-    data, 
-    loading 
-}: { 
+const BarChart = ({
+    data,
+    loading
+}: {
     data: { label: string; value: number }[];
     loading?: boolean;
 }) => {
@@ -225,13 +239,13 @@ const BarChart = ({
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
     const [animationProgress, setAnimationProgress] = useState(0);
     const maxValue = Math.max(...data.map(d => d.value), 1);
-    
+
     // Animation on mount
     useEffect(() => {
         const timer = setTimeout(() => setAnimationProgress(1), 100);
         return () => clearTimeout(timer);
     }, [data]);
-    
+
     if (loading) {
         return (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -241,21 +255,21 @@ const BarChart = ({
             </Box>
         );
     }
-    
+
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             {data.map((item, idx) => {
                 const isHovered = hoveredIndex === idx;
                 const color = CHART_COLORS[idx % CHART_COLORS.length];
                 return (
-                    <Tooltip 
+                    <Tooltip
                         key={idx}
                         title={`${item.label}: ${item.value.toLocaleString()}`}
                         arrow
                         placement="top"
                     >
-                        <Box 
-                            sx={{ 
+                        <Box
+                            sx={{
                                 cursor: 'pointer',
                                 p: 0.5,
                                 mx: -0.5,
@@ -267,8 +281,8 @@ const BarChart = ({
                             onMouseLeave={() => setHoveredIndex(null)}
                         >
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                <Typography 
-                                    variant="body2" 
+                                <Typography
+                                    variant="body2"
                                     color={isHovered ? 'text.primary' : 'text.secondary'}
                                     sx={{ transition: 'color 0.2s ease', fontWeight: isHovered ? 500 : 400 }}
                                 >
@@ -276,15 +290,15 @@ const BarChart = ({
                                 </Typography>
                                 <Typography variant="body2" fontWeight={500}>{item.value.toLocaleString()}</Typography>
                             </Box>
-                            <Box sx={{ 
-                                height: isHovered ? 10 : 8, 
-                                borderRadius: 4, 
+                            <Box sx={{
+                                height: isHovered ? 10 : 8,
+                                borderRadius: 4,
                                 bgcolor: alpha(theme.palette.text.primary, 0.06),
                                 overflow: 'hidden',
                                 transition: 'height 0.2s ease'
                             }}>
-                                <Box sx={{ 
-                                    height: '100%', 
+                                <Box sx={{
+                                    height: '100%',
                                     width: `${(item.value / maxValue) * 100 * animationProgress}%`,
                                     bgcolor: color,
                                     borderRadius: 4,
@@ -301,22 +315,22 @@ const BarChart = ({
 };
 
 // Timeline Chart - Detection activity over time (SVG line chart)
-const TimelineChart = ({ 
-    data, 
-    loading 
-}: { 
+const TimelineChart = ({
+    data,
+    loading
+}: {
     data: { month: string; count: number }[];
     loading?: boolean;
 }) => {
     const theme = useTheme();
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
     const [animationProgress, setAnimationProgress] = useState(0);
-    
+
     useEffect(() => {
         const timer = setTimeout(() => setAnimationProgress(1), 100);
         return () => clearTimeout(timer);
     }, [data]);
-    
+
     if (loading || data.length === 0) {
         return (
             <Box sx={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -326,30 +340,30 @@ const TimelineChart = ({
             </Box>
         );
     }
-    
+
     const maxValue = Math.max(...data.map(d => d.count), 1);
     const width = 360;
     const height = 140;
     const padding = { top: 20, right: 20, bottom: 30, left: 40 };
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
-    
+
     const points = data.map((d, i) => ({
         x: padding.left + (i / Math.max(data.length - 1, 1)) * chartWidth,
         y: padding.top + chartHeight - (d.count / maxValue) * chartHeight * animationProgress,
         ...d,
         idx: i
     }));
-    
+
     const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
     const areaPath = `${linePath} L ${points[points.length - 1]?.x || 0} ${padding.top + chartHeight} L ${padding.left} ${padding.top + chartHeight} Z`;
-    
+
     const formatMonth = (m: string) => {
         const [year, month] = m.split('-');
         const date = new Date(parseInt(year), parseInt(month) - 1);
         return date.toLocaleDateString('en-US', { month: 'short' });
     };
-    
+
     return (
         <Box sx={{ position: 'relative', overflow: 'visible', pt: 4, mt: -2 }}>
             <svg width={width} height={height} style={{ overflow: 'visible' }}>
@@ -365,14 +379,14 @@ const TimelineChart = ({
                         strokeDasharray="4 4"
                     />
                 ))}
-                
+
                 {/* Area fill */}
                 <path
                     d={areaPath}
                     fill={`url(#areaGradient-${theme.palette.mode})`}
                     style={{ transition: 'all 0.8s ease-out' }}
                 />
-                
+
                 {/* Line */}
                 <path
                     d={linePath}
@@ -383,7 +397,7 @@ const TimelineChart = ({
                     strokeLinejoin="round"
                     style={{ transition: 'all 0.8s ease-out' }}
                 />
-                
+
                 {/* Data points */}
                 {points.map((p) => (
                     <g key={p.idx}>
@@ -394,8 +408,8 @@ const TimelineChart = ({
                             fill={theme.palette.background.paper}
                             stroke={CHART_COLORS[0]}
                             strokeWidth={2}
-                            style={{ 
-                                cursor: 'pointer', 
+                            style={{
+                                cursor: 'pointer',
                                 transition: 'all 0.2s ease',
                                 filter: hoveredIndex === p.idx ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' : 'none'
                             }}
@@ -427,7 +441,7 @@ const TimelineChart = ({
                         )}
                     </g>
                 ))}
-                
+
                 {/* X-axis labels */}
                 {points.map((p) => (
                     <text
@@ -441,7 +455,7 @@ const TimelineChart = ({
                         {formatMonth(p.month)}
                     </text>
                 ))}
-                
+
                 {/* Gradient definition */}
                 <defs>
                     <linearGradient id={`areaGradient-${theme.palette.mode}`} x1="0%" y1="0%" x2="0%" y2="100%">
@@ -455,22 +469,22 @@ const TimelineChart = ({
 };
 
 // Population Bar Chart - Individuals per species (vertical bars)
-const PopulationChart = ({ 
-    data, 
-    loading 
-}: { 
+const PopulationChart = ({
+    data,
+    loading
+}: {
     data: { species: string; count: number }[];
     loading?: boolean;
 }) => {
     const theme = useTheme();
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
     const [animationProgress, setAnimationProgress] = useState(0);
-    
+
     useEffect(() => {
         const timer = setTimeout(() => setAnimationProgress(1), 100);
         return () => clearTimeout(timer);
     }, [data]);
-    
+
     if (loading || data.length === 0) {
         return (
             <Box sx={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -480,7 +494,7 @@ const PopulationChart = ({
             </Box>
         );
     }
-    
+
     const maxValue = Math.max(...data.map(d => d.count), 1);
     const width = 360;
     const height = 160;
@@ -489,7 +503,7 @@ const PopulationChart = ({
     const chartHeight = height - padding.top - padding.bottom;
     const barWidth = Math.min(40, chartWidth / data.length - 12);
     const gap = (chartWidth - barWidth * data.length) / (data.length + 1);
-    
+
     return (
         <Box sx={{ position: 'relative' }}>
             <svg width={width} height={height} style={{ overflow: 'visible' }}>
@@ -505,7 +519,7 @@ const PopulationChart = ({
                         strokeDasharray="4 4"
                     />
                 ))}
-                
+
                 {/* Bars */}
                 {data.map((d, i) => {
                     const barHeight = (d.count / maxValue) * chartHeight * animationProgress;
@@ -513,7 +527,7 @@ const PopulationChart = ({
                     const y = padding.top + chartHeight - barHeight;
                     const isHovered = hoveredIndex === i;
                     const color = CHART_COLORS[i % CHART_COLORS.length];
-                    
+
                     return (
                         <g key={i}>
                             <rect
@@ -523,17 +537,17 @@ const PopulationChart = ({
                                 height={barHeight}
                                 rx={6}
                                 fill={color}
-                                style={{ 
+                                style={{
                                     cursor: 'pointer',
                                     transition: 'all 0.3s ease',
                                     filter: isHovered ? 'brightness(1.15) drop-shadow(0 4px 8px rgba(0,0,0,0.15))' : 'none',
                                     transform: isHovered ? 'translateY(-2px)' : 'none',
-                                    transformOrigin: `${x + barWidth/2}px ${y + barHeight}px`
+                                    transformOrigin: `${x + barWidth / 2}px ${y + barHeight}px`
                                 }}
                                 onMouseEnter={() => setHoveredIndex(i)}
                                 onMouseLeave={() => setHoveredIndex(null)}
                             />
-                            
+
                             {/* Value label */}
                             <text
                                 x={x + barWidth / 2}
@@ -542,14 +556,14 @@ const PopulationChart = ({
                                 fill={theme.palette.text.primary}
                                 fontSize={12}
                                 fontWeight={600}
-                                style={{ 
+                                style={{
                                     opacity: animationProgress,
                                     transition: 'opacity 0.3s ease 0.5s'
                                 }}
                             >
                                 {d.count}
                             </text>
-                            
+
                             {/* Species label */}
                             <text
                                 x={x + barWidth / 2}
@@ -557,7 +571,7 @@ const PopulationChart = ({
                                 textAnchor="middle"
                                 fill={isHovered ? theme.palette.text.primary : alpha(theme.palette.text.secondary, 0.8)}
                                 fontSize={10}
-                                style={{ 
+                                style={{
                                     transition: 'fill 0.2s ease',
                                     fontWeight: isHovered ? 500 : 400
                                 }}
@@ -573,15 +587,15 @@ const PopulationChart = ({
 };
 
 // Activity Item Component - cleaner design
-const ActivityItem = ({ 
-    type, 
-    name, 
-    count, 
-    date 
-}: { 
-    type: string; 
-    name: string; 
-    count: number; 
+const ActivityItem = ({
+    type,
+    name,
+    count,
+    date
+}: {
+    type: string;
+    name: string;
+    count: number;
     date: number;
 }) => {
     const theme = useTheme();
@@ -592,13 +606,13 @@ const ActivityItem = ({
     };
     const config = typeConfig[type] || typeConfig.group;
     const Icon = config.icon;
-    
+
     const formatDate = (ts: number) => {
         const d = new Date(ts);
         const now = new Date();
         const diff = now.getTime() - d.getTime();
         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        
+
         if (days === 0) return 'Today';
         if (days === 1) return 'Yesterday';
         if (days < 7) return `${days} days ago`;
@@ -606,17 +620,17 @@ const ActivityItem = ({
     };
 
     return (
-        <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 2, 
+        <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
             py: 1.5,
             borderBottom: `1px solid ${theme.palette.divider}`,
             '&:last-child': { borderBottom: 'none' }
         }}>
-            <Box sx={{ 
-                p: 1, 
-                borderRadius: 2, 
+            <Box sx={{
+                p: 1,
+                borderRadius: 2,
                 bgcolor: alpha(theme.palette.primary.main, 0.1),
                 display: 'flex'
             }}>
@@ -647,6 +661,8 @@ const CHART_COLORS = [
 
 export default function Dashboard() {
     const theme = useTheme();
+    const { colorTheme } = useColorMode();
+    const hasGradient = colorTheme.gradient !== 'none';
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -718,8 +734,8 @@ export default function Dashboard() {
                 </Box>
                 <Box data-tour="new-job">
                     <AiModeContext.Provider value={{ shouldPlayEffect, setShouldPlayEffect }}>
-                        <AiModeButton 
-                            text="New Job" 
+                        <AiModeButton
+                            text="New Job"
                             onClick={triggerUpload}
                         />
                     </AiModeContext.Provider>
@@ -727,25 +743,29 @@ export default function Dashboard() {
             </Box>
 
             {/* Top Stats Row - 4 cards */}
-            <Box sx={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(4, 1fr)', 
-                gap: 2, 
-                mb: 3 
+            <Box sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: 2,
+                mb: 3
             }}>
-                <StatCard title="Total Images" value={stats?.totalImages || 0} loading={loading} />
-                <StatCard title="Detections" value={stats?.totalDetections || 0} loading={loading} />
-                <StatCard title="Individuals" value={stats?.totalIndividuals || 0} loading={loading} />
-                <StatCard title="Groups" value={stats?.totalGroups || 0} loading={loading} />
+                <StatCard title="Total Images" value={stats?.totalImages || 0} loading={loading} hasGradient={hasGradient} />
+                <StatCard title="Detections" value={stats?.totalDetections || 0} loading={loading} hasGradient={hasGradient} />
+                <StatCard title="Individuals" value={stats?.totalIndividuals || 0} loading={loading} hasGradient={hasGradient} />
+                <StatCard title="Groups" value={stats?.totalGroups || 0} loading={loading} hasGradient={hasGradient} />
             </Box>
 
             {/* Row 1 - Species Distribution & Population Tracking */}
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 3 }}>
                 {/* Species Distribution Ring Chart */}
-                <Box sx={{ 
-                    p: 3, 
-                    borderRadius: '16px', 
-                    bgcolor: theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT,
+                <Box sx={{
+                    p: 3,
+                    borderRadius: '16px',
+                    bgcolor: hasGradient
+                        ? (theme.palette.mode === 'dark' ? CARD_BG_DARK_TRANSPARENT : CARD_BG_LIGHT_TRANSPARENT)
+                        : (theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT),
+                    backdropFilter: hasGradient ? 'blur(12px)' : 'none',
+                    WebkitBackdropFilter: hasGradient ? 'blur(12px)' : 'none',
                     overflow: 'visible',
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
@@ -759,10 +779,14 @@ export default function Dashboard() {
                 </Box>
 
                 {/* Individuals Per Species - Population Tracking */}
-                <Box sx={{ 
-                    p: 3, 
-                    borderRadius: '16px', 
-                    bgcolor: theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT,
+                <Box sx={{
+                    p: 3,
+                    borderRadius: '16px',
+                    bgcolor: hasGradient
+                        ? (theme.palette.mode === 'dark' ? CARD_BG_DARK_TRANSPARENT : CARD_BG_LIGHT_TRANSPARENT)
+                        : (theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT),
+                    backdropFilter: hasGradient ? 'blur(12px)' : 'none',
+                    WebkitBackdropFilter: hasGradient ? 'blur(12px)' : 'none',
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
                         <Users size={20} weight="duotone" color={theme.palette.primary.main} />
@@ -778,10 +802,14 @@ export default function Dashboard() {
             {/* Row 2 - Detection Timeline & Data Summary */}
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 3 }}>
                 {/* Detection Activity Timeline */}
-                <Box sx={{ 
-                    p: 3, 
-                    borderRadius: '16px', 
-                    bgcolor: theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT,
+                <Box sx={{
+                    p: 3,
+                    borderRadius: '16px',
+                    bgcolor: hasGradient
+                        ? (theme.palette.mode === 'dark' ? CARD_BG_DARK_TRANSPARENT : CARD_BG_LIGHT_TRANSPARENT)
+                        : (theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT),
+                    backdropFilter: hasGradient ? 'blur(12px)' : 'none',
+                    WebkitBackdropFilter: hasGradient ? 'blur(12px)' : 'none',
                     overflow: 'visible',
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
@@ -795,10 +823,14 @@ export default function Dashboard() {
                 </Box>
 
                 {/* Summary Bar Chart */}
-                <Box sx={{ 
-                    p: 3, 
-                    borderRadius: '16px', 
-                    bgcolor: theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT,
+                <Box sx={{
+                    p: 3,
+                    borderRadius: '16px',
+                    bgcolor: hasGradient
+                        ? (theme.palette.mode === 'dark' ? CARD_BG_DARK_TRANSPARENT : CARD_BG_LIGHT_TRANSPARENT)
+                        : (theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT),
+                    backdropFilter: hasGradient ? 'blur(12px)' : 'none',
+                    WebkitBackdropFilter: hasGradient ? 'blur(12px)' : 'none',
                 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
                         <TrendUp size={20} weight="duotone" color={theme.palette.primary.main} />
@@ -812,16 +844,20 @@ export default function Dashboard() {
             </Box>
 
             {/* Bottom Section - Recent Activity */}
-            <Box sx={{ 
-                p: 3, 
-                borderRadius: '16px', 
-                bgcolor: theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT,
+            <Box sx={{
+                p: 3,
+                borderRadius: '16px',
+                bgcolor: hasGradient
+                    ? (theme.palette.mode === 'dark' ? CARD_BG_DARK_TRANSPARENT : CARD_BG_LIGHT_TRANSPARENT)
+                    : (theme.palette.mode === 'dark' ? CARD_BG_DARK : CARD_BG_LIGHT),
+                backdropFilter: hasGradient ? 'blur(12px)' : 'none',
+                WebkitBackdropFilter: hasGradient ? 'blur(12px)' : 'none',
             }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
                     <Clock size={20} weight="duotone" color={theme.palette.primary.main} />
                     <Typography variant="subtitle1" fontWeight={600}>Recent Activity</Typography>
                 </Box>
-                
+
                 {loading ? (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                         {[1, 2, 3].map(i => (
@@ -831,12 +867,12 @@ export default function Dashboard() {
                 ) : stats?.recentActivity && stats.recentActivity.length > 0 ? (
                     <Box>
                         {stats.recentActivity.map((activity, idx) => (
-                            <ActivityItem 
-                                key={idx} 
-                                type={activity.type} 
-                                name={activity.name} 
-                                count={activity.count} 
-                                date={activity.date} 
+                            <ActivityItem
+                                key={idx}
+                                type={activity.type}
+                                name={activity.name}
+                                count={activity.count}
+                                date={activity.date}
                             />
                         ))}
                     </Box>
