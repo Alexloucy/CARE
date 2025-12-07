@@ -437,14 +437,14 @@ export async function downloadSelectedGalleryImages(selectedPaths: string[]) {
     }
 }
 
-export async function detect(selectedPaths: string[], stream: (txt: string) => void) {
+export async function detect(selectedPaths: string[], stream: (txt: string) => void, imageIds?: number[]) {
     try {
         if (!selectedPaths || !Array.isArray(selectedPaths) || selectedPaths.length === 0) {
             return { ok: false, error: 'No images selected.' }
         }
 
-        // Add to Job Queue
-        JobManager.getInstance().addJob('detect', { selectedPaths });
+        // Add to Job Queue with optional imageIds for caching
+        JobManager.getInstance().addJob('detect', { selectedPaths, imageIds });
 
         return { ok: true }
     } catch (error) {

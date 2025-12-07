@@ -28,11 +28,11 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     checkIsDirectory: (filePath) => electron_1.ipcRenderer.invoke('checkIsDirectory', filePath),
     openFileDialog: () => electron_1.ipcRenderer.invoke('openFileDialog'),
     saveImages: (sourcePaths) => electron_1.ipcRenderer.invoke('saveImages', sourcePaths),
-    detect: (selectedPaths, onStream) => {
+    detect: (selectedPaths, onStream, imageIds) => {
         // Remove existing listeners to avoid duplicates
         electron_1.ipcRenderer.removeAllListeners('stream');
         electron_1.ipcRenderer.on('stream', (_, txt) => onStream(txt));
-        return electron_1.ipcRenderer.invoke('detect', selectedPaths);
+        return electron_1.ipcRenderer.invoke('detect', selectedPaths, imageIds);
     },
     browseDetectImage: (date, folderPath, filterLabel, confLow, confHigh) => electron_1.ipcRenderer.invoke('browseDetectImage', date, folderPath, filterLabel, confLow, confHigh),
     viewDetectImage: (date, imagePath) => electron_1.ipcRenderer.invoke('viewDetectImage', date, imagePath),

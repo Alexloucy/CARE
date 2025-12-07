@@ -161,7 +161,9 @@ def batch_dino_image_processing(image_bbox_pairs: List[Tuple[str, List[float]]],
                               device: torch.device, 
                               img_transform: transforms.Compose, 
                               dino_model: torch.nn.Module, 
-                              batch_size: int = 32
+                              batch_size: int = 32,
+                              cache = None,  # Optional EmbeddingCache
+                              image_id_map: Dict[str, int] = None  # Optional: filepath -> image_id mapping
                             ) -> List[torch.Tensor]:
     """
     Process multiple image crops in batches for efficient inference.
@@ -172,32 +174,64 @@ def batch_dino_image_processing(image_bbox_pairs: List[Tuple[str, List[float]]],
         img_transform: Image transformation pipeline
         dino_model: DINO model for feature extraction
         batch_size: Batch size for processing
+        cache: Optional EmbeddingCache for caching features
+        image_id_map: Optional dict mapping filepath -> database image_id
     
     Returns:
         List of features for each crop
     """
-    all_features = []
+    all_features = [None] * len(image_bbox_pairs)  # Pre-allocate to maintain order
+    embedding_type = 'dinov3_raw'
     
     print(f"Processing {len(image_bbox_pairs)} crops in batches of {batch_size}")
     total_crops = len(image_bbox_pairs)
     
-    for i in range(0, len(image_bbox_pairs), batch_size):
-        batch_pairs = image_bbox_pairs[i:i + batch_size]
+    # First pass: check cache and collect items that need processing
+    to_process = []  # [(original_idx, filepath, bbox)]
+    cached_count = 0
+    
+    # Normalize image_id_map keys for consistent path comparison
+    normalized_id_map = {}
+    if image_id_map:
+        for path, img_id in image_id_map.items():
+            normalized_id_map[os.path.normpath(path)] = img_id
+    
+    for idx, (filepath, bbox) in enumerate(image_bbox_pairs):
+        # Normalize filepath for comparison
+        normalized_filepath = os.path.normpath(filepath)
+        
+        # Try to get from cache if available
+        if cache and normalized_id_map and normalized_filepath in normalized_id_map:
+            image_id = normalized_id_map[normalized_filepath]
+            cached_emb = cache.get_embedding(image_id, bbox, embedding_type)
+            if cached_emb is not None:
+                all_features[idx] = torch.from_numpy(cached_emb).to(device)
+                cached_count += 1
+                continue
+        
+        to_process.append((idx, filepath, bbox, normalized_filepath))
+    
+    if cached_count > 0:
+        print(f"Found {cached_count} cached features, processing {len(to_process)} new ones")
+    
+    # Second pass: process uncached items in batches
+    for batch_start in range(0, len(to_process), batch_size):
+        batch_items = to_process[batch_start:batch_start + batch_size]
         batch_crops = []
-        valid_indices = []  # Track which crops were successfully processed
+        batch_info = []  # (original_idx, filepath, bbox, normalized_filepath)
         
         # Prepare batch of cropped images
-        for j, (filepath, bbox) in enumerate(batch_pairs):
+        for original_idx, filepath, bbox, normalized_filepath in batch_items:
             try:
                 cropped_image = crop_image_from_bbox(filepath, bbox)
                 cropped_image = img_transform(cropped_image)
                 batch_crops.append(cropped_image)
-                valid_indices.append(i + j)  # Original index in image_bbox_pairs
+                batch_info.append((original_idx, filepath, bbox, normalized_filepath))
             except Exception as e:
                 print(f"Warning: Failed to process {filepath} with bbox {bbox}: {e}")
                 # Add a dummy tensor to maintain batch consistency
                 batch_crops.append(torch.zeros(3, 224, 224))
-                valid_indices.append(i + j)
+                batch_info.append((original_idx, filepath, bbox, normalized_filepath))
         
         # Stack into batch tensor and process
         if batch_crops:
@@ -211,16 +245,32 @@ def batch_dino_image_processing(image_bbox_pairs: List[Tuple[str, List[float]]],
                 features = create_linear_input(x_tokens_list, 1, False)
                 features = features.to(device)
                 
-                # Store individual features
+                # Store individual features and cache them
+                items_to_cache = []
                 for k in range(features.shape[0]):
-                    all_features.append(features[k])
+                    original_idx, filepath, bbox, normalized_filepath = batch_info[k]
+                    all_features[original_idx] = features[k]
+                    
+                    # Prepare for caching (use normalized path to match image_id_map)
+                    if cache and normalized_id_map and normalized_filepath in normalized_id_map:
+                        image_id = normalized_id_map[normalized_filepath]
+                        items_to_cache.append((image_id, bbox, features[k].cpu().numpy()))
+                
+                # Batch store in cache
+                if items_to_cache and cache:
+                    cache.store_embeddings_batch(items_to_cache, embedding_type)
+                    print(f"Cached {len(items_to_cache)} embeddings", flush=True)
             
             # Clean up GPU memory
             del batch_tensor, x_tokens_list, features
         
         # Report progress for frontend
-        processed_crops = min(i + batch_size, total_crops)
+        processed_crops = min(batch_start + batch_size, len(to_process)) + cached_count
         print(f"PROCESS: {processed_crops}/{total_crops}", flush=True)
+    
+    # If all items were cached, report 100%
+    if len(to_process) == 0 and cached_count > 0:
+        print(f"PROCESS: {total_crops}/{total_crops}", flush=True)
     
     return all_features
 
@@ -307,7 +357,9 @@ def predict_multiple_species_batched(detection_filepath: str,
                                    device: torch.device = None,
                                    feature_batch_size: int = 32,
                                    classification_batch_size: int = 64,
-                                   log_file = None) -> List[Dict[str, Any]]:
+                                   log_file = None,
+                                   db_path: str = None,
+                                   image_id_map: Dict[str, int] = None) -> List[Dict[str, Any]]:
     """
     Process the classification results using batch processing for improved speed.
     
@@ -317,8 +369,21 @@ def predict_multiple_species_batched(detection_filepath: str,
         device: PyTorch device to use
         feature_batch_size: Batch size for feature extraction
         classification_batch_size: Batch size for classification
+        db_path: Optional path to SQLite database for embedding cache
+        image_id_map: Optional dict mapping filepath -> database image_id
     """
     start_time = time.time()
+    
+    # Initialize embedding cache if db_path provided
+    cache = None
+    if db_path:
+        try:
+            from db_utils import EmbeddingCache
+            cache = EmbeddingCache(db_path)
+            print(f"Embedding cache initialized: {db_path}", flush=True)
+        except Exception as e:
+            print(f"Warning: Could not initialize embedding cache: {e}", flush=True)
+            cache = None
     
     dino_class_to_idx = {'Hedgehog': 0, 'bird': 1, 'cat': 2, 'deer': 3, 'dog': 4, 'ferret': 5, 'goat': 6, 'kea': 7, 'kiwi': 8, 'lagomorph': 9, 'livestock': 10, 'parakeet': 11, 'pig': 12, 'possum': 13, 'pukeko': 14, 'rodent': 15, 'stoat': 16, 'takahe': 17, 'tomtit': 18, 'tui': 19, 'wallaby': 20, 'weasel': 21, 'weka': 22, 'yellow_eyed_penguin': 23}
     
@@ -404,7 +469,8 @@ def predict_multiple_species_batched(detection_filepath: str,
     print("Extracting features in batches...")
     feature_start_time = time.time()
     all_features = batch_dino_image_processing(
-        all_image_bbox_pairs, device, img_transform, dino_model, feature_batch_size
+        all_image_bbox_pairs, device, img_transform, dino_model, feature_batch_size,
+        cache=cache, image_id_map=image_id_map
     )
     feature_time = time.time() - feature_start_time
     print(f"Feature extraction completed in {feature_time:.2f} seconds")
@@ -527,6 +593,8 @@ def run(original_images_dir, output_images_dir, json_output_dir, log_dir=''):
     log_message(log_file, "Starting DINO detection pipeline")
 
     image_file_list = None
+    db_path = None  # For embedding cache
+    image_id_map = None  # filepath -> image_id mapping
     
     # Check if input is a JSON manifest
     if original_images_dir.lower().endswith('.json') and os.path.isfile(original_images_dir):
@@ -539,11 +607,21 @@ def run(original_images_dir, output_images_dir, json_output_dir, log_dir=''):
                     image_file_list = data
                 elif isinstance(data, dict) and 'files' in data:
                     image_file_list = data['files']
+                    # Extract optional cache parameters
+                    db_path = data.get('db_path')
+                    image_id_map = data.get('image_id_map')  # dict: filepath -> image_id
                 else:
                     raise ValueError("Manifest JSON must be a list or object with 'files' key")
             
             print(f"Found {len(image_file_list)} images in manifest")
             log_message(log_file, f"Found {len(image_file_list)} images in manifest")
+            
+            # Debug: Show cache params
+            print(f"[DEBUG] db_path from manifest: {db_path}", flush=True)
+            print(f"[DEBUG] image_id_map has {len(image_id_map) if image_id_map else 0} entries", flush=True)
+            
+            if db_path:
+                print(f"Embedding cache enabled: {db_path}")
             
             # Use json_output_dir for the intermediate detection results when using manifest
             detection_filepath = os.path.join(json_output_dir, "detection_results.json")
@@ -587,7 +665,9 @@ def run(original_images_dir, output_images_dir, json_output_dir, log_dir=''):
         device=device,
         feature_batch_size=feature_batch_size,
         classification_batch_size=classification_batch_size,
-        log_file=log_file
+        log_file=log_file,
+        db_path=db_path,
+        image_id_map=image_id_map
         )
     except Exception as e:
         log_message(log_file, f"Error running DINO detection pipeline: {str(e)}")

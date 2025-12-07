@@ -51,7 +51,7 @@ const LibraryPage: React.FC = () => {
     const [filterDialogOpen, setFilterDialogOpen] = useState(false);
     const [activeFilter, setActiveFilter] = useState<LibraryFilter | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    
+
     // Sort State
     const [sortBy, setSortBy] = useState<SortOption>('default');
     const [sortMenuPos, setSortMenuPos] = useState<{ top: number; left: number } | null>(null);
@@ -71,7 +71,7 @@ const LibraryPage: React.FC = () => {
     // 2. Data & Loading
     // Fetch Full Library (for Filter Dialog metadata)
     const { dateSections: fullDateSections, refreshLibrary: refreshFullLibrary } = useLibraryData();
-    
+
     // Fetch Filtered Library (for View)
     const { dateSections: filteredDateSections, loading, refreshLibrary: refreshFilteredLibrary } = useLibraryData(dbFilter);
 
@@ -112,16 +112,16 @@ const LibraryPage: React.FC = () => {
         window.addEventListener('trigger-refresh', handleRefresh as EventListener);
         return () => window.removeEventListener('trigger-refresh', handleRefresh as EventListener);
     }, [refreshFullLibrary, refreshFilteredLibrary]);
-    
+
     // 3. Image Loading
     const { imageUrls, fullImageUrls, loadImage, loadFullImage } = useImageLoader();
 
     // 4. Selection
-    const { 
-        isSelectionMode, 
-        selectedIds: selectedImageIds, 
-        toggleSelectionMode, 
-        toggleItem: toggleImageSelection, 
+    const {
+        isSelectionMode,
+        selectedIds: selectedImageIds,
+        toggleSelectionMode,
+        toggleItem: toggleImageSelection,
         clearSelection,
         setIsSelectionMode,
         setSelection
@@ -145,11 +145,11 @@ const LibraryPage: React.FC = () => {
     const rawImages = useMemo(() => {
         return filteredDateSections.flatMap(section => section.groups.flatMap(group => group.images));
     }, [filteredDateSections]);
-    
+
     // Fetch metadata (detections + ReID) for all images
     const imageIds = useMemo(() => rawImages.map(img => img.id), [rawImages]);
     const { metadata: imageMetadata } = useImageMetadata(imageIds);
-    
+
     // Merge metadata into images
     const imagesWithMetadata = useMemo(() => {
         return rawImages.map(img => ({
@@ -158,11 +158,11 @@ const LibraryPage: React.FC = () => {
             reidResults: imageMetadata[img.id]?.reidResults || []
         }));
     }, [rawImages, imageMetadata]);
-    
+
     // Filter by ReID Run (client-side)
     const reidFilteredImages = useMemo(() => {
         if (selectedReidRunId === null) return imagesWithMetadata;
-        return imagesWithMetadata.filter(img => 
+        return imagesWithMetadata.filter(img =>
             img.reidResults?.some(r => r.runId === selectedReidRunId)
         );
     }, [imagesWithMetadata, selectedReidRunId]);
@@ -170,7 +170,7 @@ const LibraryPage: React.FC = () => {
     // Sort images
     const allImages = useMemo(() => {
         if (sortBy === 'default') return reidFilteredImages;
-        
+
         return [...reidFilteredImages].sort((a, b) => {
             switch (sortBy) {
                 case 'species': {
@@ -193,7 +193,7 @@ const LibraryPage: React.FC = () => {
             }
         });
     }, [reidFilteredImages, sortBy]);
-    
+
     // Update dateSections with enriched images (keep original structure) + apply ReID filter
     const enrichedDateSections = useMemo(() => {
         return filteredDateSections.map(section => ({
@@ -267,13 +267,17 @@ const LibraryPage: React.FC = () => {
     const handleBatchDetect = async () => {
         if (selectedImageIds.size === 0) return;
         const paths: string[] = [];
+        const ids: number[] = [];
         allImages.forEach(img => {
-            if (selectedImageIds.has(img.id)) paths.push(img.original_path);
+            if (selectedImageIds.has(img.id)) {
+                paths.push(img.original_path);
+                ids.push(img.id);
+            }
         });
         if (paths.length === 0) return;
 
         try {
-            await window.api.detect(paths, (txt) => console.log(txt));
+            await window.api.detect(paths, (txt) => console.log(txt), ids);
             setIsSelectionMode(false);
             clearSelection();
         } catch (error) {
@@ -308,8 +312,9 @@ const LibraryPage: React.FC = () => {
     // Group-level handlers for Analyse menu
     const handleGroupClassify = async (images: DBImage[]) => {
         const paths = images.map(img => img.original_path);
+        const ids = images.map(img => img.id);
         try {
-            await window.api.detect(paths, (txt) => console.log(txt));
+            await window.api.detect(paths, (txt) => console.log(txt), ids);
         } catch (error) {
             console.error('Classification error:', error);
             alert('Failed to start classification: ' + error);
@@ -332,7 +337,7 @@ const LibraryPage: React.FC = () => {
     return (
         <>
             <OnboardingTour page="library" />
-            <RefreshNotification 
+            <RefreshNotification
                 watchJobTypes={['detect', 'reid']}
                 onRefresh={refreshLibrary}
                 message="Classification or Re-ID completed"
@@ -414,21 +419,21 @@ const LibraryPage: React.FC = () => {
                                 }
                             }}
                         >
-                            <MenuItem 
-                                onClick={() => { setSortBy('default'); setSelectedReidRunId(null); setSortMenuPos(null); }} 
+                            <MenuItem
+                                onClick={() => { setSortBy('default'); setSelectedReidRunId(null); setSortMenuPos(null); }}
                                 selected={sortBy === 'default'}
                                 sx={{ borderRadius: '8px', py: 1 }}
                             >
                                 Default
                             </MenuItem>
-                            <MenuItem 
-                                onClick={() => { setSortBy('species'); setSelectedReidRunId(null); setSortMenuPos(null); }} 
+                            <MenuItem
+                                onClick={() => { setSortBy('species'); setSelectedReidRunId(null); setSortMenuPos(null); }}
                                 selected={sortBy === 'species'}
                                 sx={{ borderRadius: '8px', py: 1 }}
                             >
                                 By Species
                             </MenuItem>
-                            <MenuItem 
+                            <MenuItem
                                 onClick={() => {
                                     if (reidRuns.length === 0) {
                                         // No ReID runs available
@@ -440,7 +445,7 @@ const LibraryPage: React.FC = () => {
                                         setIndividualSubmenuPos({ top: sortMenuPos.top, left: sortMenuPos.left });
                                     }
                                     setSortMenuPos(null);
-                                }} 
+                                }}
                                 selected={sortBy === 'individual'}
                                 disabled={reidRuns.length === 0}
                                 sx={{ borderRadius: '8px', py: 1, display: 'flex', justifyContent: 'space-between' }}
@@ -448,8 +453,8 @@ const LibraryPage: React.FC = () => {
                                 <span>By Individual</span>
                                 {reidRuns.length > 0 && <span style={{ opacity: 0.5, fontSize: '0.9em' }}>›</span>}
                             </MenuItem>
-                            <MenuItem 
-                                onClick={() => { setSortBy('name'); setSelectedReidRunId(null); setSortMenuPos(null); }} 
+                            <MenuItem
+                                onClick={() => { setSortBy('name'); setSelectedReidRunId(null); setSortMenuPos(null); }}
                                 selected={sortBy === 'name'}
                                 sx={{ borderRadius: '8px', py: 1 }}
                             >
@@ -485,13 +490,13 @@ const LibraryPage: React.FC = () => {
                                 Select ReID Run
                             </MenuItem>
                             {reidRuns.map(run => (
-                                <MenuItem 
+                                <MenuItem
                                     key={run.id}
-                                    onClick={() => { 
-                                        setSortBy('individual'); 
-                                        setSelectedReidRunId(run.id); 
-                                        setIndividualSubmenuPos(null); 
-                                    }} 
+                                    onClick={() => {
+                                        setSortBy('individual');
+                                        setSelectedReidRunId(run.id);
+                                        setIndividualSubmenuPos(null);
+                                    }}
                                     selected={sortBy === 'individual' && selectedReidRunId === run.id}
                                     sx={{ borderRadius: '8px', py: 1, display: 'flex', justifyContent: 'space-between', gap: 2 }}
                                 >
@@ -564,59 +569,59 @@ const LibraryPage: React.FC = () => {
                     pointerEvents: isScrolled ? 'auto' : 'none'
                 }}
             >
-                    <Tooltip title="Filter">
-                        <span>
-                            <LiquidGlassButton
-                                size={32}
-                                icon={<Funnel size={16} weight={activeFilter ? 'fill' : 'regular'} />}
-                                onClick={() => setFilterDialogOpen(true)}
-                            />
-                        </span>
-                    </Tooltip>
-                    <Tooltip title={isSelectionMode ? 'Exit Selection' : 'Select'}>
-                        <span>
-                            <LiquidGlassButton
-                                size={32}
-                                icon={<CheckSquare size={16} weight={isSelectionMode ? 'fill' : 'regular'} />}
-                                onClick={toggleSelectionMode}
-                            />
-                        </span>
-                    </Tooltip>
-                    <Tooltip title="Sort">
-                        <span>
-                            <LiquidGlassButton
-                                size={32}
-                                icon={<ArrowsDownUp size={16} weight={sortBy !== 'default' ? 'fill' : 'regular'} />}
-                                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                    const rect = e.currentTarget.getBoundingClientRect();
-                                    setSortMenuPos({ top: rect.bottom + 8, left: rect.right });
-                                }}
-                            />
-                        </span>
-                    </Tooltip>
-                    <Tooltip title="Upload">
-                        <span>
-                            <LiquidGlassButton
-                                size={32}
-                                icon={<UploadSimple size={16} />}
-                                onClick={triggerUpload}
-                            />
-                        </span>
-                    </Tooltip>
-                    <Tooltip title="Back to Top">
-                        <span>
-                            <LiquidGlassButton
-                                size={32}
-                                icon={<ArrowLineUp size={16} />}
-                                onClick={() => {
-                                    const virtuosoContainer = document.querySelector('[data-virtuoso-scroller]');
-                                    if (virtuosoContainer) {
-                                        virtuosoContainer.scrollTo({ top: 0, behavior: 'smooth' });
-                                    }
-                                }}
-                            />
-                        </span>
-                    </Tooltip>
+                <Tooltip title="Filter">
+                    <span>
+                        <LiquidGlassButton
+                            size={32}
+                            icon={<Funnel size={16} weight={activeFilter ? 'fill' : 'regular'} />}
+                            onClick={() => setFilterDialogOpen(true)}
+                        />
+                    </span>
+                </Tooltip>
+                <Tooltip title={isSelectionMode ? 'Exit Selection' : 'Select'}>
+                    <span>
+                        <LiquidGlassButton
+                            size={32}
+                            icon={<CheckSquare size={16} weight={isSelectionMode ? 'fill' : 'regular'} />}
+                            onClick={toggleSelectionMode}
+                        />
+                    </span>
+                </Tooltip>
+                <Tooltip title="Sort">
+                    <span>
+                        <LiquidGlassButton
+                            size={32}
+                            icon={<ArrowsDownUp size={16} weight={sortBy !== 'default' ? 'fill' : 'regular'} />}
+                            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setSortMenuPos({ top: rect.bottom + 8, left: rect.right });
+                            }}
+                        />
+                    </span>
+                </Tooltip>
+                <Tooltip title="Upload">
+                    <span>
+                        <LiquidGlassButton
+                            size={32}
+                            icon={<UploadSimple size={16} />}
+                            onClick={triggerUpload}
+                        />
+                    </span>
+                </Tooltip>
+                <Tooltip title="Back to Top">
+                    <span>
+                        <LiquidGlassButton
+                            size={32}
+                            icon={<ArrowLineUp size={16} />}
+                            onClick={() => {
+                                const virtuosoContainer = document.querySelector('[data-virtuoso-scroller]');
+                                if (virtuosoContainer) {
+                                    virtuosoContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                                }
+                            }}
+                        />
+                    </span>
+                </Tooltip>
             </Box>
         </>
     );

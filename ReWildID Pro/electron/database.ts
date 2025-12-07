@@ -100,6 +100,23 @@ const initSchema = () => {
         );
     `;
 
+    const createEmbeddingsTable = `
+        CREATE TABLE IF NOT EXISTS embeddings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_id INTEGER NOT NULL,
+            bbox_hash TEXT NOT NULL,
+            embedding_type TEXT NOT NULL,
+            embedding BLOB NOT NULL,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY(image_id) REFERENCES images(id) ON DELETE CASCADE
+        );
+    `;
+
+    const createEmbeddingsIndex = `
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_embeddings_lookup 
+        ON embeddings(image_id, bbox_hash, embedding_type);
+    `;
+
     db.exec(createGroupsTable);
     db.exec(createImagesTable);
     db.exec(createDetectionBatchesTable);
@@ -107,6 +124,8 @@ const initSchema = () => {
     db.exec(createReidRunsTable);
     db.exec(createReidIndividualsTable);
     db.exec(createReidMembersTable);
+    db.exec(createEmbeddingsTable);
+    db.exec(createEmbeddingsIndex);
 
     // Migration: Add metadata column if it doesn't exist
     const columns = db.pragma('table_info(images)') as { name: string }[];
@@ -175,6 +194,15 @@ export interface ReidMember {
     id: number;
     individual_id: number;
     detection_id: number;
+}
+
+export interface Embedding {
+    id: number;
+    image_id: number;
+    bbox_hash: string;
+    embedding_type: string;
+    embedding: Buffer;
+    created_at: number;
 }
 
 // Distinct, accessible colors for reid individuals
@@ -954,5 +982,60 @@ export const DatabaseService = {
             individualsPerSpecies,
             detectionTimeline
         };
+    },
+
+    // --- Embeddings ---
+    getEmbedding(imageId: number, bboxHash: string, embeddingType: string): Buffer | null {
+        const stmt = db.prepare(`
+            SELECT embedding FROM embeddings 
+            WHERE image_id = ? AND bbox_hash = ? AND embedding_type = ?
+        `);
+        const result = stmt.get(imageId, bboxHash, embeddingType) as { embedding: Buffer } | undefined;
+        return result?.embedding ?? null;
+    },
+
+    storeEmbedding(imageId: number, bboxHash: string, embeddingType: string, embedding: Buffer): void {
+        const stmt = db.prepare(`
+            INSERT OR REPLACE INTO embeddings (image_id, bbox_hash, embedding_type, embedding, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        `);
+        stmt.run(imageId, bboxHash, embeddingType, embedding, Date.now());
+    },
+
+    getEmbeddingsBatch(items: { imageId: number; bboxHash: string }[], embeddingType: string): Map<string, Buffer> {
+        const result = new Map<string, Buffer>();
+        if (items.length === 0) return result;
+
+        const stmt = db.prepare(`
+            SELECT image_id, bbox_hash, embedding FROM embeddings 
+            WHERE image_id = ? AND bbox_hash = ? AND embedding_type = ?
+        `);
+
+        for (const item of items) {
+            const row = stmt.get(item.imageId, item.bboxHash, embeddingType) as { image_id: number; bbox_hash: string; embedding: Buffer } | undefined;
+            if (row) {
+                const key = `${row.image_id}:${row.bbox_hash}`;
+                result.set(key, row.embedding);
+            }
+        }
+        return result;
+    },
+
+    storeEmbeddingsBatch(items: { imageId: number; bboxHash: string; embedding: Buffer }[], embeddingType: string): void {
+        const stmt = db.prepare(`
+            INSERT OR REPLACE INTO embeddings (image_id, bbox_hash, embedding_type, embedding, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        `);
+        const now = Date.now();
+        const transaction = db.transaction((items: { imageId: number; bboxHash: string; embedding: Buffer }[]) => {
+            for (const item of items) {
+                stmt.run(item.imageId, item.bboxHash, embeddingType, item.embedding, now);
+            }
+        });
+        transaction(items);
+    },
+
+    getDbPath(): string {
+        return DB_PATH;
     }
 };

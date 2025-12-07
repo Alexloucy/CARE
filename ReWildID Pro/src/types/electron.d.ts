@@ -142,7 +142,7 @@ export interface ElectronApi {
     checkIsDirectory: (filePath: string) => Promise<boolean>;
     openFileDialog: () => Promise<{ canceled: boolean; filePaths: string[] }>;
     saveImages: (sourcePaths: string[]) => Promise<{ ok: boolean; successCount?: number; failCount?: number; error?: string }>;
-    detect: (selectedPaths: string[], onStream: (txt: string) => void) => Promise<{ ok: boolean; error?: string }>;
+    detect: (selectedPaths: string[], onStream: (txt: string) => void, imageIds?: number[]) => Promise<{ ok: boolean; error?: string }>;
     browseDetectImage: (date: string, folderPath: string, filterLabel: string, confLow: number, confHigh: number) => Promise<BrowseImageResponse>;
     viewDetectImage: (date: string, imagePath: string) => Promise<ViewImageResponse>;
     getDetectImagePaths: (dirPath: string, filterLabel: string, confLow: number, confHigh: number) => Promise<{ ok: boolean; selectAllPaths?: string[]; error?: string }>;

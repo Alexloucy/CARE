@@ -204,7 +204,7 @@ const DetectionPage: React.FC = () => {
     // Batch Actions
     const handleBatchDelete = async () => {
         if (selectedImageIds.size === 0) return;
-        
+
         // Gather all detections from selected images
         const detectionsToDelete = allImages
             .filter(img => selectedImageIds.has(img.id))
@@ -235,13 +235,17 @@ const DetectionPage: React.FC = () => {
     const handleBatchDetect = async () => {
         if (selectedImageIds.size === 0) return;
         const paths: string[] = [];
+        const ids: number[] = [];
         allImages.forEach(img => {
-            if (selectedImageIds.has(img.id)) paths.push(img.original_path);
+            if (selectedImageIds.has(img.id)) {
+                paths.push(img.original_path);
+                ids.push(img.id);
+            }
         });
         if (paths.length === 0) return;
 
         try {
-            await window.api.detect(paths, (txt) => console.log(txt));
+            await window.api.detect(paths, (txt) => console.log(txt), ids);
             setIsSelectionMode(false);
             clearSelection();
         } catch (error) {
@@ -361,78 +365,78 @@ const DetectionPage: React.FC = () => {
 
     return (
         <>
-        <MediaExplorer
-            title="Detection"
-            loading={loading}
-            dateSections={filteredDateSections}
-            fullDateSections={fullDateSections}
-            imageUrls={imageUrls}
-            fullImageUrls={fullImageUrls}
-            allImages={allImages}
-            loadImage={loadImage}
-            loadFullImage={loadFullImage}
-            activeFilter={activeFilter}
-            onFilterChange={setActiveFilter}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            filterDialogOpen={filterDialogOpen}
-            setFilterDialogOpen={setFilterDialogOpen}
-            isSelectionMode={isSelectionMode}
-            selectedImageIds={selectedImageIds}
-            toggleSelectionMode={toggleSelectionMode}
-            toggleImageSelection={toggleImageSelection}
-            setSelection={setSelection}
-            clearSelection={clearSelection}
-            setIsSelectionMode={setIsSelectionMode}
-            onBatchDelete={handleBatchDelete}
-            onBatchDetect={handleBatchDetect}
-            onBatchSave={handleBatchSave}
-            onDeleteImage={handleDeleteImage}
-            onDeleteDetection={handleDeleteDetection}
-            leftSidebarOpen={leftSidebarOpen}
-            rightSidebarOpen={rightSidebarOpen}
-            availableSpecies={availableSpecies}
-            onGroupMenuOpen={handleMenuOpen}
-            aiButtonMode="reid"
-            onReID={handleReID}
-            groupMenu={
-                <Menu
-                    anchorEl={anchorEl}
-                    open={Boolean(anchorEl)}
-                    onClose={handleMenuClose}
-                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                    transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                    PaperProps={{
-                        elevation: 0,
-                        sx: {
-                            backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(45, 45, 45, 0.85)',
-                            backdropFilter: 'blur(8px)',
-                            borderRadius: '8px',
-                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-                            border: `1px solid ${theme.palette.divider}`,
-                            minWidth: '160px',
-                            mt: 0.5
-                        }
-                    }}
-                    MenuListProps={{ sx: { padding: '6px' } }}
-                >
-                    <MenuItem onClick={handleRenameBatchClick} sx={{ borderRadius: '6px', margin: '2px 0', gap: 1 }}>
-                        <PencilSimple size={18} /> Rename
-                    </MenuItem>
-                    <MenuItem onClick={handleDeleteBatch} sx={{ borderRadius: '6px', margin: '2px 0', gap: 1, color: 'error.main' }}>
-                        <Trash size={18} /> Delete
-                    </MenuItem>
-                </Menu>
-            }
-        />
+            <MediaExplorer
+                title="Detection"
+                loading={loading}
+                dateSections={filteredDateSections}
+                fullDateSections={fullDateSections}
+                imageUrls={imageUrls}
+                fullImageUrls={fullImageUrls}
+                allImages={allImages}
+                loadImage={loadImage}
+                loadFullImage={loadFullImage}
+                activeFilter={activeFilter}
+                onFilterChange={setActiveFilter}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                filterDialogOpen={filterDialogOpen}
+                setFilterDialogOpen={setFilterDialogOpen}
+                isSelectionMode={isSelectionMode}
+                selectedImageIds={selectedImageIds}
+                toggleSelectionMode={toggleSelectionMode}
+                toggleImageSelection={toggleImageSelection}
+                setSelection={setSelection}
+                clearSelection={clearSelection}
+                setIsSelectionMode={setIsSelectionMode}
+                onBatchDelete={handleBatchDelete}
+                onBatchDetect={handleBatchDetect}
+                onBatchSave={handleBatchSave}
+                onDeleteImage={handleDeleteImage}
+                onDeleteDetection={handleDeleteDetection}
+                leftSidebarOpen={leftSidebarOpen}
+                rightSidebarOpen={rightSidebarOpen}
+                availableSpecies={availableSpecies}
+                onGroupMenuOpen={handleMenuOpen}
+                aiButtonMode="reid"
+                onReID={handleReID}
+                groupMenu={
+                    <Menu
+                        anchorEl={anchorEl}
+                        open={Boolean(anchorEl)}
+                        onClose={handleMenuClose}
+                        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                        PaperProps={{
+                            elevation: 0,
+                            sx: {
+                                backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(45, 45, 45, 0.85)',
+                                backdropFilter: 'blur(8px)',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+                                border: `1px solid ${theme.palette.divider}`,
+                                minWidth: '160px',
+                                mt: 0.5
+                            }
+                        }}
+                        MenuListProps={{ sx: { padding: '6px' } }}
+                    >
+                        <MenuItem onClick={handleRenameBatchClick} sx={{ borderRadius: '6px', margin: '2px 0', gap: 1 }}>
+                            <PencilSimple size={18} /> Rename
+                        </MenuItem>
+                        <MenuItem onClick={handleDeleteBatch} sx={{ borderRadius: '6px', margin: '2px 0', gap: 1, color: 'error.main' }}>
+                            <Trash size={18} /> Delete
+                        </MenuItem>
+                    </Menu>
+                }
+            />
 
-        <GroupNameDialog
-            open={renameDialogOpen}
-            onClose={() => { setRenameDialogOpen(false); setBatchToRename(null); }}
-            onConfirm={handleConfirmRename}
-            title="Rename Detection Batch"
-            initialValue={batchToRename?.name || ''}
-        />
+            <GroupNameDialog
+                open={renameDialogOpen}
+                onClose={() => { setRenameDialogOpen(false); setBatchToRename(null); }}
+                onConfirm={handleConfirmRename}
+                title="Rename Detection Batch"
+                initialValue={batchToRename?.name || ''}
+            />
         </>
     );
 };

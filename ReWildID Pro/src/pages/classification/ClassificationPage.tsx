@@ -255,13 +255,17 @@ const ClassificationPage: React.FC = () => {
     const handleBatchDetect = async () => {
         if (selectedImageIds.size === 0) return;
         const paths: string[] = [];
+        const ids: number[] = [];
         allImages.forEach(img => {
-            if (selectedImageIds.has(img.id)) paths.push(img.original_path);
+            if (selectedImageIds.has(img.id)) {
+                paths.push(img.original_path);
+                ids.push(img.id);
+            }
         });
         if (paths.length === 0) return;
 
         try {
-            await window.api.detect(paths, (txt) => console.log(txt));
+            await window.api.detect(paths, (txt) => console.log(txt), ids);
             setIsSelectionMode(false);
             clearSelection();
         } catch (error) {

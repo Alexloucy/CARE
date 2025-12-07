@@ -29,11 +29,11 @@ contextBridge.exposeInMainWorld('api', {
     checkIsDirectory: (filePath: string) => ipcRenderer.invoke('checkIsDirectory', filePath),
     openFileDialog: () => ipcRenderer.invoke('openFileDialog'),
     saveImages: (sourcePaths: string[]) => ipcRenderer.invoke('saveImages', sourcePaths),
-    detect: (selectedPaths: string[], onStream: (txt: string) => void) => {
+    detect: (selectedPaths: string[], onStream: (txt: string) => void, imageIds?: number[]) => {
         // Remove existing listeners to avoid duplicates
         ipcRenderer.removeAllListeners('stream');
         ipcRenderer.on('stream', (_, txt) => onStream(txt));
-        return ipcRenderer.invoke('detect', selectedPaths);
+        return ipcRenderer.invoke('detect', selectedPaths, imageIds);
     },
     browseDetectImage: (date: string, folderPath: string, filterLabel: string, confLow: number, confHigh: number) =>
         ipcRenderer.invoke('browseDetectImage', date, folderPath, filterLabel, confLow, confHigh),

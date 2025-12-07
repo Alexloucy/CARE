@@ -93,6 +93,21 @@ const initSchema = () => {
             FOREIGN KEY(detection_id) REFERENCES detections(id) ON DELETE CASCADE
         );
     `;
+    const createEmbeddingsTable = `
+        CREATE TABLE IF NOT EXISTS embeddings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_id INTEGER NOT NULL,
+            bbox_hash TEXT NOT NULL,
+            embedding_type TEXT NOT NULL,
+            embedding BLOB NOT NULL,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY(image_id) REFERENCES images(id) ON DELETE CASCADE
+        );
+    `;
+    const createEmbeddingsIndex = `
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_embeddings_lookup 
+        ON embeddings(image_id, bbox_hash, embedding_type);
+    `;
     db.exec(createGroupsTable);
     db.exec(createImagesTable);
     db.exec(createDetectionBatchesTable);
@@ -100,6 +115,8 @@ const initSchema = () => {
     db.exec(createReidRunsTable);
     db.exec(createReidIndividualsTable);
     db.exec(createReidMembersTable);
+    db.exec(createEmbeddingsTable);
+    db.exec(createEmbeddingsIndex);
     // Migration: Add metadata column if it doesn't exist
     const columns = db.pragma('table_info(images)');
     if (!columns.some(col => col.name === 'metadata')) {
@@ -700,5 +717,54 @@ exports.DatabaseService = {
             individualsPerSpecies,
             detectionTimeline
         };
+    },
+    // --- Embeddings ---
+    getEmbedding(imageId, bboxHash, embeddingType) {
+        const stmt = db.prepare(`
+            SELECT embedding FROM embeddings 
+            WHERE image_id = ? AND bbox_hash = ? AND embedding_type = ?
+        `);
+        const result = stmt.get(imageId, bboxHash, embeddingType);
+        return result?.embedding ?? null;
+    },
+    storeEmbedding(imageId, bboxHash, embeddingType, embedding) {
+        const stmt = db.prepare(`
+            INSERT OR REPLACE INTO embeddings (image_id, bbox_hash, embedding_type, embedding, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        `);
+        stmt.run(imageId, bboxHash, embeddingType, embedding, Date.now());
+    },
+    getEmbeddingsBatch(items, embeddingType) {
+        const result = new Map();
+        if (items.length === 0)
+            return result;
+        const stmt = db.prepare(`
+            SELECT image_id, bbox_hash, embedding FROM embeddings 
+            WHERE image_id = ? AND bbox_hash = ? AND embedding_type = ?
+        `);
+        for (const item of items) {
+            const row = stmt.get(item.imageId, item.bboxHash, embeddingType);
+            if (row) {
+                const key = `${row.image_id}:${row.bbox_hash}`;
+                result.set(key, row.embedding);
+            }
+        }
+        return result;
+    },
+    storeEmbeddingsBatch(items, embeddingType) {
+        const stmt = db.prepare(`
+            INSERT OR REPLACE INTO embeddings (image_id, bbox_hash, embedding_type, embedding, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        `);
+        const now = Date.now();
+        const transaction = db.transaction((items) => {
+            for (const item of items) {
+                stmt.run(item.imageId, item.bboxHash, embeddingType, item.embedding, now);
+            }
+        });
+        transaction(items);
+    },
+    getDbPath() {
+        return DB_PATH;
     }
 };

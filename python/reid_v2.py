@@ -337,6 +337,19 @@ def run(input_json_path: str, batch_size: int = 4):
     
     detections = input_data['detections']
     output_path = input_data['output_path']
+    db_path = input_data.get('db_path')  # Optional: for embedding cache
+    species = input_data.get('species', 'unknown')
+    
+    # Initialize embedding cache if db_path provided
+    cache = None
+    if db_path:
+        try:
+            from db_utils import EmbeddingCache
+            cache = EmbeddingCache(db_path)
+            print(f"Embedding cache initialized: {db_path}", flush=True)
+        except Exception as e:
+            print(f"Warning: Could not initialize embedding cache: {e}", flush=True)
+            cache = None
     
     if len(detections) == 0:
         print("No detections provided. Exiting.", flush=True)
@@ -409,26 +422,57 @@ def run(input_json_path: str, batch_size: int = 4):
     
     print("STATUS: PROCESSING", flush=True)
     
-    # Load and crop images directly from paths
+    # Load and crop images directly from paths, with caching support
+    embedding_type = f'dinov3_reid_{species}'
     detection_ids = []
     images = []
     is_day_list = []
+    cached_embeddings = {}  # key -> numpy array
+    to_process_indices = []  # indices into detections that need processing
     
     total = len(detections)
-    print(f"Loading {total} images...", flush=True)
+    print(f"Checking cache for {total} detections...", flush=True)
     
+    # First pass: check cache and collect items that need processing
     for i, det in enumerate(detections):
         detection_ids.append(det['detection_id'])
+        
+        # Check cache if available
+        if cache and 'image_id' in det:
+            cached_emb = cache.get_embedding(det['image_id'], det['bbox'], embedding_type)
+            if cached_emb is not None:
+                key = f"{det['image_id']}:{cache.bbox_to_hash(det['bbox'])}"
+                cached_embeddings[key] = cached_emb
+                continue
+        
+        # Not cached, need to process
+        to_process_indices.append(i)
+    
+    cached_count = total - len(to_process_indices)
+    if cached_count > 0:
+        print(f"Found {cached_count} cached embeddings, computing {len(to_process_indices)} new ones", flush=True)
+    
+    # Second pass: load images only for items that need processing
+    process_detection_ids = []
+    process_det_info = []  # (image_id, bbox) for caching new embeddings
+    
+    for idx in to_process_indices:
+        det = detections[idx]
         try:
             img, is_day = load_and_crop_image(det['image_path'], det['bbox'])
             images.append(img)
             is_day_list.append(is_day)
+            process_detection_ids.append(det['detection_id'])
+            process_det_info.append((det.get('image_id'), det['bbox']))
         except Exception as e:
             print(f"Error loading {det['image_path']}: {e}", flush=True)
-            # Skip this detection
-            detection_ids.pop()
+            # Mark as failed in detection_ids
+            detection_ids[detection_ids.index(det['detection_id'])] = None
     
-    if len(images) == 0:
+    # Remove None entries from detection_ids (failed loads)
+    detection_ids = [d for d in detection_ids if d is not None]
+    
+    if len(images) == 0 and len(cached_embeddings) == 0:
         print("No valid images after loading. Exiting.", flush=True)
         output = {"individuals": []}
         with open(output_path, 'w') as f:
@@ -436,14 +480,46 @@ def run(input_json_path: str, batch_size: int = 4):
         print("STATUS: DONE", flush=True)
         return
     
-    # Compute embeddings in mini-batches
-    embeddings = compute_embeddings_batched(
-        dino_with_adapter,
-        images,
-        is_day_list,
-        DEVICE,
-        batch_size,
-    )
+    # Compute embeddings only for uncached items
+    new_embeddings = None
+    if len(images) > 0:
+        new_embeddings = compute_embeddings_batched(
+            dino_with_adapter,
+            images,
+            is_day_list,
+            DEVICE,
+            batch_size,
+        )
+        
+        # Store new embeddings in cache
+        if cache:
+            items_to_store = []
+            for i, (image_id, bbox) in enumerate(process_det_info):
+                if image_id is not None:
+                    items_to_store.append((image_id, bbox, new_embeddings[i]))
+            if items_to_store:
+                cache.store_embeddings_batch(items_to_store, embedding_type)
+                print(f"Stored {len(items_to_store)} new embeddings in cache", flush=True)
+    
+    # Combine cached and new embeddings in original order
+    all_embeddings = []
+    new_emb_idx = 0
+    for det in detections:
+        if det['detection_id'] not in detection_ids:
+            continue  # This detection failed to load
+        
+        if cache and 'image_id' in det:
+            key = f"{det['image_id']}:{cache.bbox_to_hash(det['bbox'])}"
+            if key in cached_embeddings:
+                all_embeddings.append(cached_embeddings[key])
+                continue
+        
+        # Use new embedding
+        if new_embeddings is not None and new_emb_idx < len(new_embeddings):
+            all_embeddings.append(new_embeddings[new_emb_idx])
+            new_emb_idx += 1
+    
+    embeddings = np.stack(all_embeddings, axis=0)
     
     distance_mat = compute_distance_matrix(embeddings)
     

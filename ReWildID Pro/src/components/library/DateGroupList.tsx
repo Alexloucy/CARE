@@ -97,7 +97,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
     const [containerWidth, setContainerWidth] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
     const virtuosoRef = useRef<VirtuosoHandle>(null);
-    
+
     // Analyse menu state
     const [analyseMenuOpen, setAnalyseMenuOpen] = useState(false);
     const [analyseMenuGroup, setAnalyseMenuGroup] = useState<GroupData | null>(null);
@@ -147,11 +147,11 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                     if (sortBy === 'species' || sortBy === 'individual') {
                         // Group images by species or individual
                         const subGroups = new Map<string, { images: DBImage[]; color?: string }>();
-                        
+
                         group.images.forEach(img => {
                             let key: string;
                             let color: string | undefined;
-                            
+
                             if (sortBy === 'species') {
                                 // Use most recent detection batch
                                 if (img.detections && img.detections.length > 0) {
@@ -176,20 +176,20 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                                     key = 'Unidentified';
                                 }
                             }
-                            
+
                             if (!subGroups.has(key)) {
                                 subGroups.set(key, { images: [], color });
                             }
                             subGroups.get(key)!.images.push(img);
                         });
-                        
+
                         // Sort subGroups: known items first, then unknown
                         const sortedKeys = Array.from(subGroups.keys()).sort((a, b) => {
                             if (a === 'Unclassified' || a === 'Unidentified') return 1;
                             if (b === 'Unclassified' || b === 'Unidentified') return -1;
                             return a.localeCompare(b);
                         });
-                        
+
                         sortedKeys.forEach(key => {
                             const subGroup = subGroups.get(key)!;
                             items.push({
@@ -212,14 +212,14 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                         });
                     } else {
                         // Default or name sort: chunk images into grid rows
-                        const sortedImages = sortBy === 'name' 
+                        const sortedImages = sortBy === 'name'
                             ? [...group.images].sort((a, b) => {
                                 const aName = a.original_path.split(/[\\/]/).pop() || '';
                                 const bName = b.original_path.split(/[\\/]/).pop() || '';
                                 return aName.localeCompare(bName);
                             })
                             : group.images;
-                        
+
                         for (let i = 0; i < sortedImages.length; i += columns) {
                             const rowImages = sortedImages.slice(i, i + columns);
                             items.push({
@@ -393,8 +393,9 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
 
     const handleDetect = async (images: DBImage[]) => {
         const paths = images.map(img => img.original_path);
+        const ids = images.map(img => img.id);
         try {
-            const response = await window.api.detect(paths, () => { });
+            const response = await window.api.detect(paths, () => { }, ids);
             if (!response.ok) alert('Detection failed: ' + response.error);
         } catch (error) {
             alert('Error triggering detection: ' + error);
@@ -568,12 +569,12 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
         } else if (item.type === 'sub-header') {
             // Sub-header for species/individual grouping
             return (
-                <Box sx={{ 
-                    height: 40, 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 1.5, 
-                    px: 4, 
+                <Box sx={{
+                    height: 40,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    px: 4,
                     pt: 2,
                     pb: 0.5
                 }}>
@@ -598,15 +599,15 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
             // Grid row for grouped images - same as default view
             const rowHeight = getRowHeight() + 24;
             return (
-                <Box sx={{ 
-                    height: rowHeight, 
-                    display: 'grid', 
-                    gridTemplateColumns: `repeat(${columns}, 1fr)`, 
-                    gap: 2, 
-                    pb: 3, 
-                    px: 4, 
-                    overflow: 'hidden', 
-                    alignItems: 'start' 
+                <Box sx={{
+                    height: rowHeight,
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${columns}, 1fr)`,
+                    gap: 2,
+                    pb: 3,
+                    px: 4,
+                    overflow: 'hidden',
+                    alignItems: 'start'
                 }}>
                     {item.images.map((img: DBImage) => {
                         const fileDetails = {
@@ -614,7 +615,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                             path: img.original_path,
                             isDirectory: false
                         };
-                        
+
                         // Build species badge (top-right) - use most recent detection run
                         let speciesBadge: React.ReactNode = null;
                         if (showSpeciesTags && img.detections && img.detections.length > 0) {
@@ -630,7 +631,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                                 speciesBadge = <Chip label={text} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.9)', color: '#000', height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
                             }
                         }
-                        
+
                         // Build ReID badge (top-left) - use most recent run
                         let reidBadge: React.ReactNode = null;
                         if (showReidTags && img.reidResults && img.reidResults.length > 0) {
@@ -640,10 +641,10 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                             const latestReid = sortedReid.filter(r => r.runId === latestRunId);
                             const firstReid = latestReid[0];
                             const moreCount = latestReid.length - 1;
-                            const reidLabel = moreCount > 0 
+                            const reidLabel = moreCount > 0
                                 ? `${firstReid.individualDisplayName} +${moreCount}`
                                 : firstReid.individualDisplayName;
-                            
+
                             reidBadge = (
                                 <Box sx={{
                                     display: 'flex',
@@ -663,7 +664,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                                 </Box>
                             );
                         }
-                        
+
                         return (
                             <Box key={img.id} sx={{ minWidth: 0, height: 'fit-content' }}>
                                 <ImageCard
@@ -707,7 +708,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                             path: img.original_path,
                             isDirectory: false
                         };
-                        
+
                         // Build species badge (top-right) - use most recent detection run
                         let speciesBadge: React.ReactNode = null;
                         if (showSpeciesTags && img.detections && img.detections.length > 0) {
@@ -723,7 +724,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                                 speciesBadge = <Chip label={text} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.9)', color: '#000', height: 20, fontSize: '0.65rem', fontWeight: 600 }} />;
                             }
                         }
-                        
+
                         // Build ReID badge (top-left) - use most recent run
                         let reidBadge: React.ReactNode = null;
                         if (showReidTags && img.reidResults && img.reidResults.length > 0) {
@@ -733,10 +734,10 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                             const latestReid = sortedReid.filter(r => r.runId === latestRunId);
                             const firstReid = latestReid[0];
                             const moreCount = latestReid.length - 1;
-                            const reidLabel = moreCount > 0 
+                            const reidLabel = moreCount > 0
                                 ? `${firstReid.individualDisplayName} +${moreCount}`
                                 : firstReid.individualDisplayName;
-                            
+
                             reidBadge = (
                                 <Box sx={{
                                     display: 'flex',
@@ -756,7 +757,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
                                 </Box>
                             );
                         }
-                        
+
                         const badge = speciesBadge;
 
                         return (

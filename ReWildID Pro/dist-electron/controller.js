@@ -427,13 +427,13 @@ async function downloadSelectedGalleryImages(selectedPaths) {
         return { ok: false, error: 'downloadSelectedGalleryImages failed: ' + error };
     }
 }
-async function detect(selectedPaths, stream) {
+async function detect(selectedPaths, stream, imageIds) {
     try {
         if (!selectedPaths || !Array.isArray(selectedPaths) || selectedPaths.length === 0) {
             return { ok: false, error: 'No images selected.' };
         }
-        // Add to Job Queue
-        jobs_1.JobManager.getInstance().addJob('detect', { selectedPaths });
+        // Add to Job Queue with optional imageIds for caching
+        jobs_1.JobManager.getInstance().addJob('detect', { selectedPaths, imageIds });
         return { ok: true };
     }
     catch (error) {

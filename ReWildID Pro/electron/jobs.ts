@@ -38,7 +38,7 @@ export class JobManager {
     private processing = false;
     private maxHistory = 50;
 
-    private constructor() {}
+    private constructor() { }
 
     static getInstance(): JobManager {
         if (!JobManager.instance) {
@@ -69,7 +69,7 @@ export class JobManager {
 
     getJobs(): Job[] {
         return [
-            ...Array.from(this.activeJobs.values()), 
+            ...Array.from(this.activeJobs.values()),
             ...this.queue,
             ...this.completedJobs
         ].sort((a, b) => b.createdAt - a.createdAt);
@@ -150,7 +150,7 @@ export class JobManager {
                 default:
                     throw new Error(`Unknown job type: ${job.type}`);
             }
-            
+
             if ((job.status as string) !== 'cancelled') {
                 job.status = 'completed';
                 job.progress = 100;
@@ -170,7 +170,7 @@ export class JobManager {
             this.activeJobs.delete(job.id);
             this.addToHistory(job);
             this.emitUpdate();
-            
+
             // Trigger next job
             this.processQueue();
         }
@@ -188,12 +188,12 @@ export class JobManager {
 
             const image = nativeImage.createFromPath(originalPath);
             if (image.isEmpty()) {
-                 return;
+                return;
             }
-            
+
             const resized = image.resize({ height: 300 });
             const buffer = resized.toJPEG(80);
-            
+
             await fs.writeFile(thumbPath, buffer);
             DatabaseService.updateImagePreview(imageId, thumbPath);
         } catch (error) {
@@ -208,18 +208,18 @@ export class JobManager {
                 const files = await fs.readdir(dir);
                 for (const file of files) {
                     const fullPath = path.join(dir, file);
-                    const stat = await fs.stat(fullPath).catch(()=>null);
+                    const stat = await fs.stat(fullPath).catch(() => null);
                     if (stat?.isDirectory()) await processDir(fullPath);
                     else if (stat?.isFile()) {
-                         const ext = path.extname(file).toLowerCase();
-                         if (ext === '.jpg' || ext === '.jpeg') count++;
+                        const ext = path.extname(file).toLowerCase();
+                        if (ext === '.jpg' || ext === '.jpeg') count++;
                     }
                 }
             } catch (e) { console.warn('Count error:', e); }
         };
 
         for (const p of filePaths) {
-            const stat = await fs.stat(p).catch(()=>null);
+            const stat = await fs.stat(p).catch(() => null);
             if (stat?.isDirectory()) await processDir(p);
             else if (stat?.isFile()) {
                 const ext = path.extname(p).toLowerCase();
@@ -231,19 +231,19 @@ export class JobManager {
 
     private async handleImportJob(job: Job) {
         const { filePaths, groupName, afterAction, species } = job.payload;
-        
+
         // Track imported image IDs for chained actions
         const importedImageIds: number[] = [];
-        
+
         job.message = 'Scanning files...';
         this.emitUpdate();
 
         // Count total for progress
         const totalFiles = await this.countFiles(filePaths);
-        
+
         // Create Group if needed (for flat file lists)
         let currentGroupId: number | null = null;
-        
+
         // Pre-check: are we uploading a list of files directly?
         const filesOnly = [];
         for (const p of filePaths) {
@@ -261,26 +261,26 @@ export class JobManager {
 
         // Recursive Process
         let processedCount = 0;
-        
+
         const processFile = async (filePath: string, groupId: number) => {
             if ((job.status as string) === 'cancelled') return;
-            
+
             const ext = path.extname(filePath).toLowerCase();
             if (ext === '.jpg' || ext === '.jpeg') {
                 try {
                     // Add to DB
                     const imageId = DatabaseService.addImage(groupId, filePath);
                     importedImageIds.push(imageId);
-                    
+
                     // Generate Thumbnail Synchronously (or await it) to keep it in one job
                     await this.generateThumbnail(imageId, filePath);
-                    
+
                 } catch (e) {
                     console.error(`Error adding image ${filePath}:`, e);
                 }
                 processedCount++;
             }
-            
+
             // Update Progress
             if (totalFiles > 0) {
                 job.progress = Math.floor((processedCount / totalFiles) * 100);
@@ -289,7 +289,7 @@ export class JobManager {
             // Throttle updates to avoid spamming IPC
             if (processedCount % 5 === 0) {
                 job.message = `Importing ${processedCount}/${totalFiles}...`;
-                this.emitUpdate(); 
+                this.emitUpdate();
             }
         };
 
@@ -315,7 +315,7 @@ export class JobManager {
                             await processFile(fullPath, groupId);
                         }
                     } catch (e) {
-                         console.warn(`Error processing file ${fullPath}:`, e);
+                        console.warn(`Error processing file ${fullPath}:`, e);
                     }
                 }
             } catch (e) {
@@ -325,48 +325,48 @@ export class JobManager {
 
         // Start processing
         for (const p of filePaths) {
-             if ((job.status as string) === 'cancelled') break;
-             try {
+            if ((job.status as string) === 'cancelled') break;
+            try {
                 const stat = await fs.stat(p);
                 if (stat.isDirectory()) {
                     await processDir(p);
                 } else if (currentGroupId !== null && stat.isFile()) {
                     await processFile(p, currentGroupId);
                 }
-             } catch (e) {
-                 console.warn(`Error accessing path ${p}:`, e);
-             }
+            } catch (e) {
+                console.warn(`Error accessing path ${p}:`, e);
+            }
         }
-        
+
         job.message = `Imported ${processedCount} images.`;
         job.progress = 100;
-        
+
         // Handle chained actions
         if (afterAction && importedImageIds.length > 0 && (job.status as string) !== 'cancelled') {
             if (afterAction === 'classify') {
                 // Get paths for the imported images
                 const images = DatabaseService.getImagesByIds(importedImageIds);
                 const selectedPaths = images.map(img => img.original_path);
-                
+
                 job.message = `Imported ${processedCount} images. Starting classification...`;
                 this.emitUpdate();
-                
-                // Queue a detect job
-                this.addJob('detect', { selectedPaths });
+
+                // Queue a detect job with imageIds for caching
+                this.addJob('detect', { selectedPaths, imageIds: importedImageIds });
             } else if (afterAction === 'reid' && species) {
                 // Get paths for the imported images
                 const images = DatabaseService.getImagesByIds(importedImageIds);
                 const selectedPaths = images.map(img => img.original_path);
-                
+
                 job.message = `Imported ${processedCount} images. Starting classification...`;
                 this.emitUpdate();
-                
+
                 // Queue a detect job that will chain to reid
-                this.addJob('detect', { 
-                    selectedPaths, 
-                    chainToReid: true, 
-                    imageIds: importedImageIds, 
-                    species 
+                this.addJob('detect', {
+                    selectedPaths,
+                    chainToReid: true,
+                    imageIds: importedImageIds,
+                    species
                 });
             }
         }
@@ -390,15 +390,15 @@ export class JobManager {
 
         try {
             terminateSubprocess();
-            await fs.remove(manifestPath).catch(() => {});
+            await fs.remove(manifestPath).catch(() => { });
 
             // Get images from database - this gives us the correct ID -> path mapping
             const images = DatabaseService.getImagesByIds(imageIdsToDetect);
-            
+
             // Build path -> id mapping for later
             const pathToIdMap = new Map<string, number>();
             const absolutePaths: string[] = [];
-            
+
             for (const img of images) {
                 if (await fs.pathExists(img.original_path)) {
                     absolutePaths.push(img.original_path);
@@ -478,18 +478,18 @@ export class JobManager {
             const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
             const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const batchName = `ReID Pre-Detection ${dateStr} ${timeStr}`;
-            
+
             const batchId = DatabaseService.createDetectionBatch(batchName);
 
             // Read all JSON files in the output directory
             const jsonFiles = await fs.readdir(jsonOutputDir);
             for (const jsonFile of jsonFiles) {
                 if (!jsonFile.endsWith('.json')) continue;
-                
+
                 const jsonPath = path.join(jsonOutputDir, jsonFile);
                 const baseName = path.parse(jsonFile).name;
                 const imageId = pathToIdMap.get(baseName);
-                
+
                 if (!imageId) {
                     console.warn(`[ReID Detection] No image ID found for ${baseName}`);
                     continue;
@@ -497,7 +497,7 @@ export class JobManager {
 
                 try {
                     const result = await fs.readJson(jsonPath);
-                    
+
                     if (result.boxes && Array.isArray(result.boxes)) {
                         for (const box of result.boxes) {
                             if (box.bbox && box.bbox.length === 4) {
@@ -522,7 +522,7 @@ export class JobManager {
 
         } finally {
             // Cleanup
-            await fs.remove(manifestPath).catch(() => {});
+            await fs.remove(manifestPath).catch(() => { });
         }
     }
 
@@ -539,12 +539,12 @@ export class JobManager {
 
             // Get LATEST detections for selected images (only from most recent batch per image)
             // Detection is now handled separately before this job is queued
-            
+
             // Debug: Also get ALL detections to compare
             const allDetectionsRaw = DatabaseService.getDetectionsForImages(imageIds);
             console.log(`[ReID Debug] imageIds: ${JSON.stringify(imageIds)}`);
             console.log(`[ReID Debug] ALL detections (any batch): ${allDetectionsRaw.length}`);
-            
+
             const allDetections = DatabaseService.getLatestDetectionsForImages(imageIds);
             console.log(`[ReID Debug] allDetections count (latest batch only): ${allDetections.length}`);
             console.log(`[ReID Debug] allDetections labels: ${JSON.stringify(allDetections.map((d: any) => d.label))}`);
@@ -552,11 +552,11 @@ export class JobManager {
             // Step 4: Filter by species
             const speciesLower = species.toLowerCase();
             console.log(`[ReID Debug] Looking for species: "${speciesLower}"`);
-            
+
             const matchingDetections = allDetections.filter(
                 (det: any) => det.label?.toLowerCase() === speciesLower
             );
-            
+
             console.log(`[ReID Debug] matchingDetections count: ${matchingDetections.length}`);
 
             if (matchingDetections.length === 0) {
@@ -571,8 +571,11 @@ export class JobManager {
             const outputJsonPath = path.join(tempDir, `reid_output_${job.id}.json`);
 
             const inputData = {
+                db_path: DatabaseService.getDbPath(),
+                species: species,
                 detections: matchingDetections.map((det: any) => ({
                     detection_id: det.id,
+                    image_id: det.image_id,
                     image_path: det.image_path,
                     bbox: [det.x1, det.y1, det.x2, det.y2]
                 })),
@@ -659,8 +662,8 @@ export class JobManager {
             job.message = `Identified ${outputData.individuals.length} individuals`;
 
             // Cleanup temp files
-            await fs.remove(inputJsonPath).catch(() => {});
-            await fs.remove(outputJsonPath).catch(() => {});
+            await fs.remove(inputJsonPath).catch(() => { });
+            await fs.remove(outputJsonPath).catch(() => { });
 
         } catch (error) {
             throw error;
@@ -668,28 +671,36 @@ export class JobManager {
     }
 
     private async handleDetectJob(job: Job) {
-        const { selectedPaths, chainToReid, imageIds: chainedImageIds } = job.payload;
-        
-        // Build path-to-ID map if we're chaining (to avoid duplicate image issues)
-        const pathToIdMap = new Map<string, number>();
-        if (chainToReid && chainedImageIds) {
-            const images = DatabaseService.getImagesByIds(chainedImageIds);
-            for (const img of images) {
-                pathToIdMap.set(img.original_path, img.id);
-            }
-        }
+        const { selectedPaths, chainToReid, imageIds, species } = job.payload;
+
         // Use project root for data to keep it local
         const baseDataDir = process.cwd();
         // Create unique, deterministic output paths based on job ID
         const detectionJobDir = path.join(baseDataDir, 'data', 'detections', job.id);
         const imageOutputDir = path.join(detectionJobDir, 'images');
         const jsonOutputDir = path.join(detectionJobDir, 'json');
-        
+
         const manifestPath = path.join(baseDataDir, 'data', 'temp', `detection_manifest_${job.id}.json`);
 
         try {
             terminateSubprocess();
-            await fs.remove(manifestPath).catch(() => {});
+            await fs.remove(manifestPath).catch(() => { });
+
+            // Build path-to-ID map from provided imageIds (if available)
+            // This is the CORRECT way - use IDs that were passed in, not path lookup
+            const imageIdMap: Record<string, number> = {};
+
+            console.log(`[Detect Job] Received imageIds: ${imageIds?.length ?? 'undefined'}, paths: ${selectedPaths.length}`);
+
+            if (imageIds && Array.isArray(imageIds) && imageIds.length === selectedPaths.length) {
+                // We have matching imageIds from the caller - use them directly
+                for (let i = 0; i < selectedPaths.length; i++) {
+                    imageIdMap[selectedPaths[i]] = imageIds[i];
+                }
+                console.log(`[Detect Job] Built imageIdMap with ${Object.keys(imageIdMap).length} entries`);
+            } else {
+                console.log(`[Detect Job] No valid imageIds, caching disabled`);
+            }
 
             // Validate paths
             const absolutePaths: string[] = [];
@@ -703,9 +714,13 @@ export class JobManager {
                 throw new Error('No valid images found to process.');
             }
 
-            // Write Manifest
+            // Write Manifest with cache info (only if we have valid imageIds)
             await fs.ensureDir(path.dirname(manifestPath));
-            await fs.writeJson(manifestPath, { files: absolutePaths }, { spaces: 2 });
+            await fs.writeJson(manifestPath, {
+                files: absolutePaths,
+                db_path: Object.keys(imageIdMap).length > 0 ? DatabaseService.getDbPath() : undefined,
+                image_id_map: Object.keys(imageIdMap).length > 0 ? imageIdMap : undefined
+            }, { spaces: 2 });
 
             // Ensure output directories exist
             await fs.ensureDir(imageOutputDir);
@@ -752,8 +767,8 @@ export class JobManager {
                         job.message = 'Loading AI models...';
                         this.emitUpdate();
                     } else if (txt.includes('Running MegaDetector')) {
-                         job.message = 'Running Object Detection...';
-                         this.emitUpdate();
+                        job.message = 'Running Object Detection...';
+                        this.emitUpdate();
                     }
                 });
 
@@ -779,7 +794,7 @@ export class JobManager {
             const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
             const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const batchName = `Detection ${dateStr} ${timeStr}`;
-            
+
             const batchId = DatabaseService.createDetectionBatch(batchName);
             console.log(`[Detect Job] Created batch ${batchId}, processing ${absolutePaths.length} images`);
 
@@ -792,9 +807,9 @@ export class JobManager {
                 if (await fs.pathExists(jsonPath)) {
                     try {
                         const result = await fs.readJson(jsonPath);
-                        
-                        // Use the path-to-ID map if available (for chained jobs), otherwise lookup by path
-                        const imageId = pathToIdMap.get(originalPath) ?? DatabaseService.getImageByPath(originalPath)?.id;
+
+                        // Use the image ID map if available (from passed imageIds), otherwise lookup by path
+                        const imageId = imageIdMap[originalPath] ?? DatabaseService.getImageByPath(originalPath)?.id;
 
                         if (imageId && result.boxes && Array.isArray(result.boxes)) {
                             console.log(`[Detect Job] Saving detections for image ID ${imageId} (path: ${originalPath})`);
@@ -822,22 +837,21 @@ export class JobManager {
                     console.log(`[Detect Job] No JSON found at: ${jsonPath}`);
                 }
             }
-            
+
             console.log(`[Detect Job] Saved ${savedCount} detections to batch ${batchId}`);
 
-            // Handle chained actions
-            const { chainToReid, imageIds, species } = job.payload;
+            // Handle chained actions (use values destructured at function start)
             if (chainToReid && imageIds && species && (job.status as string) !== 'cancelled') {
                 job.message = 'Classification complete. Starting ReID...';
                 this.emitUpdate();
-                
+
                 // Queue the reid job
                 this.addJob('reid', { imageIds, species });
             }
 
         } finally {
             // Cleanup
-            await fs.remove(manifestPath).catch(() => {});
+            await fs.remove(manifestPath).catch(() => { });
         }
     }
 }
