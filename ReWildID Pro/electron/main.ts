@@ -47,7 +47,10 @@ import {
     updateReidIndividualName,
     updateReidIndividualColor,
     mergeReidIndividuals,
-    getDashboardStats
+    getDashboardStats,
+    // Image Metadata
+    updateImageMetadata,
+    getImageMetadata
 } from './controller';
 import { JobManager } from './jobs';
 
@@ -232,6 +235,10 @@ ipcMain.handle('updateReidIndividualName', (_, id, displayName) => updateReidInd
 ipcMain.handle('updateReidIndividualColor', (_, id, color) => updateReidIndividualColor(id, color));
 ipcMain.handle('mergeReidIndividuals', (_, targetId, sourceIds) => mergeReidIndividuals(targetId, sourceIds));
 ipcMain.handle('getDashboardStats', () => getDashboardStats());
+
+// Image Metadata
+ipcMain.handle('updateImageMetadata', (_, id, metadata) => updateImageMetadata(id, metadata));
+ipcMain.handle('getImageMetadata', (_, id) => getImageMetadata(id));
 
 
 app.on('ready', () => {

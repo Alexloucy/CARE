@@ -21,7 +21,7 @@ contextBridge.exposeInMainWorld('api', {
     getImagePaths: (currentFolder: string) => ipcRenderer.invoke('getImagePaths', currentFolder),
     getImages: (filter?: any) => ipcRenderer.invoke('getImages', filter),
     getImagesByIds: (imageIds: number[]) => ipcRenderer.invoke('getImagesByIds', imageIds),
-    uploadPaths: (filePaths: string[], groupName?: string, afterAction?: 'classify' | 'reid', species?: string) => 
+    uploadPaths: (filePaths: string[], groupName?: string, afterAction?: 'classify' | 'reid', species?: string) =>
         ipcRenderer.invoke('uploadPaths', filePaths, groupName, afterAction, species),
     deleteGroup: (id: number) => ipcRenderer.invoke('deleteGroup', id),
     deleteImage: (id: number) => ipcRenderer.invoke('deleteImage', id),
@@ -64,6 +64,10 @@ contextBridge.exposeInMainWorld('api', {
     getAvailableSpecies: () => ipcRenderer.invoke('getAvailableSpecies'),
     updateDetectionLabel: (id: number, label: string) => ipcRenderer.invoke('updateDetectionLabel', id, label),
     deleteDetection: (id: number) => ipcRenderer.invoke('deleteDetection', id),
+
+    // Image Metadata
+    updateImageMetadata: (id: number, metadata: Record<string, string>) => ipcRenderer.invoke('updateImageMetadata', id, metadata),
+    getImageMetadata: (id: number) => ipcRenderer.invoke('getImageMetadata', id),
 
     // Jobs
     getJobs: () => ipcRenderer.invoke('getJobs'),

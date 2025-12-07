@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Box, Typography, Modal, IconButton, Fade, Backdrop, Paper, useTheme } from '@mui/material';
-import { X, MagnifyingGlassPlus, MagnifyingGlassMinus, CaretLeft, CaretRight, Trash, Sparkle } from '@phosphor-icons/react';
+import { Box, Typography, Modal, IconButton, Fade, Backdrop, Paper, useTheme, Divider, Tooltip } from '@mui/material';
+import { X, MagnifyingGlassPlus, MagnifyingGlassMinus, CaretLeft, CaretRight, Trash, Sparkle, Sidebar } from '@phosphor-icons/react';
 import { FileDetails, Detection, ReidInfoForImage } from '../types/electron';
 import { LiquidGlassOverlay } from './LiquidGlassOverlay';
-
+import AnalysisSidebar from './AnalysisSidebar';
 
 interface ReidInfoForDetection {
     individualDisplayName: string;
@@ -26,11 +26,11 @@ interface DetectionBoxProps {
     reidResults?: ReidInfoForDetection[];
 }
 
-const DetectionBox: React.FC<DetectionBoxProps> = ({ 
-    bbox, 
-    detection, 
-    containerWidth, 
-    containerHeight, 
+const DetectionBox: React.FC<DetectionBoxProps> = ({
+    bbox,
+    detection,
+    containerWidth,
+    containerHeight,
     useLiquidGlass = true,
     onDelete,
     customPopupContent,
@@ -63,7 +63,7 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
         if (useLiquidGlass) {
             // Small delay to ensure the initial 'center' position is painted
             const timer = requestAnimationFrame(() => {
-                 setActiveBbox(bbox);
+                setActiveBbox(bbox);
             });
             return () => cancelAnimationFrame(timer);
         }
@@ -123,21 +123,21 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                 >
                     {detection.label} ({Math.round(detection.confidence * 100)}%)
                 </Box>
-                
+
                 {/* Info Popup for Standard Mode */}
                 <Fade in={isHovered}>
                     <Paper sx={{
                         position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        mt: 1,
+                        top: 0,
+                        left: '100%',
+                        ml: 1,
                         p: 2,
-                        zIndex: 101,
+                        zIndex: 1000,
                         width: 240,
-                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(30, 30, 30, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(30, 30, 30, 0.95)' : 'rgba(255, 255, 255, 0.95)',
                         backdropFilter: 'blur(12px)',
                         borderRadius: 3,
-                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
                         border: `1px solid ${theme.palette.divider}`,
                     }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -147,10 +147,10 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                             </Typography>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Typography variant="caption" color="text.secondary">Species</Typography>
-                                <Box sx={{ 
-                                    bgcolor: 'rgba(66, 133, 244, 0.1)', 
-                                    color: '#4285F4', 
-                                    px: 1, py: 0.2, 
+                                <Box sx={{
+                                    bgcolor: 'rgba(66, 133, 244, 0.1)',
+                                    color: '#4285F4',
+                                    px: 1, py: 0.2,
                                     borderRadius: 1,
                                     fontSize: '0.75rem',
                                     fontWeight: 600
@@ -170,36 +170,45 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                                     {(detection.detection_confidence * 100).toFixed(1)}%
                                 </Typography>
                             </Box>
-                            
+
                             {/* Re-identification Section */}
-                            {reidResults && reidResults.length > 0 && (
-                                <>
-                                    <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, mt: 1, pt: 1 }} />
-                                    <Typography variant="caption" fontWeight="600" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                        Re-identification
-                                    </Typography>
-                                    {reidResults.map((reid, idx) => (
-                                        <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <Typography variant="caption" color="text.secondary">Individual</Typography>
-                                            <Box sx={{ 
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: 0.5,
-                                                bgcolor: `${reid.individualColor}20`, 
-                                                color: reid.individualColor, 
-                                                px: 1, py: 0.2, 
-                                                borderRadius: 1,
-                                                fontSize: '0.75rem',
-                                                fontWeight: 600
-                                            }}>
-                                                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: reid.individualColor }} />
-                                                {reid.individualDisplayName}
+                            {reidResults && reidResults.length > 0 && (() => {
+                                // Show only unique individuals (most recent first)
+                                const seen = new Set<string>();
+                                const uniqueResults = reidResults.filter(r => {
+                                    if (seen.has(r.individualDisplayName)) return false;
+                                    seen.add(r.individualDisplayName);
+                                    return true;
+                                });
+                                return (
+                                    <>
+                                        <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, mt: 1, pt: 1 }} />
+                                        <Typography variant="caption" fontWeight="600" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                            Re-identification
+                                        </Typography>
+                                        {uniqueResults.slice(0, 1).map((reid, idx) => (
+                                            <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Typography variant="caption" color="text.secondary">Individual</Typography>
+                                                <Box sx={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 0.5,
+                                                    bgcolor: `${reid.individualColor}20`,
+                                                    color: reid.individualColor,
+                                                    px: 1, py: 0.2,
+                                                    borderRadius: 1,
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 600
+                                                }}>
+                                                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: reid.individualColor }} />
+                                                    {reid.individualDisplayName}
+                                                </Box>
                                             </Box>
-                                        </Box>
-                                    ))}
-                                </>
-                            )}
-                            
+                                        ))}
+                                    </>
+                                );
+                            })()}
+
                             {onDelete && (
                                 <IconButton
                                     size="small"
@@ -237,7 +246,7 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                 zIndex: 100,
                 transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)', // Slow, fluid movement for liquid glass
                 bgcolor: 'rgba(255, 255, 255, 0.03)',
-                
+
                 // Hover State - Slight Light Up of Entire Glass
                 '&:hover': {
                     bgcolor: 'rgba(255, 255, 255, 0.00)', // Subtle light up
@@ -245,14 +254,14 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                         opacity: 0.15, // Boost rainbow visibility slightly
                     }
                 },
-                
+
                 // Glass Rim (White highlights)
                 boxShadow: `
                     inset 0 0 0 1px rgba(255, 255, 255, 0.15), 
                     inset 2px 2px 6px -2px rgba(255, 255, 255, 0.6), 
                     inset -2px -2px 6px -2px rgba(255, 255, 255, 0.2)
                 `,
-                
+
                 // Rainbow Refraction Edge (::before)
                 '&::before': {
                     content: '""',
@@ -261,20 +270,20 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                     zIndex: 1,
                     borderRadius: '30px',
                     padding: '1.5px', // Very thin thickness
-                    
+
                     // Bright Rainbow Gradient
                     background: 'linear-gradient(125deg, #ff0000, #ff8800, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff)',
-                    
+
                     // Masking magic to show only the border
                     mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
                     maskComposite: 'exclude',
                     WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
                     WebkitMaskComposite: 'xor',
-                    
+
                     opacity: 0.08, // Bright but slightly transparent
                     pointerEvents: 'none'
                 },
-                
+
                 // Glass distortion layer (from .glassContainer::after) - ONLY AT EDGES
                 '&::after': {
                     content: '""',
@@ -293,12 +302,12 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
             }}
         >
             {/* Content (Label Badge) - Elevated z-index to sit above glass */}
-            <Box 
-                sx={{ 
-                    position: 'relative', 
-                    width: '100%', 
-                    height: '100%', 
-                    zIndex: 3 
+            <Box
+                sx={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '100%',
+                    zIndex: 3
                 }}
             >
                 {/* Label Badge */}
@@ -366,7 +375,7 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                                         {popupTitle}
                                     </Typography>
                                 </Box>
-                                
+
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                                     {/* Classification Section */}
                                     <Typography variant="caption" fontWeight="600" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -374,10 +383,10 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                                     </Typography>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <Typography variant="caption" color="text.secondary">Species</Typography>
-                                        <Box sx={{ 
-                                            bgcolor: 'rgba(66, 133, 244, 0.1)', 
-                                            color: '#4285F4', 
-                                            px: 1, py: 0.2, 
+                                        <Box sx={{
+                                            bgcolor: 'rgba(66, 133, 244, 0.1)',
+                                            color: '#4285F4',
+                                            px: 1, py: 0.2,
                                             borderRadius: 1,
                                             fontSize: '0.75rem',
                                             fontWeight: 600
@@ -397,36 +406,45 @@ const DetectionBox: React.FC<DetectionBoxProps> = ({
                                             {(detection.detection_confidence * 100).toFixed(1)}%
                                         </Typography>
                                     </Box>
-                                    
+
                                     {/* Re-identification Section */}
-                                    {reidResults && reidResults.length > 0 && (
-                                        <>
-                                            <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, mt: 1, pt: 1 }} />
-                                            <Typography variant="caption" fontWeight="600" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                                Re-identification
-                                            </Typography>
-                                            {reidResults.map((reid, idx) => (
-                                                <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <Typography variant="caption" color="text.secondary">Individual</Typography>
-                                                    <Box sx={{ 
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 0.5,
-                                                        bgcolor: `${reid.individualColor}20`, 
-                                                        color: reid.individualColor, 
-                                                        px: 1, py: 0.2, 
-                                                        borderRadius: 1,
-                                                        fontSize: '0.75rem',
-                                                        fontWeight: 600
-                                                    }}>
-                                                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: reid.individualColor }} />
-                                                        {reid.individualDisplayName}
+                                    {reidResults && reidResults.length > 0 && (() => {
+                                        // Show only unique individuals (most recent first)
+                                        const seen = new Set<string>();
+                                        const uniqueResults = reidResults.filter(r => {
+                                            if (seen.has(r.individualDisplayName)) return false;
+                                            seen.add(r.individualDisplayName);
+                                            return true;
+                                        });
+                                        return (
+                                            <>
+                                                <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, mt: 1, pt: 1 }} />
+                                                <Typography variant="caption" fontWeight="600" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                    Re-identification
+                                                </Typography>
+                                                {uniqueResults.slice(0, 1).map((reid, idx) => (
+                                                    <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <Typography variant="caption" color="text.secondary">Individual</Typography>
+                                                        <Box sx={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 0.5,
+                                                            bgcolor: `${reid.individualColor}20`,
+                                                            color: reid.individualColor,
+                                                            px: 1, py: 0.2,
+                                                            borderRadius: 1,
+                                                            fontSize: '0.75rem',
+                                                            fontWeight: 600
+                                                        }}>
+                                                            <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: reid.individualColor }} />
+                                                            {reid.individualDisplayName}
+                                                        </Box>
                                                     </Box>
-                                                </Box>
-                                            ))}
-                                        </>
-                                    )}
-                                    
+                                                ))}
+                                            </>
+                                        );
+                                    })()}
+
                                     {onDelete && (
                                         <IconButton
                                             size="small"
@@ -452,6 +470,7 @@ interface ImageModalProps {
     onClose: () => void;
     imageUrl?: string;
     file?: FileDetails;
+    imageId?: number; // For metadata operations
     onNext?: () => void;
     onPrev?: () => void;
     hasNext?: boolean;
@@ -469,6 +488,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
     onClose,
     imageUrl,
     file,
+    imageId,
     onNext,
     onPrev,
     hasNext,
@@ -490,6 +510,9 @@ const ImageModal: React.FC<ImageModalProps> = ({
     // Track which imageUrl the current dimensions belong to
     const dimensionsForUrl = useRef<string | undefined>(undefined);
 
+    // Sidebar state
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
     // Reset state when opening a new image
     useEffect(() => {
         if (open) {
@@ -504,14 +527,14 @@ const ImageModal: React.FC<ImageModalProps> = ({
             const img = imageRef.current;
             const container = containerRef.current;
             const containerRect = container.getBoundingClientRect();
-            
+
             // Only proceed if container has size
             if (containerRect.width === 0 || containerRect.height === 0) return;
 
             // Calculate displayed size (objectFit: contain)
             const imgAspect = img.naturalWidth / img.naturalHeight;
             const containerAspect = containerRect.width / containerRect.height;
-            
+
             let displayedWidth, displayedHeight;
             if (imgAspect > containerAspect) {
                 displayedWidth = containerRect.width;
@@ -520,7 +543,7 @@ const ImageModal: React.FC<ImageModalProps> = ({
                 displayedHeight = containerRect.height;
                 displayedWidth = containerRect.height * imgAspect;
             }
-            
+
             setImageDimensions({
                 natural: { width: img.naturalWidth, height: img.naturalHeight },
                 displayed: { width: displayedWidth, height: displayedHeight }
@@ -596,19 +619,19 @@ const ImageModal: React.FC<ImageModalProps> = ({
     // Transform bbox coordinates from original image space to displayed image space
     const transformBbox = (detection: Detection) => {
         if (imageDimensions.natural.width === 0) return null;
-        
+
         const { natural, displayed } = imageDimensions;
         const scale = displayed.width / natural.width;
-        
+
         // Convert from absolute coordinates to scaled coordinates within displayed image
         const x1 = detection.x1 * scale;
         const y1 = detection.y1 * scale;
         const x2 = detection.x2 * scale;
         const y2 = detection.y2 * scale;
-        
+
         const width = x2 - x1;
         const height = y2 - y1;
-        
+
         return {
             x: x1,
             y: y1,
@@ -663,224 +686,246 @@ const ImageModal: React.FC<ImageModalProps> = ({
                         </filter>
                     </svg>
 
-                    {/* Image Container */}
-                    <Box
-                        ref={containerRef}
-                        sx={{
-                            position: 'relative',
-                            flex: 1,
-                            overflow: 'hidden',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            bgcolor: 'black',
-                            cursor: isDragging ? 'grabbing' : 'grab'
-                        }}
-                        onWheel={handleWheel}
-                        onMouseDown={handleMouseDown}
-                        onMouseMove={(e: React.MouseEvent<HTMLDivElement>) => {
-                            handleMouseMove(e);
-                        }}
-                        onMouseUp={handleMouseUp}
-                        onMouseLeave={() => {
-                            handleMouseUp();
-                        }}
-                    >
-                        <img
-                            ref={imageRef}
-                            src={imageUrl}
-                            alt={file.name}
-                            onLoad={handleImageLoad}
-                            style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'contain',
-                                transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
-                                transition: isDragging ? 'none' : 'transform 0.1s ease-out',
-                                userSelect: 'none'
+                    {/* Main content area with sidebar */}
+                    <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+                        {/* Image Container */}
+                        <Box
+                            ref={containerRef}
+                            sx={{
+                                position: 'relative',
+                                flex: 1,
+                                overflow: 'hidden',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                bgcolor: 'black',
+                                cursor: isDragging ? 'grabbing' : 'grab'
                             }}
-                            draggable={false}
-                            onDragStart={(e) => e.preventDefault()}
-                        />
+                            onWheel={handleWheel}
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={(e: React.MouseEvent<HTMLDivElement>) => {
+                                handleMouseMove(e);
+                            }}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={() => {
+                                handleMouseUp();
+                            }}
+                        >
+                            <img
+                                ref={imageRef}
+                                src={imageUrl}
+                                alt={file.name}
+                                onLoad={handleImageLoad}
+                                style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'contain',
+                                    transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+                                    transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+                                    userSelect: 'none'
+                                }}
+                                draggable={false}
+                                onDragStart={(e) => e.preventDefault()}
+                            />
 
-                        {/* Bounding Box Overlay */}
-                        {detections && detections.length > 0 && imageDimensions.natural.width > 0 && (
-                            useLiquidGlass && useRayTracedGlass && imageUrl ? (
-                                /* Ray-traced liquid glass - single WebGL canvas, aligned to displayed image area */
-                                <Box
-                                    sx={{
-                                        position: 'absolute',
-                                        top: '50%',
-                                        left: '50%',
-                                        width: imageDimensions.displayed.width,
-                                        height: imageDimensions.displayed.height,
-                                        pointerEvents: 'none',
-                                        transform: `translate(-50%, -50%) scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
-                                        transformOrigin: 'center center',
-                                        transition: isDragging ? 'none' : 'transform 0.1s ease-out'
-                                    }}
-                                >
-                                    <LiquidGlassOverlay
-                                        imageUrl={imageUrl}
-                                        bboxes={dimensionsAreValid ? detections.map(det => {
+                            {/* Bounding Box Overlay */}
+                            {detections && detections.length > 0 && imageDimensions.natural.width > 0 && (
+                                useLiquidGlass && useRayTracedGlass && imageUrl ? (
+                                    /* Ray-traced liquid glass - single WebGL canvas, aligned to displayed image area */
+                                    <Box
+                                        sx={{
+                                            position: 'absolute',
+                                            top: '50%',
+                                            left: '50%',
+                                            width: imageDimensions.displayed.width,
+                                            height: imageDimensions.displayed.height,
+                                            pointerEvents: 'none',
+                                            transform: `translate(-50%, -50%) scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+                                            transformOrigin: 'center center',
+                                            transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+                                        }}
+                                    >
+                                        <LiquidGlassOverlay
+                                            imageUrl={imageUrl}
+                                            bboxes={dimensionsAreValid ? detections.map(det => {
+                                                const bbox = transformBbox(det);
+                                                return bbox ? { bbox, label: det.label, detection: det } : null;
+                                            }).filter(Boolean) as { bbox: { x: number; y: number; width: number; height: number }; label?: string; detection?: Detection }[] : []}
+                                            containerWidth={imageDimensions.displayed.width}
+                                            containerHeight={imageDimensions.displayed.height}
+                                            reidResults={reidResults?.map(r => ({
+                                                individualDisplayName: r.individualDisplayName,
+                                                individualColor: r.individualColor,
+                                                species: r.species
+                                            }))}
+                                        />
+                                    </Box>
+                                ) : (
+                                    /* CSS-based detection boxes (liquid glass or classic based on useLiquidGlass prop) */
+                                    <Box
+                                        sx={{
+                                            position: 'absolute',
+                                            top: '50%',
+                                            left: '50%',
+                                            width: imageDimensions.displayed.width,
+                                            height: imageDimensions.displayed.height,
+                                            pointerEvents: 'auto',
+                                            overflow: 'visible',
+                                            transform: `translate(-50%, -50%) scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+                                            transformOrigin: 'center center',
+                                            transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+                                        }}
+                                    >
+                                        {detections.map((det, idx) => {
                                             const bbox = transformBbox(det);
-                                            return bbox ? { bbox, label: det.label, detection: det } : null;
-                                        }).filter(Boolean) as { bbox: { x: number; y: number; width: number; height: number }; label?: string; detection?: Detection }[] : []}
-                                        containerWidth={imageDimensions.displayed.width}
-                                        containerHeight={imageDimensions.displayed.height}
-                                        reidResults={reidResults?.map(r => ({
-                                            individualDisplayName: r.individualDisplayName,
-                                            individualColor: r.individualColor,
-                                            species: r.species
-                                        }))}
-                                    />
-                                </Box>
-                            ) : (
-                                /* CSS-based detection boxes (liquid glass or classic based on useLiquidGlass prop) */
-                                <Box
+                                            if (!bbox) return null;
+
+                                            return (
+                                                <DetectionBox
+                                                    key={idx}
+                                                    bbox={bbox}
+                                                    detection={det}
+                                                    zoom={zoom}
+                                                    containerWidth={imageDimensions.displayed.width}
+                                                    containerHeight={imageDimensions.displayed.height}
+                                                    useLiquidGlass={useLiquidGlass}
+                                                    onDelete={onDeleteDetection}
+                                                    reidResults={reidResults?.map(r => ({
+                                                        individualDisplayName: r.individualDisplayName,
+                                                        individualColor: r.individualColor,
+                                                        species: r.species
+                                                    }))}
+                                                />
+                                            );
+                                        })}
+                                    </Box>
+                                )
+                            )}
+
+                            {/* Navigation Buttons (Overlay) */}
+                            {hasPrev && (
+                                <IconButton
+                                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); onPrev?.(); }}
                                     sx={{
                                         position: 'absolute',
+                                        left: 16,
                                         top: '50%',
-                                        left: '50%',
-                                        width: imageDimensions.displayed.width,
-                                        height: imageDimensions.displayed.height,
-                                        pointerEvents: 'none',
-                                        transform: `translate(-50%, -50%) scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
-                                        transformOrigin: 'center center',
-                                        transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+                                        transform: 'translateY(-50%)',
+                                        color: 'white',
+                                        bgcolor: 'rgba(0,0,0,0.4)',
+                                        backdropFilter: 'blur(4px)',
+                                        '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+                                        zIndex: 20
                                     }}
                                 >
-                                    {detections.map((det, idx) => {
-                                        const bbox = transformBbox(det);
-                                        if (!bbox) return null;
-                                        
-                                        return (
-                                            <DetectionBox 
-                                                key={idx} 
-                                                bbox={bbox} 
-                                                detection={det} 
-                                                zoom={zoom} 
-                                                containerWidth={imageDimensions.displayed.width}
-                                                containerHeight={imageDimensions.displayed.height}
-                                                useLiquidGlass={useLiquidGlass}
-                                                onDelete={onDeleteDetection}
-                                                reidResults={reidResults?.map(r => ({
-                                                    individualDisplayName: r.individualDisplayName,
-                                                    individualColor: r.individualColor,
-                                                    species: r.species
-                                                }))}
-                                            />
-                                        );
-                                    })}
-                                </Box>
-                            )
-                        )}
+                                    <CaretLeft size={32} />
+                                </IconButton>
+                            )}
+                            {hasNext && (
+                                <IconButton
+                                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); onNext?.(); }}
+                                    sx={{
+                                        position: 'absolute',
+                                        right: 16,
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        color: 'white',
+                                        bgcolor: 'rgba(0,0,0,0.4)',
+                                        backdropFilter: 'blur(4px)',
+                                        '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+                                        zIndex: 20
+                                    }}
+                                >
+                                    <CaretRight size={32} />
+                                </IconButton>
+                            )}
 
-                        {/* Navigation Buttons (Overlay) */}
-                        {hasPrev && (
-                            <IconButton
-                                onClick={(e: React.MouseEvent) => { e.stopPropagation(); onPrev?.(); }}
-                                sx={{
-                                    position: 'absolute',
-                                    left: 16,
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    color: 'white',
-                                    bgcolor: 'rgba(0,0,0,0.4)',
-                                    backdropFilter: 'blur(4px)',
-                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
-                                    zIndex: 20
-                                }}
-                            >
-                                <CaretLeft size={32} />
-                            </IconButton>
-                        )}
-                        {hasNext && (
-                            <IconButton
-                                onClick={(e: React.MouseEvent) => { e.stopPropagation(); onNext?.(); }}
-                                sx={{
-                                    position: 'absolute',
-                                    right: 16,
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    color: 'white',
-                                    bgcolor: 'rgba(0,0,0,0.4)',
-                                    backdropFilter: 'blur(4px)',
-                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
-                                    zIndex: 20
-                                }}
-                            >
-                                <CaretRight size={32} />
-                            </IconButton>
-                        )}
+                            {/* Top Toolbar (Floating) */}
+                            <Box sx={{
+                                position: 'absolute',
+                                top: 16,
+                                right: 16,
+                                zIndex: 10,
+                                display: 'flex',
+                                gap: 1,
+                                pointerEvents: 'auto',
+                                bgcolor: 'rgba(0,0,0,0.4)',
+                                borderRadius: 3,
+                                p: 0.5,
+                                backdropFilter: 'blur(4px)'
+                            }}>
+                                <IconButton
+                                    onClick={(e: React.MouseEvent) => {
+                                        e.stopPropagation();
+                                        if (window.confirm('Are you sure you want to delete this image?')) {
+                                            onDelete?.();
+                                        }
+                                    }}
+                                    size="small"
+                                    sx={{ color: '#ff4444', '&:hover': { bgcolor: 'rgba(255,68,68,0.2)' }, mr: 1 }}
+                                >
+                                    <Trash size={20} />
+                                </IconButton>
+                                <IconButton
+                                    onClick={() => setZoom(z => Math.max(z - 0.5, 0.5))}
+                                    size="small"
+                                    sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+                                >
+                                    <MagnifyingGlassMinus size={20} />
+                                </IconButton>
+                                <IconButton
+                                    onClick={() => setZoom(z => Math.min(z + 0.5, 5))}
+                                    size="small"
+                                    sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+                                >
+                                    <MagnifyingGlassPlus size={20} />
+                                </IconButton>
+                                <IconButton
+                                    onClick={onClose}
+                                    size="small"
+                                    sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+                                >
+                                    <X size={20} />
+                                </IconButton>
+                                <Divider orientation="vertical" flexItem sx={{ mx: 0.5, borderColor: 'rgba(255,255,255,0.2)' }} />
+                                <Tooltip title={sidebarOpen ? "Hide Details" : "Show Details"}>
+                                    <IconButton
+                                        onClick={() => setSidebarOpen(!sidebarOpen)}
+                                        size="small"
+                                        sx={{
+                                            color: sidebarOpen ? '#4FC3F7' : 'white',
+                                            '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+                                        }}
+                                    >
+                                        <Sidebar size={20} weight={sidebarOpen ? "fill" : "regular"} />
+                                    </IconButton>
+                                </Tooltip>
+                            </Box>
 
-                        {/* Top Toolbar (Floating) */}
-                        <Box sx={{
-                            position: 'absolute',
-                            top: 16,
-                            right: 16,
-                            zIndex: 10,
-                            display: 'flex',
-                            gap: 1,
-                            pointerEvents: 'auto',
-                            bgcolor: 'rgba(0,0,0,0.4)',
-                            borderRadius: 3,
-                            p: 0.5,
-                            backdropFilter: 'blur(4px)'
-                        }}>
-                            <IconButton
-                                onClick={(e: React.MouseEvent) => {
-                                    e.stopPropagation();
-                                    if (window.confirm('Are you sure you want to delete this image?')) {
-                                        onDelete?.();
-                                    }
-                                }}
-                                size="small"
-                                sx={{ color: '#ff4444', '&:hover': { bgcolor: 'rgba(255,68,68,0.2)' }, mr: 1 }}
-                            >
-                                <Trash size={20} />
-                            </IconButton>
-                            <IconButton
-                                onClick={() => setZoom(z => Math.max(z - 0.5, 0.5))}
-                                size="small"
-                                sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
-                            >
-                                <MagnifyingGlassMinus size={20} />
-                            </IconButton>
-                            <IconButton
-                                onClick={() => setZoom(z => Math.min(z + 0.5, 5))}
-                                size="small"
-                                sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
-                            >
-                                <MagnifyingGlassPlus size={20} />
-                            </IconButton>
-                            <IconButton
-                                onClick={onClose}
-                                size="small"
-                                sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
-                            >
-                                <X size={20} />
-                            </IconButton>
+                            {/* Metadata Overlay (Bottom) */}
+                            <Box sx={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                p: 3,
+                                background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%)',
+                                color: 'white',
+                                pointerEvents: 'none'
+                            }}>
+                                <Typography variant="h6" sx={{ fontWeight: 600, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                                    {file.name}
+                                </Typography>
+                                <Typography variant="body2" sx={{ opacity: 0.8, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                                    {file.path}
+                                </Typography>
+                            </Box>
                         </Box>
-
-                        {/* Metadata Overlay (Bottom) */}
-                        <Box sx={{
-                            position: 'absolute',
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            p: 3,
-                            background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%)',
-                            color: 'white',
-                            pointerEvents: 'none'
-                        }}>
-                            <Typography variant="h6" sx={{ fontWeight: 600, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
-                                {file.name}
-                            </Typography>
-                            <Typography variant="body2" sx={{ opacity: 0.8, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-                                {file.path}
-                            </Typography>
-                        </Box>
+                        {/* Analysis Sidebar */}
+                        <AnalysisSidebar
+                            imageId={imageId}
+                            isOpen={sidebarOpen}
+                        />
                     </Box>
                 </Box>
             </Fade>

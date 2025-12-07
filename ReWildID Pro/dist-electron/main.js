@@ -168,6 +168,9 @@ electron_1.ipcMain.handle('updateReidIndividualName', (_, id, displayName) => (0
 electron_1.ipcMain.handle('updateReidIndividualColor', (_, id, color) => (0, controller_1.updateReidIndividualColor)(id, color));
 electron_1.ipcMain.handle('mergeReidIndividuals', (_, targetId, sourceIds) => (0, controller_1.mergeReidIndividuals)(targetId, sourceIds));
 electron_1.ipcMain.handle('getDashboardStats', () => (0, controller_1.getDashboardStats)());
+// Image Metadata
+electron_1.ipcMain.handle('updateImageMetadata', (_, id, metadata) => (0, controller_1.updateImageMetadata)(id, metadata));
+electron_1.ipcMain.handle('getImageMetadata', (_, id) => (0, controller_1.getImageMetadata)(id));
 electron_1.app.on('ready', () => {
     createWindow();
     electron_1.app.on('activate', function () {

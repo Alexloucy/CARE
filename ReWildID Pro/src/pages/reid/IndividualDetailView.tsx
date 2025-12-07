@@ -17,7 +17,7 @@ const IndividualDetailView: React.FC = () => {
     const theme = useTheme();
     const navigate = useNavigate();
     const location = useLocation();
-    
+
     // Try to get individual from state, otherwise we might need to fetch it (not implemented yet)
     const individual = location.state?.individual as ReidIndividual | undefined;
 
@@ -191,8 +191,8 @@ const IndividualDetailView: React.FC = () => {
 
 
     // Column calculation
-    const horizontalPadding = 64; 
-    const gap = 16; 
+    const horizontalPadding = 64;
+    const gap = 16;
     const availableWidth = containerWidth - horizontalPadding;
     const columns = availableWidth > 0 ? Math.max(1, Math.floor((availableWidth + gap) / (gridItemSize + gap))) : 1;
     const actualItemWidth = columns > 0 ? (availableWidth - (gap * (columns - 1))) / columns : gridItemSize;
@@ -222,7 +222,7 @@ const IndividualDetailView: React.FC = () => {
             .map(d => ({
                 id: d.id,
                 image_id: d.image_id,
-                label: individual.display_name,
+                label: d.label, // Keep the actual species label, NOT the individual name
                 confidence: d.confidence,
                 detection_confidence: d.detection_confidence,
                 x1: d.x1,
@@ -239,19 +239,19 @@ const IndividualDetailView: React.FC = () => {
     const currentIndex = selectedImage ? dbImages.findIndex(img => img.id === selectedImage.id) : -1;
     const hasNext = currentIndex >= 0 && currentIndex < dbImages.length - 1;
     const hasPrev = currentIndex > 0;
-    const goNext = useCallback(() => { 
-        if (hasNext) { 
-            const nextImg = dbImages[currentIndex + 1]; 
-            setSelectedImage(nextImg); 
-            loadFullImage(nextImg); 
-        } 
+    const goNext = useCallback(() => {
+        if (hasNext) {
+            const nextImg = dbImages[currentIndex + 1];
+            setSelectedImage(nextImg);
+            loadFullImage(nextImg);
+        }
     }, [hasNext, currentIndex, dbImages, loadFullImage]);
-    const goPrev = useCallback(() => { 
-        if (hasPrev) { 
-            const prevImg = dbImages[currentIndex - 1]; 
-            setSelectedImage(prevImg); 
-            loadFullImage(prevImg); 
-        } 
+    const goPrev = useCallback(() => {
+        if (hasPrev) {
+            const prevImg = dbImages[currentIndex - 1];
+            setSelectedImage(prevImg);
+            loadFullImage(prevImg);
+        }
     }, [hasPrev, currentIndex, dbImages, loadFullImage]);
 
     const handleImageClick = useCallback((img: DBImage) => {
@@ -335,9 +335,9 @@ const IndividualDetailView: React.FC = () => {
                         itemContent={(rowIndex: number) => {
                             const row = imageRows[rowIndex];
                             return (
-                                <Box sx={{ 
+                                <Box sx={{
                                     height: rowHeight,
-                                    display: 'grid', 
+                                    display: 'grid',
                                     gridTemplateColumns: `repeat(${columns}, 1fr)`,
                                     gap: 2,
                                     pb: 3,
@@ -348,7 +348,7 @@ const IndividualDetailView: React.FC = () => {
                                     {row.map(img => {
                                         const url = imageUrls[img.id];
                                         const fileName = img.original_path.split(/[\\/]/).pop() || 'image';
-                                        
+
                                         return (
                                             <Box
                                                 key={img.id}
@@ -383,9 +383,9 @@ const IndividualDetailView: React.FC = () => {
                                                             component="img"
                                                             src={url}
                                                             draggable={false}
-                                                            sx={{ 
-                                                                width: '100%', 
-                                                                height: '100%', 
+                                                            sx={{
+                                                                width: '100%',
+                                                                height: '100%',
                                                                 objectFit: 'cover',
                                                                 userSelect: 'none',
                                                                 WebkitUserDrag: 'none',
@@ -397,7 +397,7 @@ const IndividualDetailView: React.FC = () => {
                                                             <Fingerprint size={32} weight="thin" color={theme.palette.text.disabled} />
                                                         </Box>
                                                     )}
-                                                    
+
                                                     <Box className="file-overlay" sx={{
                                                         position: 'absolute',
                                                         bottom: 0,
@@ -513,13 +513,25 @@ const IndividualDetailView: React.FC = () => {
                     isDirectory: false,
                     path: selectedImage.original_path
                 } : undefined;
+                // Build reidResults from current individual context
+                const reidInfo = individual ? [{
+                    individualId: individual.id,
+                    individualName: individual.name,
+                    individualDisplayName: individual.display_name,
+                    individualColor: individual.color,
+                    runId: individual.run_id,
+                    runName: '', // We don't have run name in the individual object 
+                    species: dets[0]?.label || ''
+                }] : [];
                 return (
                     <ImageModal
                         open={isOpen}
                         onClose={() => setSelectedImage(null)}
                         imageUrl={imageUrl}
+                        imageId={selectedImage?.id}
                         file={file}
                         detections={showBoundingBoxes ? dets : []}
+                        reidResults={reidInfo}
                         onNext={hasNext ? goNext : undefined}
                         onPrev={hasPrev ? goPrev : undefined}
                         hasNext={hasNext}

@@ -35,6 +35,7 @@ const initSchema = () => {
             original_path TEXT NOT NULL,
             preview_path TEXT,
             date_added INTEGER NOT NULL,
+            metadata TEXT,
             FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
         );
     `;
@@ -99,6 +100,11 @@ const initSchema = () => {
     db.exec(createReidRunsTable);
     db.exec(createReidIndividualsTable);
     db.exec(createReidMembersTable);
+    // Migration: Add metadata column if it doesn't exist
+    const columns = db.pragma('table_info(images)');
+    if (!columns.some(col => col.name === 'metadata')) {
+        db.exec('ALTER TABLE images ADD COLUMN metadata TEXT');
+    }
 };
 initSchema();
 // Distinct, accessible colors for reid individuals
@@ -163,6 +169,22 @@ exports.DatabaseService = {
     deleteImage: (id) => {
         const stmt = db.prepare('DELETE FROM images WHERE id = ?');
         stmt.run(id);
+    },
+    updateImageMetadata: (id, metadata) => {
+        const stmt = db.prepare('UPDATE images SET metadata = ? WHERE id = ?');
+        stmt.run(JSON.stringify(metadata), id);
+    },
+    getImageMetadata: (id) => {
+        const stmt = db.prepare('SELECT metadata FROM images WHERE id = ?');
+        const row = stmt.get(id);
+        if (!row || !row.metadata)
+            return null;
+        try {
+            return JSON.parse(row.metadata);
+        }
+        catch {
+            return null;
+        }
     },
     getImageByPath: (originalPath) => {
         const stmt = db.prepare('SELECT * FROM images WHERE original_path = ?');

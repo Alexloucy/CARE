@@ -713,6 +713,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                     open={!!selectedImage}
                     onClose={() => setSelectedImage(null)}
                     imageUrl={selectedImage?.url}
+                    imageId={selectedImage?.image.id}
                     file={selectedImage ? {
                         name: selectedImage.image.original_path.split(/[\\/]/).pop() || 'image.jpg',
                         path: selectedImage.image.original_path,

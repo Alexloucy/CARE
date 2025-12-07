@@ -58,6 +58,9 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     getAvailableSpecies: () => electron_1.ipcRenderer.invoke('getAvailableSpecies'),
     updateDetectionLabel: (id, label) => electron_1.ipcRenderer.invoke('updateDetectionLabel', id, label),
     deleteDetection: (id) => electron_1.ipcRenderer.invoke('deleteDetection', id),
+    // Image Metadata
+    updateImageMetadata: (id, metadata) => electron_1.ipcRenderer.invoke('updateImageMetadata', id, metadata),
+    getImageMetadata: (id) => electron_1.ipcRenderer.invoke('getImageMetadata', id),
     // Jobs
     getJobs: () => electron_1.ipcRenderer.invoke('getJobs'),
     cancelJob: (id) => electron_1.ipcRenderer.invoke('cancelJob', id),

@@ -29,6 +29,8 @@ exports.getDetectionsForBatch = getDetectionsForBatch;
 exports.getAvailableSpecies = getAvailableSpecies;
 exports.updateDetectionLabel = updateDetectionLabel;
 exports.deleteDetection = deleteDetection;
+exports.updateImageMetadata = updateImageMetadata;
+exports.getImageMetadata = getImageMetadata;
 exports.browseReidImage = browseReidImage;
 exports.deleteReidResult = deleteReidResult;
 exports.renameReidGroup = renameReidGroup;
@@ -807,6 +809,25 @@ async function deleteDetection(id) {
     }
     catch (error) {
         return { ok: false, error: 'deleteDetection failed: ' + error };
+    }
+}
+// --- Image Metadata ---
+async function updateImageMetadata(id, metadata) {
+    try {
+        database_1.DatabaseService.updateImageMetadata(id, metadata);
+        return { ok: true };
+    }
+    catch (error) {
+        return { ok: false, error: 'updateImageMetadata failed: ' + error };
+    }
+}
+async function getImageMetadata(id) {
+    try {
+        const metadata = database_1.DatabaseService.getImageMetadata(id);
+        return { ok: true, metadata };
+    }
+    catch (error) {
+        return { ok: false, error: 'getImageMetadata failed: ' + error };
     }
 }
 // Function to read the JSON file and extract values for a specific key

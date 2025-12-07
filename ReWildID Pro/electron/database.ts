@@ -36,6 +36,7 @@ const initSchema = () => {
             original_path TEXT NOT NULL,
             preview_path TEXT,
             date_added INTEGER NOT NULL,
+            metadata TEXT,
             FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
         );
     `;
@@ -106,6 +107,12 @@ const initSchema = () => {
     db.exec(createReidRunsTable);
     db.exec(createReidIndividualsTable);
     db.exec(createReidMembersTable);
+
+    // Migration: Add metadata column if it doesn't exist
+    const columns = db.pragma('table_info(images)') as { name: string }[];
+    if (!columns.some(col => col.name === 'metadata')) {
+        db.exec('ALTER TABLE images ADD COLUMN metadata TEXT');
+    }
 };
 
 initSchema();
@@ -123,6 +130,7 @@ export interface Image {
     original_path: string;
     preview_path?: string;
     date_added: number;
+    metadata?: string; // JSON string of Record<string, string>
 }
 
 export interface DetectionBatch {
@@ -190,7 +198,7 @@ function generateDisplayName(existingNames: string[]): { name: string; color: st
             if (num > maxId) maxId = num;
         }
     }
-    
+
     const newId = maxId + 1;
     const colorIndex = (newId - 1) % INDIVIDUAL_COLORS.length;
     return { name: `ID-${newId}`, color: INDIVIDUAL_COLORS[colorIndex] };
@@ -265,6 +273,22 @@ export const DatabaseService = {
     deleteImage: (id: number): void => {
         const stmt = db.prepare('DELETE FROM images WHERE id = ?');
         stmt.run(id);
+    },
+
+    updateImageMetadata: (id: number, metadata: Record<string, string>): void => {
+        const stmt = db.prepare('UPDATE images SET metadata = ? WHERE id = ?');
+        stmt.run(JSON.stringify(metadata), id);
+    },
+
+    getImageMetadata: (id: number): Record<string, string> | null => {
+        const stmt = db.prepare('SELECT metadata FROM images WHERE id = ?');
+        const row = stmt.get(id) as { metadata: string | null } | undefined;
+        if (!row || !row.metadata) return null;
+        try {
+            return JSON.parse(row.metadata);
+        } catch {
+            return null;
+        }
     },
 
     getImageByPath: (originalPath: string): Image | undefined => {
@@ -487,9 +511,9 @@ export const DatabaseService = {
         // Get existing display names for this run to avoid collisions
         const existingStmt = db.prepare('SELECT display_name FROM reid_individuals WHERE run_id = ?');
         const existingNames = (existingStmt.all(runId) as { display_name: string }[]).map(r => r.display_name);
-        
+
         const { name: displayName, color } = generateDisplayName(existingNames);
-        
+
         const stmt = db.prepare(`
             INSERT INTO reid_individuals (run_id, name, display_name, color, created_at) 
             VALUES (?, ?, ?, ?, ?)
@@ -541,7 +565,7 @@ export const DatabaseService = {
     mergeReidIndividuals: (targetId: number, sourceIds: number[]): void => {
         const updateStmt = db.prepare('UPDATE reid_members SET individual_id = ? WHERE individual_id = ?');
         const deleteStmt = db.prepare('DELETE FROM reid_individuals WHERE id = ?');
-        
+
         const mergeTransaction = db.transaction(() => {
             for (const sourceId of sourceIds) {
                 if (sourceId !== targetId) {
@@ -550,7 +574,7 @@ export const DatabaseService = {
                 }
             }
         });
-        
+
         mergeTransaction();
     },
 
@@ -649,11 +673,11 @@ export const DatabaseService = {
             const detParams: any[] = [ind.id];
             if (species && species.length > 0) detParams.push(...species);
             if (minConfidence !== undefined) detParams.push(minConfidence);
-            
+
             const detStmt = db.prepare(detectionQuery);
             const detections = detStmt.all(...detParams) as ReidDetectionWithImage[];
             totalDetections += detections.length;
-            
+
             return {
                 ...ind,
                 detections
@@ -903,12 +927,12 @@ export const DatabaseService = {
             SELECT 'group' as type, name, (SELECT COUNT(*) FROM images WHERE group_id = groups.id) as count, created_at as date 
             FROM groups ORDER BY created_at DESC LIMIT 3
         `).all() as { type: string; name: string; count: number; date: number }[];
-        
+
         const recentBatches = db.prepare(`
             SELECT 'classification' as type, name, (SELECT COUNT(*) FROM detections WHERE batch_id = detection_batches.id) as count, created_at as date 
             FROM detection_batches ORDER BY created_at DESC LIMIT 3
         `).all() as { type: string; name: string; count: number; date: number }[];
-        
+
         const recentReid = db.prepare(`
             SELECT 'reid' as type, name, (SELECT COUNT(*) FROM reid_individuals WHERE run_id = reid_runs.id) as count, created_at as date 
             FROM reid_runs ORDER BY created_at DESC LIMIT 3

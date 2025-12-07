@@ -36,6 +36,7 @@ export interface DBImage {
     date_added: number;
     group_name: string;
     group_created_at: number;
+    metadata?: Record<string, string>;
     detections?: Detection[];
     reidResults?: ReidInfoForImage[];
 }
@@ -157,19 +158,19 @@ export interface ElectronApi {
 
     // New Smart ReID (DB-based)
     smartReID: (imageIds: number[], species: string) => Promise<{ ok: boolean; reidRunId?: number; error?: string }>;
-    
+
     // ReID Run Management
     getReidRuns: () => Promise<{ ok: boolean; runs?: ReidRunWithStats[]; error?: string }>;
     getReidRun: (id: number) => Promise<{ ok: boolean; run?: ReidRun; error?: string }>;
     deleteReidRun: (id: number) => Promise<{ ok: boolean; error?: string }>;
     updateReidRunName: (id: number, name: string) => Promise<{ ok: boolean; error?: string }>;
-    
+
     // ReID Results (Paginated)
     getReidResults: (filter: ReidResultsFilter) => Promise<{ ok: boolean; result?: ReidQueryResult; error?: string }>;
-    
+
     // ReID Results for Image (get all runs/individuals that include a specific image)
-    getReidResultsForImage: (imageId: number) => Promise<{ 
-        ok: boolean; 
+    getReidResultsForImage: (imageId: number) => Promise<{
+        ok: boolean;
         results?: {
             runId: number;
             runName: string;
@@ -183,9 +184,9 @@ export interface ElectronApi {
         }[];
         error?: string;
     }>;
-    
-    getReidResultsForImages: (imageIds: number[]) => Promise<{ 
-        ok: boolean; 
+
+    getReidResultsForImages: (imageIds: number[]) => Promise<{
+        ok: boolean;
         results?: {
             imageId: number;
             runId: number;
@@ -200,22 +201,22 @@ export interface ElectronApi {
         }[];
         error?: string;
     }>;
-    
+
     // Get latest detections for images (only from most recent batch per image)
     getLatestDetectionsForImages: (imageIds: number[]) => Promise<{
         ok: boolean;
         detections?: (Detection & { image_path: string })[];
         error?: string;
     }>;
-    
+
     // ReID Individual Management
     updateReidIndividualName: (id: number, displayName: string) => Promise<{ ok: boolean; error?: string }>;
     updateReidIndividualColor: (id: number, color: string) => Promise<{ ok: boolean; error?: string }>;
     mergeReidIndividuals: (targetId: number, sourceIds: number[]) => Promise<{ ok: boolean; error?: string }>;
-    
+
     // Dashboard Stats
-    getDashboardStats: () => Promise<{ 
-        ok: boolean; 
+    getDashboardStats: () => Promise<{
+        ok: boolean;
         stats?: {
             totalImages: number;
             totalGroups: number;
@@ -230,7 +231,11 @@ export interface ElectronApi {
         };
         error?: string;
     }>;
-    
+
+    // Image Metadata
+    updateImageMetadata: (id: number, metadata: Record<string, string>) => Promise<{ ok: boolean; error?: string }>;
+    getImageMetadata: (id: number) => Promise<{ ok: boolean; metadata?: Record<string, string> | null; error?: string }>;
+
     getPathForFile: (file: File) => string;
     getJobs: () => Promise<any[]>;
     cancelJob: (id: string) => Promise<void>;

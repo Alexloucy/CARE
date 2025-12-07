@@ -76,8 +76,8 @@ export async function uploadImage(relativePath: string, originalPath: string) {
 }
 
 export async function uploadPaths(
-    filePaths: string[], 
-    groupName?: string, 
+    filePaths: string[],
+    groupName?: string,
     afterAction?: 'classify' | 'reid',
     species?: string
 ) {
@@ -88,8 +88,8 @@ export async function uploadPaths(
         }
 
         // Add to Job Queue with optional chained action
-        JobManager.getInstance().addJob('import', { 
-            filePaths, 
+        JobManager.getInstance().addJob('import', {
+            filePaths,
             groupName,
             afterAction,
             species
@@ -906,6 +906,26 @@ export async function deleteDetection(id: number) {
     }
 }
 
+// --- Image Metadata ---
+
+export async function updateImageMetadata(id: number, metadata: Record<string, string>) {
+    try {
+        DatabaseService.updateImageMetadata(id, metadata);
+        return { ok: true };
+    } catch (error) {
+        return { ok: false, error: 'updateImageMetadata failed: ' + error };
+    }
+}
+
+export async function getImageMetadata(id: number) {
+    try {
+        const metadata = DatabaseService.getImageMetadata(id);
+        return { ok: true, metadata };
+    } catch (error) {
+        return { ok: false, error: 'getImageMetadata failed: ' + error };
+    }
+}
+
 // Function to read the JSON file and extract values for a specific key
 const extractValuesForKey = async (filePath: string, key: string) => {
     try {
@@ -1257,23 +1277,23 @@ export async function smartReID(imageIds: number[], species: string) {
 
         // Check if any images need detection first
         const imagesWithoutDetections = DatabaseService.getImagesWithoutDetections(imageIds);
-        
+
         console.log(`[smartReID] imageIds: ${JSON.stringify(imageIds)}`);
         console.log(`[smartReID] imagesWithoutDetections: ${JSON.stringify(imagesWithoutDetections)}`);
-        
+
         if (imagesWithoutDetections.length > 0) {
             // Get paths for images that need detection
             const images = DatabaseService.getImagesByIds(imagesWithoutDetections);
             const selectedPaths = images.map(img => img.original_path);
-            
+
             console.log(`[smartReID] Queuing detect job for ${selectedPaths.length} images, then reid`);
-            
+
             // Queue a detect job that will chain to reid
-            JobManager.getInstance().addJob('detect', { 
-                selectedPaths, 
-                chainToReid: true, 
-                imageIds, 
-                species 
+            JobManager.getInstance().addJob('detect', {
+                selectedPaths,
+                chainToReid: true,
+                imageIds,
+                species
             });
         } else {
             console.log(`[smartReID] All images have detections, queuing reid directly`);

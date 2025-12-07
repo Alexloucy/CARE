@@ -224,7 +224,7 @@ const ClassificationPage: React.FC = () => {
     // Batch Actions
     const handleBatchDelete = async () => {
         if (selectedImageIds.size === 0) return;
-        
+
         // Gather all detections from selected images
         const detectionsToDelete = allImages
             .filter(img => selectedImageIds.has(img.id))
@@ -292,13 +292,6 @@ const ClassificationPage: React.FC = () => {
     const handleDeleteImage = async (image: DBImage) => {
         await window.api.deleteImage(image.id);
         await refreshLibrary();
-    };
-
-    const handleDeleteDetection = async (id: number) => {
-        if (window.confirm('Are you sure you want to delete this detection?')) {
-            await window.api.deleteDetection(id);
-            await refreshLibrary();
-        }
     };
 
     // ReID Handler
@@ -381,136 +374,135 @@ const ClassificationPage: React.FC = () => {
 
     return (
         <>
-        <RefreshNotification 
-            watchJobTypes={['detect']}
-            onRefresh={refreshLibrary}
-            message="Classification completed"
-        />
-        <MediaExplorer
-            title="Classification"
-            loading={loading}
-            dateSections={filteredDateSections}
-            fullDateSections={fullDateSections}
-            imageUrls={imageUrls}
-            fullImageUrls={fullImageUrls}
-            allImages={allImages}
-            loadImage={loadImage}
-            loadFullImage={loadFullImage}
-            activeFilter={activeFilter}
-            onFilterChange={setActiveFilter}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            filterDialogOpen={filterDialogOpen}
-            setFilterDialogOpen={setFilterDialogOpen}
-            isSelectionMode={isSelectionMode}
-            selectedImageIds={selectedImageIds}
-            toggleSelectionMode={toggleSelectionMode}
-            toggleImageSelection={toggleImageSelection}
-            setSelection={setSelection}
-            clearSelection={clearSelection}
-            setIsSelectionMode={setIsSelectionMode}
-            onBatchDelete={handleBatchDelete}
-            onBatchDetect={handleBatchDetect}
-            onBatchSave={handleBatchSave}
-            onDeleteImage={handleDeleteImage}
-            onDeleteDetection={handleDeleteDetection}
-            leftSidebarOpen={leftSidebarOpen}
-            rightSidebarOpen={rightSidebarOpen}
-            availableSpecies={availableSpecies}
-            onGroupMenuOpen={handleMenuOpen}
-            aiButtonMode="reid"
-            onReID={handleReID}
-            onUpload={triggerUpload}
-            onScrollStateChange={setIsScrolled}
-            groupMenu={
-                <Menu
-                    anchorEl={anchorEl}
-                    open={Boolean(anchorEl)}
-                    onClose={handleMenuClose}
-                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                    transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                    PaperProps={{
-                        elevation: 0,
-                        sx: {
-                            backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(45, 45, 45, 0.85)',
-                            backdropFilter: 'blur(8px)',
-                            borderRadius: '8px',
-                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-                            border: `1px solid ${theme.palette.divider}`,
-                            minWidth: '160px',
-                            mt: 0.5
-                        }
-                    }}
-                    MenuListProps={{ sx: { padding: '6px' } }}
-                >
-                    <MenuItem onClick={handleRenameBatchClick} sx={{ borderRadius: '6px', margin: '2px 0', gap: 1 }}>
-                        <PencilSimple size={18} /> Rename
-                    </MenuItem>
-                    <MenuItem onClick={handleDeleteBatch} sx={{ borderRadius: '6px', margin: '2px 0', gap: 1, color: 'error.main' }}>
-                        <Trash size={18} /> Delete
-                    </MenuItem>
-                </Menu>
-            }
-        />
-
-        <GroupNameDialog
-            open={renameDialogOpen}
-            onClose={() => { setRenameDialogOpen(false); setBatchToRename(null); }}
-            onConfirm={handleConfirmRename}
-            title="Rename Classification Batch"
-            initialValue={batchToRename?.name || ''}
-        />
-
-        {/* Floating Action Buttons - Show when scrolled */}
-        <Box
-            sx={{
-                position: 'fixed',
-                top: 80,
-                right: rightSidebarOpen ? 228 : 16,
-                display: 'flex',
-                flexDirection: 'row',
-                gap: 1,
-                zIndex: 1000,
-                p: 1.5,
-                opacity: isScrolled ? 1 : 0,
-                transform: isScrolled ? 'translateX(0)' : 'translateX(calc(100% + 32px))',
-                transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, right 0.3s ease',
-                pointerEvents: isScrolled ? 'auto' : 'none'
-            }}
-        >
-            <Tooltip title="Filter">
-                <span>
-                    <LiquidGlassButton
-                        size={32}
-                        icon={<Funnel size={16} weight={activeFilter ? 'fill' : 'regular'} />}
-                        onClick={() => setFilterDialogOpen(true)}
-                    />
-                </span>
-            </Tooltip>
-            <Tooltip title={isSelectionMode ? 'Exit Selection' : 'Select'}>
-                <span>
-                    <LiquidGlassButton
-                        size={32}
-                        icon={<CheckSquare size={16} weight={isSelectionMode ? 'fill' : 'regular'} />}
-                        onClick={toggleSelectionMode}
-                    />
-                </span>
-            </Tooltip>
-            <Tooltip title="Back to Top">
-                <span>
-                    <LiquidGlassButton
-                        size={32}
-                        icon={<ArrowLineUp size={16} />}
-                        onClick={() => {
-                            const virtuosoContainer = document.querySelector('[data-virtuoso-scroller]');
-                            if (virtuosoContainer) {
-                                virtuosoContainer.scrollTo({ top: 0, behavior: 'smooth' });
+            <RefreshNotification
+                watchJobTypes={['detect']}
+                onRefresh={refreshLibrary}
+                message="Classification completed"
+            />
+            <MediaExplorer
+                title="Classification"
+                loading={loading}
+                dateSections={filteredDateSections}
+                fullDateSections={fullDateSections}
+                imageUrls={imageUrls}
+                fullImageUrls={fullImageUrls}
+                allImages={allImages}
+                loadImage={loadImage}
+                loadFullImage={loadFullImage}
+                activeFilter={activeFilter}
+                onFilterChange={setActiveFilter}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                filterDialogOpen={filterDialogOpen}
+                setFilterDialogOpen={setFilterDialogOpen}
+                isSelectionMode={isSelectionMode}
+                selectedImageIds={selectedImageIds}
+                toggleSelectionMode={toggleSelectionMode}
+                toggleImageSelection={toggleImageSelection}
+                setSelection={setSelection}
+                clearSelection={clearSelection}
+                setIsSelectionMode={setIsSelectionMode}
+                onBatchDelete={handleBatchDelete}
+                onBatchDetect={handleBatchDetect}
+                onBatchSave={handleBatchSave}
+                onDeleteImage={handleDeleteImage}
+                leftSidebarOpen={leftSidebarOpen}
+                rightSidebarOpen={rightSidebarOpen}
+                availableSpecies={availableSpecies}
+                onGroupMenuOpen={handleMenuOpen}
+                aiButtonMode="reid"
+                onReID={handleReID}
+                onUpload={triggerUpload}
+                onScrollStateChange={setIsScrolled}
+                groupMenu={
+                    <Menu
+                        anchorEl={anchorEl}
+                        open={Boolean(anchorEl)}
+                        onClose={handleMenuClose}
+                        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                        PaperProps={{
+                            elevation: 0,
+                            sx: {
+                                backgroundColor: theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(45, 45, 45, 0.85)',
+                                backdropFilter: 'blur(8px)',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+                                border: `1px solid ${theme.palette.divider}`,
+                                minWidth: '160px',
+                                mt: 0.5
                             }
                         }}
-                    />
-                </span>
-            </Tooltip>
-        </Box>
+                        MenuListProps={{ sx: { padding: '6px' } }}
+                    >
+                        <MenuItem onClick={handleRenameBatchClick} sx={{ borderRadius: '6px', margin: '2px 0', gap: 1 }}>
+                            <PencilSimple size={18} /> Rename
+                        </MenuItem>
+                        <MenuItem onClick={handleDeleteBatch} sx={{ borderRadius: '6px', margin: '2px 0', gap: 1, color: 'error.main' }}>
+                            <Trash size={18} /> Delete
+                        </MenuItem>
+                    </Menu>
+                }
+            />
+
+            <GroupNameDialog
+                open={renameDialogOpen}
+                onClose={() => { setRenameDialogOpen(false); setBatchToRename(null); }}
+                onConfirm={handleConfirmRename}
+                title="Rename Classification Batch"
+                initialValue={batchToRename?.name || ''}
+            />
+
+            {/* Floating Action Buttons - Show when scrolled */}
+            <Box
+                sx={{
+                    position: 'fixed',
+                    top: 80,
+                    right: rightSidebarOpen ? 228 : 16,
+                    display: 'flex',
+                    flexDirection: 'row',
+                    gap: 1,
+                    zIndex: 1000,
+                    p: 1.5,
+                    opacity: isScrolled ? 1 : 0,
+                    transform: isScrolled ? 'translateX(0)' : 'translateX(calc(100% + 32px))',
+                    transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, right 0.3s ease',
+                    pointerEvents: isScrolled ? 'auto' : 'none'
+                }}
+            >
+                <Tooltip title="Filter">
+                    <span>
+                        <LiquidGlassButton
+                            size={32}
+                            icon={<Funnel size={16} weight={activeFilter ? 'fill' : 'regular'} />}
+                            onClick={() => setFilterDialogOpen(true)}
+                        />
+                    </span>
+                </Tooltip>
+                <Tooltip title={isSelectionMode ? 'Exit Selection' : 'Select'}>
+                    <span>
+                        <LiquidGlassButton
+                            size={32}
+                            icon={<CheckSquare size={16} weight={isSelectionMode ? 'fill' : 'regular'} />}
+                            onClick={toggleSelectionMode}
+                        />
+                    </span>
+                </Tooltip>
+                <Tooltip title="Back to Top">
+                    <span>
+                        <LiquidGlassButton
+                            size={32}
+                            icon={<ArrowLineUp size={16} />}
+                            onClick={() => {
+                                const virtuosoContainer = document.querySelector('[data-virtuoso-scroller]');
+                                if (virtuosoContainer) {
+                                    virtuosoContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                                }
+                            }}
+                        />
+                    </span>
+                </Tooltip>
+            </Box>
         </>
     );
 };
