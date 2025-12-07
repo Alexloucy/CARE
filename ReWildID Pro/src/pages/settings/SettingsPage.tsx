@@ -246,7 +246,7 @@ const ThemeSwatch: React.FC<{
 const SettingsPage: React.FC = () => {
     const theme = useTheme();
     const { colorTheme, setColorTheme } = useColorMode();
-    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special;
+    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special || !!colorTheme.image;
 
     // Load all settings from localStorage
     const [settings, setSettings] = useState<Record<string, any>>(() => {

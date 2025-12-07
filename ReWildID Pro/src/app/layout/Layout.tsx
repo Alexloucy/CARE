@@ -132,7 +132,7 @@ export default function Layout() {
         return removeListener;
     }, []);
 
-    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special;
+    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special || !!colorTheme.image;
 
     return (
         <Box sx={{ position: 'relative', height: '100vh', overflow: 'hidden' }}>
@@ -259,6 +259,21 @@ export default function Layout() {
                         mixBlendMode="normal"
                     />
                 </Box>
+            ) : colorTheme.image ? (
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 0,
+                        backgroundImage: `url(${colorTheme.image})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                    }}
+                />
             ) : hasGradient && (
                 <Box
                     sx={{

@@ -160,7 +160,7 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
 }) => {
     const theme = useTheme();
     const { colorTheme } = useColorMode();
-    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special;
+    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special || !!colorTheme.image;
     // Local View State
     const [activeId, setActiveId] = useState<string>('');
     const [gridItemSize, setGridItemSize] = useState(() => {
@@ -503,8 +503,6 @@ export const MediaExplorer: React.FC<MediaExplorerProps> = ({
                                         bgcolor: hasGradient
                                             ? "transparent"
                                             : theme.palette.background.default,
-                                        backdropFilter: hasGradient ? 'blur(20px)' : 'none',
-                                        WebkitBackdropFilter: hasGradient ? 'blur(20px)' : 'none',
                                         zIndex: 10
                                     }}>
                                         <Typography variant="h4" fontWeight="bold">{title}</Typography>

@@ -662,7 +662,7 @@ const CHART_COLORS = [
 export default function Dashboard() {
     const theme = useTheme();
     const { colorTheme } = useColorMode();
-    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special;
+    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special || !!colorTheme.image;
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
 

@@ -10,6 +10,7 @@ export interface ColorTheme {
     gradient: string;
     previewGradient: string; // For the swatch in settings
     special?: 'prismatic-burst' | 'color-bends' | 'floating-lines' | 'galaxy' | 'light-pillar'; // For animated WebGL backgrounds
+    image?: string; // For static image backgrounds
 }
 
 export const COLOR_THEMES: ColorTheme[] = [
@@ -118,6 +119,15 @@ export const COLOR_THEMES: ColorTheme[] = [
         gradient: 'none', // Handled specially by Layout
         previewGradient: 'linear-gradient(180deg, #5227FF 0%, #FF9FFC 100%)',
         special: 'light-pillar',
+    },
+    // Image themes
+    {
+        id: 'minecraft',
+        name: 'Minecraft',
+        mode: 'dark',
+        gradient: 'none',
+        previewGradient: 'url(/images/mc.jpg)',
+        image: '/images/mc.jpg',
     },
     // Light themes
     {

@@ -56,7 +56,7 @@ export default function Navbar({
     const { jobs } = useJobs();
     const activeJobsCount = jobs.filter(j => ['pending', 'running'].includes(j.status)).length;
 
-    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special;
+    const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special || !!colorTheme.image;
 
     useEffect(() => {
         // Function to update navigation state based on history
