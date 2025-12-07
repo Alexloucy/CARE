@@ -15,6 +15,12 @@ import { LibrarySearchBar } from '../../components/library/LibrarySearchBar';
 import { RefreshNotification } from '../../components/RefreshNotification';
 import { ReidIndividual, ReidRun } from './types';
 import { useColorMode } from '../../features/theme/ThemeContext';
+import {
+    getReidPageCache,
+    setReidPageCache,
+    invalidateReidPageCache,
+    updateReidPageCacheImageUrls
+} from './reidPageCache';
 
 // Skeleton Card for loading state
 const SkeletonCard: React.FC<{ hasGradient?: boolean }> = ({ hasGradient }) => {
@@ -252,9 +258,38 @@ const ReIDPage: React.FC = () => {
         }
     }, []);
 
-    // Initial load - fetch runs and first page of each
+    // Initial load - fetch runs and first page of each (or restore from cache)
     useEffect(() => {
         const loadData = async () => {
+            // Check cache first (for back navigation)
+            const cached = getReidPageCache();
+            if (cached && refreshTrigger === 0) {
+                // Restore from cache - instant!
+                setRuns(cached.runs);
+                setIndividuals(cached.individuals);
+                setPagination(cached.pagination);
+                setImageUrls(cached.imageUrls);
+                setLoading(false);
+
+                // Restore scroll position
+                const savedPosition = sessionStorage.getItem('reid_scroll_position');
+                if (savedPosition) {
+                    setTimeout(() => {
+                        const mainEl = document.querySelector('main');
+                        if (mainEl) {
+                            mainEl.scrollTop = parseInt(savedPosition, 10);
+                            sessionStorage.removeItem('reid_scroll_position');
+                        }
+                    }, 50);
+                }
+                return;
+            }
+
+            // Cache miss or refresh triggered - fetch from API
+            if (refreshTrigger > 0) {
+                invalidateReidPageCache();
+            }
+
             setLoading(true);
             try {
                 const runsRes = await window.api.getReidRuns();
@@ -264,6 +299,7 @@ const ReIDPage: React.FC = () => {
                     setRuns(sortedRuns);
                     const newIndividuals = new Map<number, ReidIndividual[]>();
                     const newPagination = new Map<number, { page: number; hasMore: boolean }>();
+
 
                     for (const run of sortedRuns) {
                         const res = await window.api.getReidResults({ runId: run.id, page: 1, pageSize: PAGE_SIZE });
@@ -275,6 +311,15 @@ const ReIDPage: React.FC = () => {
                     }
                     setIndividuals(newIndividuals);
                     setPagination(newPagination);
+
+                    // Save to cache for back navigation
+                    // imageUrls will be populated asynchronously by loadImagesForIndividuals
+                    setReidPageCache({
+                        runs: sortedRuns,
+                        individuals: newIndividuals,
+                        pagination: newPagination,
+                        imageUrls: new Map()
+                    });
 
                     // Restore scroll position after data is loaded
                     const savedPosition = sessionStorage.getItem('reid_scroll_position');
@@ -318,6 +363,13 @@ const ReIDPage: React.FC = () => {
 
         setLoadingMore(prev => new Map(prev).set(runId, false));
     };
+
+    // Sync imageUrls to cache as they are loaded asynchronously
+    useEffect(() => {
+        if (imageUrls.size > 0) {
+            updateReidPageCacheImageUrls(imageUrls);
+        }
+    }, [imageUrls]);
 
     const handleMenuOpen = (e: React.MouseEvent<HTMLElement>, runId: number) => { setMenuAnchor(e.currentTarget); setSelectedRunId(runId); };
     const handleMenuClose = () => { setMenuAnchor(null); setSelectedRunId(null); };

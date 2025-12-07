@@ -597,14 +597,14 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
             );
         } else if (item.type === 'horizontal-row') {
             // Grid row for grouped images - same as default view
-            const rowHeight = getRowHeight() + 24;
+            const rowHeight = getRowHeight() + 8;
             return (
                 <Box sx={{
                     height: rowHeight,
                     display: 'grid',
                     gridTemplateColumns: `repeat(${columns}, 1fr)`,
                     gap: 2,
-                    pb: 3,
+                    pb: 0,
                     px: 4,
                     overflow: 'hidden',
                     alignItems: 'start'
@@ -699,9 +699,9 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
             );
         } else {
             // Default: Image Row (grid) - fixed height prevents scroll jumps
-            const rowHeight = getRowHeight() + 24; // +24 for bottom margin (row gap)
+            const rowHeight = getRowHeight() + 8; // +8 for bottom margin (row gap)
             return (
-                <Box sx={{ height: rowHeight, display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 2, pb: 3, px: 4, overflow: 'hidden', alignItems: 'start' }}>
+                <Box sx={{ height: rowHeight, display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 2, pb: 1, px: 4, overflow: 'hidden', alignItems: 'start' }}>
                     {item.images.map((img: DBImage) => {
                         const fileDetails = {
                             name: img.original_path.split(/[\\/]/).pop() || 'image.jpg',
@@ -803,7 +803,7 @@ export const DateGroupList = forwardRef<DateGroupListHandle, DateGroupListProps>
 
     // Average item height for better Virtuoso estimation
     const avgItemHeight = useMemo(() => {
-        const rowHeight = getRowHeight() + 24;
+        const rowHeight = getRowHeight() + 8;
         return Math.round((56 + 78 + rowHeight * 3) / 5); // 56=date-header, 78=group-header
     }, [getRowHeight]);
 

@@ -126,6 +126,55 @@ class CustomDino(nn.Module):
         # Normalize mixed features for retrieval/metric learning
         mixed_features_norm = torch.nn.functional.normalize(mixed_features, dim=-1, eps=1e-6)
         return mixed_features_norm
+    
+    def forward_from_raw(self, base_features, time):
+        """
+        Forward pass that skips the DINO backbone - uses pre-computed dinov3_raw features.
+        This is much faster when embeddings are cached from classification.
+        
+        Args:
+            base_features: Pre-computed dinov3_raw features from cache [B, D]
+            time: Day/night flags for each sample
+        
+        Returns:
+            Normalized mixed features suitable for ReID
+        """
+        adapter_ratio = 0.4
+        
+        if isinstance(time, int):
+            time = torch.tensor([time]).to(base_features.device)
+        else:
+            time = torch.tensor(time).to(base_features.device)
+        
+        unique_times = torch.unique(time)
+        mixed_features = base_features.clone()
+        
+        if self.day_night_adapter:
+            if time is None:
+                raise ValueError("Time information (day/night) must be provided when using day/night adapters.")
+            day_adapter = self.adapter_dict["adapter_0_day"]
+            night_adapter = self.adapter_dict["adapter_0_night"]
+            for t in unique_times.tolist():
+                idx = (time == t).nonzero(as_tuple=False).squeeze(1)
+                sub_base_features = base_features.index_select(0, idx)
+                if t == 1:  # day
+                    sub_adapter_features = day_adapter(sub_base_features)
+                else:  # night
+                    sub_adapter_features = night_adapter(sub_base_features)
+                sub_mixed_features = (
+                    adapter_ratio * sub_adapter_features + (1 - adapter_ratio) * sub_base_features
+                )
+                mixed_features[idx] = sub_mixed_features
+        else:
+            adapter = self.adapter_dict["adapter_0"]
+            sub_adapter_features = adapter(base_features)
+            mixed_features = (
+                adapter_ratio * sub_adapter_features + (1 - adapter_ratio) * base_features
+            )
+        
+        # Normalize mixed features for retrieval/metric learning
+        mixed_features_norm = torch.nn.functional.normalize(mixed_features, dim=-1, eps=1e-6)
+        return mixed_features_norm
 
 
 def create_linear_input(x_tokens_list, use_n_blocks, use_avgpool):
@@ -422,102 +471,172 @@ def run(input_json_path: str, batch_size: int = 4):
     
     print("STATUS: PROCESSING", flush=True)
     
-    # Load and crop images directly from paths, with caching support
-    embedding_type = f'dinov3_reid_{species}'
+    # Embedding types - using config for consistency
+    from config.config import REID_EMBEDDING_PREFIX, RAW_FOR_ADAPTER_TYPE
+    reid_embedding_type = f'{REID_EMBEDDING_PREFIX}{species}'
+    raw_embedding_type = RAW_FOR_ADAPTER_TYPE  # Set to non-existent name to disable adapter-only path
+    
+    # Categorize detections into three groups:
+    # 1. Already have dinov3_reid (fully cached - just use it)
+    # 2. Have dinov3_raw but not dinov3_reid (run adapter only)
+    # 3. Have neither (run full model)
+    
+    cached_reid = {}      # key -> numpy array (final embeddings)
+    has_raw = []          # [(idx, det, raw_embedding)] - needs adapter only
+    needs_full = []       # [(idx, det)] - needs full model
     detection_ids = []
-    images = []
-    is_day_list = []
-    cached_embeddings = {}  # key -> numpy array
-    to_process_indices = []  # indices into detections that need processing
     
     total = len(detections)
     print(f"Checking cache for {total} detections...", flush=True)
     
-    # First pass: check cache and collect items that need processing
     for i, det in enumerate(detections):
         detection_ids.append(det['detection_id'])
         
-        # Check cache if available
         if cache and 'image_id' in det:
-            cached_emb = cache.get_embedding(det['image_id'], det['bbox'], embedding_type)
-            if cached_emb is not None:
-                key = f"{det['image_id']}:{cache.bbox_to_hash(det['bbox'])}"
-                cached_embeddings[key] = cached_emb
+            image_id = det['image_id']
+            bbox = det['bbox']
+            key = f"{image_id}:{cache.bbox_to_hash(bbox)}"
+            
+            # First check: do we have final reid embedding?
+            reid_emb = cache.get_embedding(image_id, bbox, reid_embedding_type)
+            if reid_emb is not None:
+                cached_reid[key] = reid_emb
+                continue
+            
+            # Second check: do we have raw embedding from classification?
+            raw_emb = cache.get_embedding(image_id, bbox, raw_embedding_type)
+            if raw_emb is not None:
+                has_raw.append((i, det, raw_emb))
                 continue
         
-        # Not cached, need to process
-        to_process_indices.append(i)
+        # Need full model
+        needs_full.append((i, det))
     
-    cached_count = total - len(to_process_indices)
-    if cached_count > 0:
-        print(f"Found {cached_count} cached embeddings, computing {len(to_process_indices)} new ones", flush=True)
+    print(f"Cache status: {len(cached_reid)} reid cached, {len(has_raw)} have raw (adapter only), {len(needs_full)} need full model", flush=True)
     
-    # Second pass: load images only for items that need processing
-    process_detection_ids = []
-    process_det_info = []  # (image_id, bbox) for caching new embeddings
+    # Process items that have dinov3_raw (adapter only - FAST)
+    raw_embeddings = {}  # idx -> numpy array
+    if has_raw:
+        print(f"Running adapter on {len(has_raw)} cached raw embeddings...", flush=True)
+        
+        for batch_start in range(0, len(has_raw), batch_size):
+            batch_items = has_raw[batch_start:batch_start + batch_size]
+            
+            # Prepare batch
+            raw_tensors = []
+            is_day_list = []
+            batch_info = []  # (idx, det)
+            
+            for idx, det, raw_emb in batch_items:
+                raw_tensors.append(torch.from_numpy(raw_emb))
+                # Get day/night from image
+                try:
+                    _, is_day = load_and_crop_image(det['image_path'], det['bbox'])
+                    is_day_list.append(is_day)
+                except:
+                    is_day_list.append(1)  # Default to day if error
+                batch_info.append((idx, det))
+            
+            # Stack and process through adapter only
+            batch_tensor = torch.stack(raw_tensors).to(DEVICE)
+            
+            with torch.no_grad(), autocast(device_type=DEVICE.type, dtype=torch.float16, enabled=_fp16_supported(DEVICE)):
+                reid_features = dino_with_adapter.forward_from_raw(batch_tensor, is_day_list)
+                reid_features_np = reid_features.cpu().float().numpy()
+            
+            # Save on-the-fly and store results
+            items_to_store = []
+            for k, (idx, det) in enumerate(batch_info):
+                raw_embeddings[idx] = reid_features_np[k]
+                if cache and 'image_id' in det:
+                    items_to_store.append((det['image_id'], det['bbox'], reid_features_np[k]))
+            
+            if items_to_store and cache:
+                cache.store_embeddings_batch(items_to_store, reid_embedding_type)
+            
+            processed = min(batch_start + batch_size, len(has_raw))
+            print(f"ADAPTER: {processed}/{len(has_raw)}", flush=True)
     
-    for idx in to_process_indices:
-        det = detections[idx]
-        try:
-            img, is_day = load_and_crop_image(det['image_path'], det['bbox'])
-            images.append(img)
-            is_day_list.append(is_day)
-            process_detection_ids.append(det['detection_id'])
-            process_det_info.append((det.get('image_id'), det['bbox']))
-        except Exception as e:
-            print(f"Error loading {det['image_path']}: {e}", flush=True)
-            # Mark as failed in detection_ids
-            detection_ids[detection_ids.index(det['detection_id'])] = None
+    # Process items that need full model (SLOW)
+    full_embeddings = {}  # idx -> numpy array
+    if needs_full:
+        print(f"Running full model on {len(needs_full)} images...", flush=True)
+        
+        for batch_start in range(0, len(needs_full), batch_size):
+            batch_items = needs_full[batch_start:batch_start + batch_size]
+            
+            # Load and prepare batch
+            images = []
+            is_day_list = []
+            batch_info = []  # (idx, det)
+            
+            for idx, det in batch_items:
+                try:
+                    img, is_day = load_and_crop_image(det['image_path'], det['bbox'])
+                    images.append(img)
+                    is_day_list.append(is_day)
+                    batch_info.append((idx, det))
+                except Exception as e:
+                    print(f"Error loading {det['image_path']}: {e}", flush=True)
+                    # Mark as failed
+                    detection_ids[detection_ids.index(det['detection_id'])] = None
+            
+            if not images:
+                continue
+            
+            # Stack and process through full model
+            batch_tensor = torch.cat(images, dim=0).to(DEVICE)
+            
+            with torch.no_grad(), autocast(device_type=DEVICE.type, dtype=torch.float16, enabled=_fp16_supported(DEVICE)):
+                reid_features = dino_with_adapter(batch_tensor, is_day_list)
+                reid_features_np = reid_features.cpu().float().numpy()
+            
+            # Save on-the-fly and store results
+            items_to_store = []
+            for k, (idx, det) in enumerate(batch_info):
+                full_embeddings[idx] = reid_features_np[k]
+                if cache and 'image_id' in det:
+                    items_to_store.append((det['image_id'], det['bbox'], reid_features_np[k]))
+            
+            if items_to_store and cache:
+                cache.store_embeddings_batch(items_to_store, reid_embedding_type)
+            
+            processed = min(batch_start + batch_size, len(needs_full))
+            print(f"PROCESS: {processed}/{len(needs_full)}", flush=True)
     
-    # Remove None entries from detection_ids (failed loads)
+    # Remove failed detection_ids
     detection_ids = [d for d in detection_ids if d is not None]
     
-    if len(images) == 0 and len(cached_embeddings) == 0:
-        print("No valid images after loading. Exiting.", flush=True)
+    # Combine cached and new embeddings in original order
+    all_embeddings = []
+    for i, det in enumerate(detections):
+        if det['detection_id'] not in detection_ids:
+            continue  # This detection failed to load
+        
+        # Check cached_reid first (from previous ReID runs)
+        if cache and 'image_id' in det:
+            key = f"{det['image_id']}:{cache.bbox_to_hash(det['bbox'])}"
+            if key in cached_reid:
+                all_embeddings.append(cached_reid[key])
+                continue
+        
+        # Check raw_embeddings (from adapter-only processing)
+        if i in raw_embeddings:
+            all_embeddings.append(raw_embeddings[i])
+            continue
+        
+        # Check full_embeddings (from full model processing)
+        if i in full_embeddings:
+            all_embeddings.append(full_embeddings[i])
+            continue
+    
+    if len(all_embeddings) == 0:
+        print("No valid embeddings after processing. Exiting.", flush=True)
         output = {"individuals": []}
         with open(output_path, 'w') as f:
             json.dump(output, f, indent=2)
         print("STATUS: DONE", flush=True)
         return
-    
-    # Compute embeddings only for uncached items
-    new_embeddings = None
-    if len(images) > 0:
-        new_embeddings = compute_embeddings_batched(
-            dino_with_adapter,
-            images,
-            is_day_list,
-            DEVICE,
-            batch_size,
-        )
-        
-        # Store new embeddings in cache
-        if cache:
-            items_to_store = []
-            for i, (image_id, bbox) in enumerate(process_det_info):
-                if image_id is not None:
-                    items_to_store.append((image_id, bbox, new_embeddings[i]))
-            if items_to_store:
-                cache.store_embeddings_batch(items_to_store, embedding_type)
-                print(f"Stored {len(items_to_store)} new embeddings in cache", flush=True)
-    
-    # Combine cached and new embeddings in original order
-    all_embeddings = []
-    new_emb_idx = 0
-    for det in detections:
-        if det['detection_id'] not in detection_ids:
-            continue  # This detection failed to load
-        
-        if cache and 'image_id' in det:
-            key = f"{det['image_id']}:{cache.bbox_to_hash(det['bbox'])}"
-            if key in cached_embeddings:
-                all_embeddings.append(cached_embeddings[key])
-                continue
-        
-        # Use new embedding
-        if new_embeddings is not None and new_emb_idx < len(new_embeddings):
-            all_embeddings.append(new_embeddings[new_emb_idx])
-            new_emb_idx += 1
     
     embeddings = np.stack(all_embeddings, axis=0)
     

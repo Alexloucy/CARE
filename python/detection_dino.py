@@ -181,7 +181,8 @@ def batch_dino_image_processing(image_bbox_pairs: List[Tuple[str, List[float]]],
         List of features for each crop
     """
     all_features = [None] * len(image_bbox_pairs)  # Pre-allocate to maintain order
-    embedding_type = 'dinov3_raw'
+    from config.config import RAW_EMBEDDING_TYPE
+    embedding_type = RAW_EMBEDDING_TYPE
     
     print(f"Processing {len(image_bbox_pairs)} crops in batches of {batch_size}")
     total_crops = len(image_bbox_pairs)
@@ -203,7 +204,18 @@ def batch_dino_image_processing(image_bbox_pairs: List[Tuple[str, List[float]]],
         # Try to get from cache if available
         if cache and normalized_id_map and normalized_filepath in normalized_id_map:
             image_id = normalized_id_map[normalized_filepath]
-            cached_emb = cache.get_embedding(image_id, bbox, embedding_type)
+            
+            # Convert normalized bbox to pixel for cache lookup (must match store format)
+            try:
+                pil_image = PIL.Image.open(filepath)
+                image_width, image_height = pil_image.size
+                pil_image.close()
+                from detection_utils import convert_bbox_normalized_to_absolute
+                pixel_bbox = convert_bbox_normalized_to_absolute(bbox, image_width, image_height)
+            except:
+                pixel_bbox = bbox  # Fallback to original
+            
+            cached_emb = cache.get_embedding(image_id, pixel_bbox, embedding_type)
             if cached_emb is not None:
                 all_features[idx] = torch.from_numpy(cached_emb).to(device)
                 cached_count += 1
@@ -218,20 +230,31 @@ def batch_dino_image_processing(image_bbox_pairs: List[Tuple[str, List[float]]],
     for batch_start in range(0, len(to_process), batch_size):
         batch_items = to_process[batch_start:batch_start + batch_size]
         batch_crops = []
-        batch_info = []  # (original_idx, filepath, bbox, normalized_filepath)
+        batch_info = []  # (original_idx, filepath, bbox, normalized_filepath, pixel_bbox)
         
         # Prepare batch of cropped images
         for original_idx, filepath, bbox, normalized_filepath in batch_items:
             try:
-                cropped_image = crop_image_from_bbox(filepath, bbox)
+                # Open image to get dimensions for bbox conversion
+                pil_image = PIL.Image.open(filepath)
+                pil_image = pil_image.convert('RGB')
+                image_width, image_height = pil_image.size
+                
+                # Convert normalized bbox to pixel coordinates for caching
+                from detection_utils import convert_bbox_normalized_to_absolute
+                pixel_bbox = convert_bbox_normalized_to_absolute(bbox, image_width, image_height)
+                
+                # Crop and transform
+                xmin, ymin, xmax, ymax = pixel_bbox
+                cropped_image = pil_image.crop((xmin, ymin, xmax, ymax))
                 cropped_image = img_transform(cropped_image)
                 batch_crops.append(cropped_image)
-                batch_info.append((original_idx, filepath, bbox, normalized_filepath))
+                batch_info.append((original_idx, filepath, bbox, normalized_filepath, pixel_bbox))
             except Exception as e:
                 print(f"Warning: Failed to process {filepath} with bbox {bbox}: {e}")
                 # Add a dummy tensor to maintain batch consistency
                 batch_crops.append(torch.zeros(3, 224, 224))
-                batch_info.append((original_idx, filepath, bbox, normalized_filepath))
+                batch_info.append((original_idx, filepath, bbox, normalized_filepath, [0, 0, 0, 0]))
         
         # Stack into batch tensor and process
         if batch_crops:
@@ -248,13 +271,13 @@ def batch_dino_image_processing(image_bbox_pairs: List[Tuple[str, List[float]]],
                 # Store individual features and cache them
                 items_to_cache = []
                 for k in range(features.shape[0]):
-                    original_idx, filepath, bbox, normalized_filepath = batch_info[k]
+                    original_idx, filepath, bbox, normalized_filepath, pixel_bbox = batch_info[k]
                     all_features[original_idx] = features[k]
                     
-                    # Prepare for caching (use normalized path to match image_id_map)
+                    # Prepare for caching with PIXEL bbox (to match ReID lookup)
                     if cache and normalized_id_map and normalized_filepath in normalized_id_map:
                         image_id = normalized_id_map[normalized_filepath]
-                        items_to_cache.append((image_id, bbox, features[k].cpu().numpy()))
+                        items_to_cache.append((image_id, pixel_bbox, features[k].cpu().numpy()))
                 
                 # Batch store in cache
                 if items_to_cache and cache:

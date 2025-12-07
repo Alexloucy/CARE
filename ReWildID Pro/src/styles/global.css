@@ -1,0 +1,44 @@
+/* Global scrollbar styles - beautiful thin scrollbars */
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(128, 128, 128, 0.4);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(128, 128, 128, 0.6);
+}
+
+/* Dark mode adjustments via prefers-color-scheme or class */
+@media (prefers-color-scheme: dark) {
+    ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.35);
+    }
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(128, 128, 128, 0.4) transparent;
+}
+
+/* For dark mode in Firefox (when body has dark class or data attribute) */
+body[data-theme="dark"] *,
+body.dark-mode *,
+.MuiPaper-root * {
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
