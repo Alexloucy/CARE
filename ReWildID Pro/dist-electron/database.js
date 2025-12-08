@@ -764,6 +764,17 @@ exports.DatabaseService = {
         });
         transaction(items);
     },
+    /**
+     * Clear all cached embeddings from the database.
+     * Returns the number of embeddings deleted.
+     */
+    clearAllEmbeddings() {
+        const countStmt = db.prepare('SELECT COUNT(*) as count FROM embeddings');
+        const count = countStmt.get().count;
+        const deleteStmt = db.prepare('DELETE FROM embeddings');
+        deleteStmt.run();
+        return count;
+    },
     getDbPath() {
         return DB_PATH;
     }

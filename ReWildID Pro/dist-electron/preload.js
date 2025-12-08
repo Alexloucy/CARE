@@ -85,5 +85,7 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     updateReidIndividualName: (id, displayName) => electron_1.ipcRenderer.invoke('updateReidIndividualName', id, displayName),
     updateReidIndividualColor: (id, color) => electron_1.ipcRenderer.invoke('updateReidIndividualColor', id, color),
     mergeReidIndividuals: (targetId, sourceIds) => electron_1.ipcRenderer.invoke('mergeReidIndividuals', targetId, sourceIds),
-    getDashboardStats: () => electron_1.ipcRenderer.invoke('getDashboardStats')
+    getDashboardStats: () => electron_1.ipcRenderer.invoke('getDashboardStats'),
+    // Embeddings Cache
+    clearEmbeddingsCache: () => electron_1.ipcRenderer.invoke('clearEmbeddingsCache')
 });

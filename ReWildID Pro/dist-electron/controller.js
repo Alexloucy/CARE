@@ -51,6 +51,7 @@ exports.updateReidIndividualName = updateReidIndividualName;
 exports.updateReidIndividualColor = updateReidIndividualColor;
 exports.mergeReidIndividuals = mergeReidIndividuals;
 exports.getDashboardStats = getDashboardStats;
+exports.clearEmbeddingsCache = clearEmbeddingsCache;
 const fs_extra_1 = __importDefault(require("fs-extra"));
 const path_1 = __importDefault(require("path"));
 const archiver_1 = __importDefault(require("archiver"));
@@ -1291,5 +1292,15 @@ async function getDashboardStats() {
     }
     catch (error) {
         return { ok: false, error: 'getDashboardStats failed: ' + error };
+    }
+}
+// --- Embeddings Cache ---
+async function clearEmbeddingsCache() {
+    try {
+        const count = database_1.DatabaseService.clearAllEmbeddings();
+        return { ok: true, count };
+    }
+    catch (error) {
+        return { ok: false, error: 'clearEmbeddingsCache failed: ' + error };
     }
 }

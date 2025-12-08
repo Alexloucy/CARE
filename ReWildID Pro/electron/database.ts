@@ -1035,6 +1035,20 @@ export const DatabaseService = {
         transaction(items);
     },
 
+    /**
+     * Clear all cached embeddings from the database.
+     * Returns the number of embeddings deleted.
+     */
+    clearAllEmbeddings(): number {
+        const countStmt = db.prepare('SELECT COUNT(*) as count FROM embeddings');
+        const count = (countStmt.get() as { count: number }).count;
+
+        const deleteStmt = db.prepare('DELETE FROM embeddings');
+        deleteStmt.run();
+
+        return count;
+    },
+
     getDbPath(): string {
         return DB_PATH;
     }

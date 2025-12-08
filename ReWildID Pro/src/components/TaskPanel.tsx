@@ -4,6 +4,7 @@ import { XCircle, DownloadIcon, ScanIcon, IdentificationCardIcon, ImageIcon, Arr
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useJobs, Job } from '../hooks/useJobs';
 import { triggerRefresh } from '../utils/navigationEvents';
+import { toast } from 'sonner';
 
 const TaskPanel: React.FC = () => {
     const { jobs, cancelJob, retryJob } = useJobs();
@@ -37,6 +38,13 @@ const TaskPanel: React.FC = () => {
             // Navigate to the page (it will load fresh data)
             navigate(target.path);
         }
+    };
+
+    const handleRetry = (jobId: string) => {
+        retryJob(jobId);
+        toast.info('Retrying with cached results', {
+            description: 'Previously processed images will be skipped.',
+        });
     };
 
     if (jobs.length === 0) {
@@ -202,7 +210,7 @@ const TaskPanel: React.FC = () => {
                                         (job.type === 'detect' || job.type === 'reid') && (
                                             <Button
                                                 size="small"
-                                                onClick={() => retryJob(job.id)}
+                                                onClick={() => handleRetry(job.id)}
                                                 startIcon={<ArrowClockwise size={14} />}
                                                 sx={{
                                                     fontSize: '0.7rem',

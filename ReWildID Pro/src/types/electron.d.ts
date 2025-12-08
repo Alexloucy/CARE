@@ -241,6 +241,9 @@ export interface ElectronApi {
     cancelJob: (id: string) => Promise<void>;
     retryJob: (id: string) => Promise<string | null>;
     onJobUpdate: (callback: (jobs: any[]) => void) => () => void;
+
+    // Embeddings Cache
+    clearEmbeddingsCache: () => Promise<{ ok: boolean; count?: number; error?: string }>;
 }
 
 declare global {

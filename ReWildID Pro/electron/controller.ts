@@ -1437,3 +1437,14 @@ export async function getDashboardStats() {
         return { ok: false, error: 'getDashboardStats failed: ' + error };
     }
 }
+
+// --- Embeddings Cache ---
+
+export async function clearEmbeddingsCache() {
+    try {
+        const count = DatabaseService.clearAllEmbeddings();
+        return { ok: true, count };
+    } catch (error) {
+        return { ok: false, error: 'clearEmbeddingsCache failed: ' + error };
+    }
+}

@@ -172,6 +172,8 @@ electron_1.ipcMain.handle('getDashboardStats', () => (0, controller_1.getDashboa
 // Image Metadata
 electron_1.ipcMain.handle('updateImageMetadata', (_, id, metadata) => (0, controller_1.updateImageMetadata)(id, metadata));
 electron_1.ipcMain.handle('getImageMetadata', (_, id) => (0, controller_1.getImageMetadata)(id));
+// Embeddings Cache
+electron_1.ipcMain.handle('clearEmbeddingsCache', () => (0, controller_1.clearEmbeddingsCache)());
 electron_1.app.on('ready', () => {
     createWindow();
     electron_1.app.on('activate', function () {

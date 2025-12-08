@@ -50,7 +50,9 @@ import {
     getDashboardStats,
     // Image Metadata
     updateImageMetadata,
-    getImageMetadata
+    getImageMetadata,
+    // Embeddings Cache
+    clearEmbeddingsCache
 } from './controller';
 import { JobManager } from './jobs';
 
@@ -240,6 +242,9 @@ ipcMain.handle('getDashboardStats', () => getDashboardStats());
 // Image Metadata
 ipcMain.handle('updateImageMetadata', (_, id, metadata) => updateImageMetadata(id, metadata));
 ipcMain.handle('getImageMetadata', (_, id) => getImageMetadata(id));
+
+// Embeddings Cache
+ipcMain.handle('clearEmbeddingsCache', () => clearEmbeddingsCache());
 
 
 app.on('ready', () => {

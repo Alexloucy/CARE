@@ -94,5 +94,8 @@ contextBridge.exposeInMainWorld('api', {
     updateReidIndividualName: (id: number, displayName: string) => ipcRenderer.invoke('updateReidIndividualName', id, displayName),
     updateReidIndividualColor: (id: number, color: string) => ipcRenderer.invoke('updateReidIndividualColor', id, color),
     mergeReidIndividuals: (targetId: number, sourceIds: number[]) => ipcRenderer.invoke('mergeReidIndividuals', targetId, sourceIds),
-    getDashboardStats: () => ipcRenderer.invoke('getDashboardStats')
+    getDashboardStats: () => ipcRenderer.invoke('getDashboardStats'),
+
+    // Embeddings Cache
+    clearEmbeddingsCache: () => ipcRenderer.invoke('clearEmbeddingsCache')
 });

@@ -36,7 +36,8 @@ import {
     PaintBrush,
     Check,
     Sun,
-    Moon
+    Moon,
+    Trash
 } from '@phosphor-icons/react';
 import StyledSwitch from '../../components/StyledSwitch';
 import { resetAllTours } from '../../components/OnboardingTour';
@@ -548,6 +549,54 @@ const SettingsPage: React.FC = () => {
                             }}
                         >
                             <ArrowCounterClockwise size={20} />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
+
+                {/* Clear Embeddings Cache */}
+                <Box
+                    sx={{
+                        mt: 2,
+                        p: 2,
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: 2.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        bgcolor: hasGradient
+                            ? (theme.palette.mode === 'dark' ? 'rgba(30, 30, 36, 0.75)' : 'rgba(247, 249, 251, 0.75)')
+                            : 'transparent',
+                        backdropFilter: hasGradient ? 'blur(12px)' : 'none',
+                        WebkitBackdropFilter: hasGradient ? 'blur(12px)' : 'none',
+                    }}
+                >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Cube size={24} />
+                        <Box>
+                            <Typography variant="body1" fontWeight={500}>Clear Embeddings Cache</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                Remove cached AI embeddings to free disk space. Classification and Re-ID will take longer after clearing.
+                            </Typography>
+                        </Box>
+                    </Box>
+                    <Tooltip title="Clear Cache">
+                        <IconButton
+                            onClick={async () => {
+                                if (confirm('Are you sure you want to clear all cached embeddings? This cannot be undone and Classification/Re-ID jobs will take longer.')) {
+                                    const result = await window.api.clearEmbeddingsCache();
+                                    if (result.ok) {
+                                        alert(`Cleared ${result.count} cached embeddings.`);
+                                    } else {
+                                        alert('Failed to clear cache: ' + result.error);
+                                    }
+                                }
+                            }}
+                            sx={{
+                                bgcolor: theme.palette.action.hover,
+                                '&:hover': { bgcolor: theme.palette.error.main, color: 'white' }
+                            }}
+                        >
+                            <Trash size={20} />
                         </IconButton>
                     </Tooltip>
                 </Box>
