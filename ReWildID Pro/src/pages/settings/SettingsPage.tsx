@@ -600,11 +600,6 @@ const SettingsPage: React.FC = () => {
                         </IconButton>
                     </Tooltip>
                 </Box>
-
-                {/* Footer note */}
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 3, textAlign: 'center' }}>
-                    Settings are saved automatically and will persist across sessions.
-                </Typography>
             </Container>
         </Box>
     );
