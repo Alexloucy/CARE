@@ -151,9 +151,6 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({ message }) =>
                     ...glassStyle,
                     backdropFilter: 'blur(76px)',
                     WebkitBackdropFilter: 'blur(76px)',
-                    boxShadow: isDark
-                        ? '0 4px 20px rgba(0, 0, 0, 0.3)'
-                        : '0 4px 20px rgba(0, 0, 0, 0.1)',
                 }}
             >
                 {isTool ? (

@@ -55,6 +55,7 @@ import {
     clearEmbeddingsCache
 } from './controller';
 import { JobManager } from './jobs';
+import { executePythonCode } from './pythonExecutor';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -245,6 +246,9 @@ ipcMain.handle('getImageMetadata', (_, id) => getImageMetadata(id));
 
 // Embeddings Cache
 ipcMain.handle('clearEmbeddingsCache', () => clearEmbeddingsCache());
+
+// Python Code Execution (for AI Agent)
+ipcMain.handle('executePythonCode', (_, code: string) => executePythonCode(code));
 
 
 app.on('ready', () => {

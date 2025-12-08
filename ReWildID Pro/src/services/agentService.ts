@@ -4,7 +4,6 @@ import { HumanMessage, AIMessage, BaseMessage, SystemMessage, ToolMessage } from
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { ChatMessage, AgentSettings, DEFAULT_AGENT_SETTINGS } from '../types/agent';
-import { Sandbox } from '@e2b/code-interpreter';
 
 // Define the secret reveal tool
 const revealSecretTool = tool(
@@ -18,73 +17,24 @@ const revealSecretTool = tool(
     }
 );
 
-// Define the Python code execution tool
+// Define the Python code execution tool (LOCAL execution via Electron)
 const runPythonCodeTool = tool(
     async ({ code }: { code: string }) => {
-        const settings = getAgentSettings();
-        console.log('[E2B] Starting code execution, code length:', code.length);
-
-        if (!settings.e2bApiKey) {
-            console.log('[E2B] No API key configured');
-            return JSON.stringify({
-                success: false,
-                error: 'E2B API key not configured. Please add it in Settings.',
-                output: null,
-                images: [],
-            });
-        }
+        console.log('[Python] Starting local code execution, code length:', code.length);
 
         try {
-            console.log('[E2B] Creating sandbox...');
-            // Create sandbox with API key
-            const sandbox = await Sandbox.create({
-                apiKey: settings.e2bApiKey,
+            // Call the Electron main process to execute Python locally
+            const result = await (window as any).api.executePythonCode(code);
+            console.log('[Python] Execution complete:', result);
+
+            return JSON.stringify({
+                success: result.success,
+                error: result.error,
+                output: result.output,
+                images: result.images || [],
             });
-            console.log('[E2B] Sandbox created');
-
-            try {
-                // Execute the code
-                console.log('[E2B] Running code...');
-                const execution = await sandbox.runCode(code);
-                console.log('[E2B] Execution complete. Results count:', execution.results.length);
-                console.log('[E2B] Stdout lines:', execution.logs.stdout.length);
-                console.log('[E2B] Stderr lines:', execution.logs.stderr.length);
-                console.log('[E2B] Error:', execution.error ? `${execution.error.name}: ${execution.error.value}` : 'none');
-
-                // Collect results - properly format error using name/value/traceback
-                const errorMessage = execution.error
-                    ? `${execution.error.name}: ${execution.error.value}\n${execution.error.traceback || ''}`
-                    : null;
-
-                const result = {
-                    success: !execution.error,
-                    error: errorMessage,
-                    output: [...execution.logs.stdout, ...execution.logs.stderr].join('\n'),
-                    images: [] as string[],
-                };
-
-                // Check for image results (matplotlib, etc.)
-                for (const output of execution.results) {
-                    console.log('[E2B] Result formats:', output.formats ? output.formats() : 'N/A');
-                    if (output.png) {
-                        console.log('[E2B] Found PNG image, length:', output.png.length);
-                        result.images.push(`data:image/png;base64,${output.png}`);
-                    }
-                    if (output.jpeg) {
-                        console.log('[E2B] Found JPEG image');
-                        result.images.push(`data:image/jpeg;base64,${output.jpeg}`);
-                    }
-                }
-
-                console.log('[E2B] Final result - success:', result.success, 'images:', result.images.length);
-                return JSON.stringify(result);
-            } finally {
-                // Always close the sandbox
-                console.log('[E2B] Killing sandbox...');
-                await sandbox.kill();
-            }
         } catch (error) {
-            console.error('[E2B] Exception:', error);
+            console.error('[Python] Exception:', error);
             return JSON.stringify({
                 success: false,
                 error: error instanceof Error ? error.message : 'Unknown error',
@@ -95,23 +45,16 @@ const runPythonCodeTool = tool(
     },
     {
         name: 'runPythonCode',
-        description: 'Execute Python code in a secure sandbox. Use this for calculations, data processing, and generating visualizations with matplotlib/seaborn. Code output and any generated images will be returned.',
+        description: 'Execute Python code locally on the user\'s machine. Use this for calculations, data processing, and generating visualizations with matplotlib/seaborn. Code output and any generated images will be returned. Python must be installed on the system.',
         schema: z.object({
-            code: z.string().describe('The Python code to execute. Include necessary imports. For charts, use matplotlib.pyplot and they will be returned as images.'),
+            code: z.string().describe('The Python code to execute. Include necessary imports like "import matplotlib.pyplot as plt". Use plt.show() to display charts.'),
         }),
     }
 );
 
-// Get the tools list based on available API keys
+// Get the tools list - Python runs locally, no API key needed
 function getAvailableTools() {
-    const settings = getAgentSettings();
-    const availableTools = [revealSecretTool];
-
-    if (settings.e2bApiKey) {
-        availableTools.push(runPythonCodeTool as any);
-    }
-
-    return availableTools;
+    return [revealSecretTool, runPythonCodeTool as any];
 }
 
 // Storage keys

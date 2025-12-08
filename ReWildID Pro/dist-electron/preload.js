@@ -87,5 +87,7 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     mergeReidIndividuals: (targetId, sourceIds) => electron_1.ipcRenderer.invoke('mergeReidIndividuals', targetId, sourceIds),
     getDashboardStats: () => electron_1.ipcRenderer.invoke('getDashboardStats'),
     // Embeddings Cache
-    clearEmbeddingsCache: () => electron_1.ipcRenderer.invoke('clearEmbeddingsCache')
+    clearEmbeddingsCache: () => electron_1.ipcRenderer.invoke('clearEmbeddingsCache'),
+    // Python Code Execution (for AI Agent)
+    executePythonCode: (code) => electron_1.ipcRenderer.invoke('executePythonCode', code)
 });

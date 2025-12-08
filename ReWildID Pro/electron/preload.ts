@@ -97,5 +97,8 @@ contextBridge.exposeInMainWorld('api', {
     getDashboardStats: () => ipcRenderer.invoke('getDashboardStats'),
 
     // Embeddings Cache
-    clearEmbeddingsCache: () => ipcRenderer.invoke('clearEmbeddingsCache')
+    clearEmbeddingsCache: () => ipcRenderer.invoke('clearEmbeddingsCache'),
+
+    // Python Code Execution (for AI Agent)
+    executePythonCode: (code: string) => ipcRenderer.invoke('executePythonCode', code)
 });

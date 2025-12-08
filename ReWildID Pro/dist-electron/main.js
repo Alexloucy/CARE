@@ -7,6 +7,7 @@ const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
 const controller_1 = require("./controller");
 const jobs_1 = require("./jobs");
+const pythonExecutor_1 = require("./pythonExecutor");
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
     electron_1.app.quit();
@@ -174,6 +175,8 @@ electron_1.ipcMain.handle('updateImageMetadata', (_, id, metadata) => (0, contro
 electron_1.ipcMain.handle('getImageMetadata', (_, id) => (0, controller_1.getImageMetadata)(id));
 // Embeddings Cache
 electron_1.ipcMain.handle('clearEmbeddingsCache', () => (0, controller_1.clearEmbeddingsCache)());
+// Python Code Execution (for AI Agent)
+electron_1.ipcMain.handle('executePythonCode', (_, code) => (0, pythonExecutor_1.executePythonCode)(code));
 electron_1.app.on('ready', () => {
     createWindow();
     electron_1.app.on('activate', function () {
