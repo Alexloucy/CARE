@@ -17,6 +17,7 @@ export interface ToolCallResult {
 
 export interface AgentSession {
     id: string;
+    title: string;
     messages: ChatMessage[];
     createdAt: Date;
     updatedAt: Date;

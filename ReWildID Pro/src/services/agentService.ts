@@ -21,6 +21,57 @@ const tools = [revealSecretTool];
 
 // Storage keys
 const SETTINGS_KEY = 'agent_settings';
+const SESSIONS_KEY = 'agent_sessions';
+const CURRENT_SESSION_KEY = 'agent_current_session';
+
+// Session management
+export function getSessions(): import('../types/agent').AgentSession[] {
+    try {
+        const stored = localStorage.getItem(SESSIONS_KEY);
+        if (stored) {
+            const sessions = JSON.parse(stored);
+            // Convert date strings back to Date objects
+            return sessions.map((s: any) => ({
+                ...s,
+                createdAt: new Date(s.createdAt),
+                updatedAt: new Date(s.updatedAt),
+                messages: s.messages.map((m: any) => ({
+                    ...m,
+                    timestamp: new Date(m.timestamp),
+                })),
+            }));
+        }
+    } catch (e) {
+        console.error('Failed to parse sessions:', e);
+    }
+    return [];
+}
+
+export function saveSession(session: import('../types/agent').AgentSession): void {
+    const sessions = getSessions();
+    const existingIdx = sessions.findIndex(s => s.id === session.id);
+    if (existingIdx >= 0) {
+        sessions[existingIdx] = session;
+    } else {
+        sessions.unshift(session); // Add to beginning
+    }
+    // Keep only last 50 sessions
+    const trimmed = sessions.slice(0, 50);
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(trimmed));
+}
+
+export function deleteSession(sessionId: string): void {
+    const sessions = getSessions().filter(s => s.id !== sessionId);
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+}
+
+export function getCurrentSessionId(): string | null {
+    return localStorage.getItem(CURRENT_SESSION_KEY);
+}
+
+export function setCurrentSessionId(sessionId: string): void {
+    localStorage.setItem(CURRENT_SESSION_KEY, sessionId);
+}
 
 // Get settings from localStorage
 export function getAgentSettings(): AgentSettings {
