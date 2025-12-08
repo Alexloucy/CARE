@@ -207,7 +207,7 @@ const TaskPanel: React.FC = () => {
                                         </Button>
                                     )}
                                     {(job.status === 'failed' || job.status === 'cancelled') &&
-                                        (job.type === 'detect' || job.type === 'reid') && (
+                                        (job.type === 'detect' || job.type === 'reid' || job.type === 'import') && (
                                             <Button
                                                 size="small"
                                                 onClick={() => handleRetry(job.id)}

@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -33,6 +66,8 @@ class JobManager {
     static getInstance() {
         if (!JobManager.instance) {
             JobManager.instance = new JobManager();
+            JobManager.instance.loadPersistedJobs();
+            JobManager.instance.cleanupOldJobs();
         }
         return JobManager.instance;
     }
@@ -50,6 +85,8 @@ class JobManager {
             createdAt: Date.now()
         };
         this.queue.push(job);
+        // Persist to database
+        this.saveJobToDb(job);
         this.emitUpdate();
         this.processQueue();
         return job.id;
@@ -93,14 +130,15 @@ class JobManager {
         if (jobIndex === -1)
             return null;
         const originalJob = this.completedJobs[jobIndex];
-        // Only allow retry for detect and reid jobs that failed or were cancelled
-        if (!['detect', 'reid'].includes(originalJob.type))
+        // Allow retry for import, detect, and reid jobs that failed or were cancelled
+        if (!['import', 'detect', 'reid'].includes(originalJob.type))
             return null;
         if (!['failed', 'cancelled'].includes(originalJob.status))
             return null;
-        // Remove from history
+        // Remove from history and from database
         this.completedJobs.splice(jobIndex, 1);
-        // Re-queue with same payload
+        database_1.DatabaseService.deleteJob(id);
+        // Re-queue with same payload (which includes processedPaths for resume)
         const newJobId = this.addJob(originalJob.type, originalJob.payload);
         return newJobId;
     }
@@ -109,6 +147,8 @@ class JobManager {
         if (this.completedJobs.length > this.maxHistory) {
             this.completedJobs.pop();
         }
+        // Update job status in database
+        this.updateJobInDb(job);
     }
     emitUpdate() {
         if (this.mainWindow) {
@@ -214,7 +254,8 @@ class JobManager {
                         await processDir(fullPath);
                     else if (stat?.isFile()) {
                         const ext = path_1.default.extname(file).toLowerCase();
-                        if (ext === '.jpg' || ext === '.jpeg')
+                        // Skip macOS ._ files
+                        if (!file.startsWith('._') && (ext === '.jpg' || ext === '.jpeg'))
                             count++;
                     }
                 }
@@ -228,23 +269,30 @@ class JobManager {
             if (stat?.isDirectory())
                 await processDir(p);
             else if (stat?.isFile()) {
+                const basename = path_1.default.basename(p);
                 const ext = path_1.default.extname(p).toLowerCase();
-                if (ext === '.jpg' || ext === '.jpeg')
+                // Skip macOS ._ files
+                if (!basename.startsWith('._') && (ext === '.jpg' || ext === '.jpeg'))
                     count++;
             }
         }
         return count;
     }
     async handleImportJob(job) {
-        const { filePaths, groupName, afterAction, species } = job.payload;
+        const { filePaths, groupName, afterAction, species, processedPaths = [] } = job.payload;
         // Track imported image IDs for chained actions
         const importedImageIds = [];
+        // Track processed paths for resume capability
+        const processedSet = new Set(processedPaths);
+        const newlyProcessedPaths = [...processedPaths];
+        // Set of existing target filenames for uniqueness checking
+        const existingTargetFiles = new Set();
         job.message = 'Scanning files...';
         this.emitUpdate();
         // Count total for progress
         const totalFiles = await this.countFiles(filePaths);
         // Create Group if needed (for flat file lists)
-        let currentGroupId = null;
+        let currentGroupId = job.payload.lastGroupId || null;
         // Pre-check: are we uploading a list of files directly?
         const filesOnly = [];
         for (const p of filePaths) {
@@ -257,22 +305,66 @@ class JobManager {
                 console.warn(`Failed to stat ${p}`, e);
             }
         }
-        if (filesOnly.length > 0 && groupName) {
+        if (filesOnly.length > 0 && groupName && !currentGroupId) {
             currentGroupId = database_1.DatabaseService.createGroup(groupName);
+            job.payload.lastGroupId = currentGroupId;
         }
+        // Local storage directory for copied files
+        const baseDataDir = process.cwd();
+        const localImagesDir = path_1.default.join(baseDataDir, 'data', 'images');
+        await fs_extra_1.default.ensureDir(localImagesDir);
         // Recursive Process
-        let processedCount = 0;
-        const processFile = async (filePath, groupId) => {
+        let processedCount = processedPaths.length;
+        const processFile = async (filePath, groupId, targetGroupName) => {
             if (job.status === 'cancelled')
                 return;
+            // Skip if already processed (for resume)
+            if (processedSet.has(filePath)) {
+                return;
+            }
+            // Skip macOS resource fork files (._filename)
+            const filename = path_1.default.basename(filePath);
+            if (filename.startsWith('._')) {
+                return;
+            }
             const ext = path_1.default.extname(filePath).toLowerCase();
             if (ext === '.jpg' || ext === '.jpeg') {
                 try {
-                    // Add to DB
-                    const imageId = database_1.DatabaseService.addImage(groupId, filePath);
+                    // Check if file is on removable drive
+                    const { isRemovableDrive } = await Promise.resolve().then(() => __importStar(require('./utils/driveType')));
+                    const isRemovable = await isRemovableDrive(filePath);
+                    let finalPath = filePath;
+                    if (isRemovable) {
+                        // Copy file to local storage with unique folder per import job
+                        const sanitizedGroupName = targetGroupName.replace(/[<>:"/\\|?*]/g, '_').trim() || 'imported';
+                        // Use job.id to create unique folder, preventing collisions between imports with same group name
+                        const uniqueFolderName = `${sanitizedGroupName}_${job.id.slice(0, 8)}`;
+                        const groupDir = path_1.default.join(localImagesDir, uniqueFolderName);
+                        await fs_extra_1.default.ensureDir(groupDir);
+                        let targetPath = path_1.default.join(groupDir, path_1.default.basename(filePath));
+                        // Handle filename collisions within the same import batch
+                        if (existingTargetFiles.has(targetPath) || await fs_extra_1.default.pathExists(targetPath)) {
+                            const base = path_1.default.basename(filePath, ext);
+                            let counter = 1;
+                            while (existingTargetFiles.has(targetPath) || await fs_extra_1.default.pathExists(targetPath)) {
+                                targetPath = path_1.default.join(groupDir, `${base}_${counter}${ext}`);
+                                counter++;
+                            }
+                        }
+                        existingTargetFiles.add(targetPath);
+                        // Copy file
+                        await fs_extra_1.default.copy(filePath, targetPath);
+                        finalPath = targetPath;
+                        console.log(`[Import] Copied from removable: ${filePath} -> ${targetPath}`);
+                    }
+                    // Add to DB with final path
+                    const imageId = database_1.DatabaseService.addImage(groupId, finalPath);
                     importedImageIds.push(imageId);
-                    // Generate Thumbnail Synchronously (or await it) to keep it in one job
-                    await this.generateThumbnail(imageId, filePath);
+                    // Generate Thumbnail
+                    await this.generateThumbnail(imageId, finalPath);
+                    // Track as processed
+                    newlyProcessedPaths.push(filePath);
+                    processedSet.add(filePath);
                 }
                 catch (e) {
                     console.error(`Error adding image ${filePath}:`, e);
@@ -283,9 +375,11 @@ class JobManager {
             if (totalFiles > 0) {
                 job.progress = Math.floor((processedCount / totalFiles) * 100);
             }
-            // Throttle updates to avoid spamming IPC
+            // Throttle updates and persist progress periodically
             if (processedCount % 5 === 0) {
                 job.message = `Importing ${processedCount}/${totalFiles}...`;
+                job.payload.processedPaths = newlyProcessedPaths;
+                this.updateJobInDb(job);
                 this.emitUpdate();
             }
         };
@@ -309,7 +403,7 @@ class JobManager {
                             await processDir(fullPath);
                         }
                         else if (fileStat.isFile()) {
-                            await processFile(fullPath, groupId);
+                            await processFile(fullPath, groupId, folderName);
                         }
                     }
                     catch (e) {
@@ -331,7 +425,7 @@ class JobManager {
                     await processDir(p);
                 }
                 else if (currentGroupId !== null && stat.isFile()) {
-                    await processFile(p, currentGroupId);
+                    await processFile(p, currentGroupId, groupName || 'imported');
                 }
             }
             catch (e) {
@@ -763,6 +857,75 @@ class JobManager {
         finally {
             // Cleanup
             await fs_extra_1.default.remove(manifestPath).catch(() => { });
+        }
+    }
+    // --- Job Persistence Helpers ---
+    saveJobToDb(job) {
+        try {
+            database_1.DatabaseService.saveJob({
+                id: job.id,
+                type: job.type,
+                payload: job.payload,
+                status: job.status,
+                progress: job.progress,
+                message: job.message,
+                createdAt: job.createdAt
+            });
+        }
+        catch (error) {
+            console.error('[JobManager] Failed to save job to DB:', error);
+        }
+    }
+    updateJobInDb(job) {
+        try {
+            database_1.DatabaseService.updateJob(job.id, {
+                status: job.status,
+                progress: job.progress,
+                message: job.message,
+                payload: job.payload
+            });
+        }
+        catch (error) {
+            console.error('[JobManager] Failed to update job in DB:', error);
+        }
+    }
+    loadPersistedJobs() {
+        try {
+            const unfinished = database_1.DatabaseService.getUnfinishedJobs();
+            for (const jobData of unfinished) {
+                // Mark as failed since app terminated before completion
+                const job = {
+                    id: jobData.id,
+                    type: jobData.type,
+                    status: 'failed',
+                    progress: jobData.progress,
+                    message: 'App terminated unexpectedly. Click Retry to resume.',
+                    payload: jobData.payload,
+                    createdAt: jobData.createdAt,
+                    completedAt: Date.now(),
+                    error: 'App terminated unexpectedly'
+                };
+                this.completedJobs.push(job);
+                // Update status in DB
+                database_1.DatabaseService.updateJob(job.id, { status: 'failed', message: job.message });
+            }
+            if (unfinished.length > 0) {
+                console.log(`[JobManager] Loaded ${unfinished.length} interrupted jobs from previous session`);
+            }
+        }
+        catch (error) {
+            console.error('[JobManager] Failed to load persisted jobs:', error);
+        }
+    }
+    cleanupOldJobs() {
+        try {
+            const deleted = database_1.DatabaseService.cleanupOldJobs(50, 7);
+            if (deleted > 0) {
+                console.log(`[JobManager] Cleaned up ${deleted} old jobs from database`);
+            }
+        }
+        catch (error) {
+            console.error('[JobManager] Failed to cleanup old jobs:', error);
         }
     }
 }

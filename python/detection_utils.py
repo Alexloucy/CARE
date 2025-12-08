@@ -37,14 +37,19 @@ def save_detection_results(predictions, image_output_path, original_images_dir, 
             image_path = img_file['filepath']
             predictions_list = img_file.get('predictions', [])
 
+            # Skip macOS resource fork files
+            if image_filename.startswith('._'):
+                log_message(log_file, f"Skipping macOS resource fork file: '{image_filename}'")
+                continue
+
             if not os.path.exists(image_path):
                 log_message(log_file, f"The path '{image_path}' does not exist.")
-                return None
+                continue  # Continue to next image instead of aborting
 
             image = cv2.imread(image_path)
             if image is None:
                 log_message(log_file, f"Failed to read image '{image_path}'.")
-                return None
+                continue  # Continue to next image instead of aborting
 
             json_results = {}
             json_results["image"] = os.path.basename(image_path)

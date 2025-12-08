@@ -108,6 +108,18 @@ const initSchema = () => {
         CREATE UNIQUE INDEX IF NOT EXISTS idx_embeddings_lookup 
         ON embeddings(image_id, bbox_hash, embedding_type);
     `;
+    // Jobs table for persistence across app restarts
+    const createJobsTable = `
+        CREATE TABLE IF NOT EXISTS jobs (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            payload TEXT,
+            status TEXT NOT NULL,
+            progress INTEGER DEFAULT 0,
+            message TEXT,
+            created_at INTEGER NOT NULL
+        );
+    `;
     db.exec(createGroupsTable);
     db.exec(createImagesTable);
     db.exec(createDetectionBatchesTable);
@@ -117,6 +129,7 @@ const initSchema = () => {
     db.exec(createReidMembersTable);
     db.exec(createEmbeddingsTable);
     db.exec(createEmbeddingsIndex);
+    db.exec(createJobsTable);
     // Migration: Add metadata column if it doesn't exist
     const columns = db.pragma('table_info(images)');
     if (!columns.some(col => col.name === 'metadata')) {
@@ -777,5 +790,85 @@ exports.DatabaseService = {
     },
     getDbPath() {
         return DB_PATH;
+    },
+    // --- Jobs Persistence ---
+    saveJob(job) {
+        const stmt = db.prepare(`
+            INSERT OR REPLACE INTO jobs (id, type, payload, status, progress, message, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        stmt.run(job.id, job.type, JSON.stringify(job.payload), job.status, job.progress, job.message, job.createdAt);
+    },
+    updateJob(id, updates) {
+        const fields = [];
+        const values = [];
+        if (updates.status !== undefined) {
+            fields.push('status = ?');
+            values.push(updates.status);
+        }
+        if (updates.progress !== undefined) {
+            fields.push('progress = ?');
+            values.push(updates.progress);
+        }
+        if (updates.message !== undefined) {
+            fields.push('message = ?');
+            values.push(updates.message);
+        }
+        if (updates.payload !== undefined) {
+            fields.push('payload = ?');
+            values.push(JSON.stringify(updates.payload));
+        }
+        if (fields.length === 0)
+            return;
+        values.push(id);
+        const stmt = db.prepare(`UPDATE jobs SET ${fields.join(', ')} WHERE id = ?`);
+        stmt.run(...values);
+    },
+    deleteJob(id) {
+        const stmt = db.prepare('DELETE FROM jobs WHERE id = ?');
+        stmt.run(id);
+    },
+    getUnfinishedJobs() {
+        const stmt = db.prepare(`SELECT * FROM jobs WHERE status IN ('running', 'pending') ORDER BY created_at DESC`);
+        const rows = stmt.all();
+        return rows.map(row => ({
+            id: row.id,
+            type: row.type,
+            payload: JSON.parse(row.payload || '{}'),
+            status: row.status,
+            progress: row.progress,
+            message: row.message,
+            createdAt: row.created_at
+        }));
+    },
+    getCompletedJobs(limit = 50) {
+        const stmt = db.prepare(`SELECT * FROM jobs WHERE status IN ('completed', 'failed', 'cancelled') ORDER BY created_at DESC LIMIT ?`);
+        const rows = stmt.all(limit);
+        return rows.map(row => ({
+            id: row.id,
+            type: row.type,
+            payload: JSON.parse(row.payload || '{}'),
+            status: row.status,
+            progress: row.progress,
+            message: row.message,
+            createdAt: row.created_at
+        }));
+    },
+    cleanupOldJobs(keepCount = 50, maxAgeDays = 7) {
+        const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+        const cutoffTime = Date.now() - maxAgeMs;
+        // Delete completed jobs older than maxAgeDays, keeping at most keepCount recent
+        const stmt = db.prepare(`
+            DELETE FROM jobs 
+            WHERE status IN ('completed', 'failed', 'cancelled')
+            AND (created_at < ? OR id NOT IN (
+                SELECT id FROM jobs 
+                WHERE status IN ('completed', 'failed', 'cancelled')
+                ORDER BY created_at DESC 
+                LIMIT ?
+            ))
+        `);
+        const result = stmt.run(cutoffTime, keepCount);
+        return result.changes;
     }
 };
