@@ -444,7 +444,7 @@ const AgentPage: React.FC = () => {
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                minHeight: '40vh',
+                                minHeight: '71vh',
                                 textAlign: 'center',
                                 gap: 2,
                             }}
@@ -466,7 +466,7 @@ const AgentPage: React.FC = () => {
                                 variant="body1"
                                 sx={{ color: theme.palette.text.secondary, maxWidth: 400 }}
                             >
-                                Ask me anything about wildlife conservation, image analysis, or try asking me to reveal a secret!
+                                Ask me anything about wildlife conservation, data analysis, or batch operations on images!
                             </Typography>
                         </Box>
                     ) : (
