@@ -148,8 +148,8 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({ message }) =>
                     p: 2,
                     borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                     ...glassStyle,
-                    backdropFilter: 'blur(12px)',
-                    WebkitBackdropFilter: 'blur(12px)',
+                    backdropFilter: 'blur(76px)',
+                    WebkitBackdropFilter: 'blur(76px)',
                     boxShadow: isDark
                         ? '0 4px 20px rgba(0, 0, 0, 0.3)'
                         : '0 4px 20px rgba(0, 0, 0, 0.1)',

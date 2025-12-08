@@ -226,25 +226,38 @@ const ReIDPage: React.FC = () => {
         return () => window.removeEventListener('trigger-refresh', handleRefresh as EventListener);
     }, [refreshData]);
 
-    const loadImageByPath = async (path: string, setFn: React.Dispatch<React.SetStateAction<Map<string, string>>>) => {
+    // Track paths that are currently being loaded to prevent duplicate requests
+    const loadingPathsRef = useRef<Set<string>>(new Set());
+
+    const loadImageByPath = useCallback(async (path: string) => {
+        // Skip if already loaded or currently loading
+        if (loadingPathsRef.current.has(path)) return;
+
+        // Mark as loading
+        loadingPathsRef.current.add(path);
+
         try {
             const response = await window.api.viewImage(path);
             if (response.ok && response.data) {
                 const blob = new Blob([response.data as unknown as BlobPart], { type: 'image/jpeg' });
                 const url = URL.createObjectURL(blob);
-                setFn(prev => new Map(prev).set(path, url));
+                setImageUrls(prev => new Map(prev).set(path, url));
             }
-        } catch (e) { console.error('Failed to load image:', path, e); }
-    };
+        } catch (e) {
+            console.error('Failed to load image:', path, e);
+            // Remove from loading so it can be retried
+            loadingPathsRef.current.delete(path);
+        }
+    }, []);
 
-    const loadImagesForIndividuals = (inds: ReidIndividual[]) => {
+    const loadImagesForIndividuals = useCallback((inds: ReidIndividual[]) => {
         for (const ind of inds) {
             for (const det of ind.detections) {
                 const path = det.image_preview_path || det.image_path;
-                if (path && !imageUrls.has(path)) loadImageByPath(path, setImageUrls);
+                if (path) loadImageByPath(path);
             }
         }
-    };
+    }, [loadImageByPath]);
 
     // Restore scroll position on mount
     useEffect(() => {
