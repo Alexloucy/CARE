@@ -1126,6 +1126,20 @@ export const DatabaseService = {
         }));
     },
 
+    getAllJobs(limit = 50): { id: string; type: string; payload: any; status: string; progress: number; message: string; createdAt: number }[] {
+        const stmt = db.prepare(`SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?`);
+        const rows = stmt.all(limit) as { id: string; type: string; payload: string; status: string; progress: number; message: string; created_at: number }[];
+        return rows.map(row => ({
+            id: row.id,
+            type: row.type,
+            payload: JSON.parse(row.payload || '{}'),
+            status: row.status,
+            progress: row.progress,
+            message: row.message,
+            createdAt: row.created_at
+        }));
+    },
+
     cleanupOldJobs(keepCount = 50, maxAgeDays = 7): number {
         const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
         const cutoffTime = Date.now() - maxAgeMs;

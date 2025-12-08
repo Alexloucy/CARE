@@ -891,26 +891,34 @@ class JobManager {
     }
     loadPersistedJobs() {
         try {
-            const unfinished = database_1.DatabaseService.getUnfinishedJobs();
-            for (const jobData of unfinished) {
-                // Mark as failed since app terminated before completion
+            console.log('[JobManager] loadPersistedJobs called');
+            // Load ALL recent jobs from database
+            const allJobsFromDb = database_1.DatabaseService.getAllJobs(this.maxHistory);
+            console.log('[JobManager] All jobs from DB:', allJobsFromDb.length);
+            for (const jobData of allJobsFromDb) {
+                // For unfinished jobs (running/pending), mark as failed since app was closed
+                const wasUnfinished = ['running', 'pending'].includes(jobData.status);
                 const job = {
                     id: jobData.id,
                     type: jobData.type,
-                    status: 'failed',
+                    status: wasUnfinished ? 'failed' : jobData.status,
                     progress: jobData.progress,
-                    message: 'App terminated unexpectedly. Click Retry to resume.',
+                    message: wasUnfinished
+                        ? 'App terminated unexpectedly. Click Retry to resume.'
+                        : jobData.message,
                     payload: jobData.payload,
                     createdAt: jobData.createdAt,
-                    completedAt: Date.now(),
-                    error: 'App terminated unexpectedly'
+                    completedAt: wasUnfinished ? Date.now() : undefined,
+                    error: wasUnfinished ? 'App terminated unexpectedly' : undefined
                 };
                 this.completedJobs.push(job);
-                // Update status in DB
-                database_1.DatabaseService.updateJob(job.id, { status: 'failed', message: job.message });
+                // Update unfinished jobs status in DB
+                if (wasUnfinished) {
+                    database_1.DatabaseService.updateJob(job.id, { status: 'failed', message: job.message });
+                }
             }
-            if (unfinished.length > 0) {
-                console.log(`[JobManager] Loaded ${unfinished.length} interrupted jobs from previous session`);
+            if (allJobsFromDb.length > 0) {
+                console.log(`[JobManager] Loaded ${allJobsFromDb.length} jobs from previous sessions`);
             }
         }
         catch (error) {

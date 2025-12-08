@@ -854,6 +854,19 @@ exports.DatabaseService = {
             createdAt: row.created_at
         }));
     },
+    getAllJobs(limit = 50) {
+        const stmt = db.prepare(`SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?`);
+        const rows = stmt.all(limit);
+        return rows.map(row => ({
+            id: row.id,
+            type: row.type,
+            payload: JSON.parse(row.payload || '{}'),
+            status: row.status,
+            progress: row.progress,
+            message: row.message,
+            createdAt: row.created_at
+        }));
+    },
     cleanupOldJobs(keepCount = 50, maxAgeDays = 7) {
         const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
         const cutoffTime = Date.now() - maxAgeMs;

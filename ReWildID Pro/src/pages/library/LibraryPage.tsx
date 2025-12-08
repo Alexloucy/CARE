@@ -97,9 +97,11 @@ const LibraryPage: React.FC = () => {
         fetchReidRuns();
     }, [fetchReidRuns]);
 
-    // Unified Refresh
+    // Unified Refresh (includes metadata refresh)
     const refreshLibrary = async () => {
         await Promise.all([refreshFullLibrary(), refreshFilteredLibrary(), fetchReidRuns()]);
+        // Also refresh metadata (detections/reid) - done after images refresh
+        refreshMetadata();
     };
 
     // Listen for refresh events from TaskPanel
@@ -148,7 +150,7 @@ const LibraryPage: React.FC = () => {
 
     // Fetch metadata (detections + ReID) for all images
     const imageIds = useMemo(() => rawImages.map(img => img.id), [rawImages]);
-    const { metadata: imageMetadata } = useImageMetadata(imageIds);
+    const { metadata: imageMetadata, refresh: refreshMetadata } = useImageMetadata(imageIds);
 
     // Merge metadata into images
     const imagesWithMetadata = useMemo(() => {
