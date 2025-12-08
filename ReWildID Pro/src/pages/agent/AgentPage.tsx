@@ -5,9 +5,9 @@ import { ClockCounterClockwise, Trash, X } from '@phosphor-icons/react';
 import AgentInputBar from '../../components/agent/AgentInputBar';
 import ChatMessageRenderer from '../../components/agent/ChatMessageRenderer';
 import MessageSkeleton from '../../components/agent/MessageSkeleton';
-import { ChatMessage, AgentSession, CodeExecutionResult } from '../../types/agent';
+import { ChatMessage, AgentSession, ToolCall } from '../../types/agent';
 import {
-    streamAgentResponse,
+    runAgentLoop,
     generateMessageId,
     generateSessionId,
     getAgentSettings,
@@ -23,7 +23,6 @@ const AgentPage: React.FC = () => {
     const isDark = theme.palette.mode === 'dark';
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [streamingContent, setStreamingContent] = useState('');
     const [currentSessionId, setCurrentSessionIdState] = useState<string>('');
     const [sessions, setSessions] = useState<AgentSession[]>([]);
     const [historyOpen, setHistoryOpen] = useState(false);
@@ -54,7 +53,6 @@ const AgentPage: React.FC = () => {
     // Save current session when messages change
     useEffect(() => {
         if (currentSessionId && messages.length > 0) {
-            // Generate title from first user message
             const firstUserMsg = messages.find(m => m.role === 'user');
             const title = firstUserMsg
                 ? firstUserMsg.content.slice(0, 40) + (firstUserMsg.content.length > 40 ? '...' : '')
@@ -69,7 +67,6 @@ const AgentPage: React.FC = () => {
             };
             saveSession(session);
 
-            // Update local sessions list
             setSessions(prev => {
                 const existing = prev.findIndex(s => s.id === currentSessionId);
                 if (existing >= 0) {
@@ -82,15 +79,14 @@ const AgentPage: React.FC = () => {
         }
     }, [messages, currentSessionId]);
 
-    // Auto-scroll to bottom when new messages arrive or streaming content updates
+    // Auto-scroll to bottom when new messages arrive
     useEffect(() => {
         if (scrollContainerRef.current) {
             scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
         }
-    }, [messages, streamingContent]);
+    }, [messages]);
 
     const handleNewChat = useCallback(() => {
-        // Save current session first if it has messages
         if (currentSessionId && messages.length > 0) {
             const firstUserMsg = messages.find(m => m.role === 'user');
             const title = firstUserMsg
@@ -105,12 +101,10 @@ const AgentPage: React.FC = () => {
             });
         }
 
-        // Create new session
         const newId = generateSessionId();
         setCurrentSessionIdState(newId);
         setCurrentSessionId(newId);
         setMessages([]);
-        setStreamingContent('');
         setIsLoading(false);
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
@@ -122,7 +116,6 @@ const AgentPage: React.FC = () => {
         setCurrentSessionIdState(session.id);
         setCurrentSessionId(session.id);
         setMessages(session.messages);
-        setStreamingContent('');
         setHistoryOpen(false);
     }, []);
 
@@ -131,7 +124,6 @@ const AgentPage: React.FC = () => {
         deleteSession(sessionId);
         setSessions(prev => prev.filter(s => s.id !== sessionId));
 
-        // If deleting current session, start a new one
         if (sessionId === currentSessionId) {
             const newId = generateSessionId();
             setCurrentSessionIdState(newId);
@@ -145,122 +137,97 @@ const AgentPage: React.FC = () => {
             abortControllerRef.current.abort();
             abortControllerRef.current = null;
         }
-        // If we have streaming content, add it as a message
-        if (streamingContent) {
-            const assistantMessage: ChatMessage = {
-                id: generateMessageId(),
-                role: 'assistant',
-                content: streamingContent + '\n\n*[Generation stopped]*',
-                timestamp: new Date(),
-            };
-            setMessages(prev => [...prev, assistantMessage]);
-            setStreamingContent('');
-        }
         setIsLoading(false);
-    }, [streamingContent]);
+    }, []);
+
+    const addMessage = useCallback((msg: Partial<ChatMessage> & { role: ChatMessage['role']; content: string }) => {
+        const newMsg: ChatMessage = {
+            id: generateMessageId(),
+            timestamp: new Date(),
+            ...msg,
+        };
+        setMessages(prev => [...prev, newMsg]);
+        return newMsg;
+    }, []);
 
     const handleSendMessage = useCallback(async (content: string) => {
-        // Check for API key
         const settings = getAgentSettings();
         if (!settings.apiKey) {
-            const errorMessage: ChatMessage = {
-                id: generateMessageId(),
+            addMessage({
                 role: 'assistant',
                 content: '⚠️ Please configure your Google AI Studio API key in **Settings** to use the AI agent.',
-                timestamp: new Date(),
-            };
-            setMessages(prev => [...prev, errorMessage]);
+            });
             return;
         }
 
         // Add user message
-        const userMessage: ChatMessage = {
-            id: generateMessageId(),
-            role: 'user',
-            content,
-            timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, userMessage]);
+        const userMessage = addMessage({ role: 'user', content });
         setIsLoading(true);
-        setStreamingContent('');
 
-        // Create abort controller for this request
         abortControllerRef.current = new AbortController();
 
         try {
             const allMessages = [...messages, userMessage];
-            let accumulatedContent = '';
-            let latestCodeExecution: CodeExecutionResult | null = null;
+            let pendingToolCalls: ToolCall[] = [];
 
-            for await (const chunk of streamAgentResponse(allMessages)) {
-                // Check if aborted
+            for await (const chunk of runAgentLoop(allMessages)) {
                 if (abortControllerRef.current?.signal.aborted) {
                     break;
                 }
 
                 if (chunk.type === 'error') {
-                    const errorMessage: ChatMessage = {
-                        id: generateMessageId(),
+                    addMessage({
                         role: 'assistant',
                         content: `❌ ${chunk.content}`,
-                        timestamp: new Date(),
-                    };
-                    setMessages(prev => [...prev, errorMessage]);
-                    setStreamingContent('');
+                    });
                     break;
                 }
 
-                if (chunk.type === 'tool') {
-                    // Show tool call as a separate message
-                    const toolMessage: ChatMessage = {
-                        id: generateMessageId(),
+                if (chunk.type === 'tool_call') {
+                    // Collect tool calls - they'll be added to the assistant message
+                    pendingToolCalls.push(chunk.toolCall);
+
+                    // Add assistant message showing tool call
+                    addMessage({
+                        role: 'assistant',
+                        content: '',
+                        toolCalls: [...pendingToolCalls],
+                    });
+                }
+
+                if (chunk.type === 'tool_result') {
+                    // Add tool result as separate message
+                    addMessage({
                         role: 'tool',
+                        content: '',
+                        toolCallId: chunk.toolCallId,
+                        toolName: chunk.toolName,
+                        toolResult: chunk.result,
+                    });
+                    // Reset pending tool calls for next round
+                    pendingToolCalls = [];
+                }
+
+                if (chunk.type === 'text') {
+                    // Add final text response
+                    addMessage({
+                        role: 'assistant',
                         content: chunk.content,
-                        timestamp: new Date(),
-                    };
-                    setMessages(prev => [...prev, toolMessage]);
+                    });
                 }
-
-                if (chunk.type === 'tool_result' && chunk.codeExecution) {
-                    // Store code execution result locally to attach to the final message
-                    latestCodeExecution = chunk.codeExecution;
-                }
-
-                if (chunk.type === 'text_delta') {
-                    // Accumulate streaming content
-                    accumulatedContent += chunk.content;
-                    setStreamingContent(accumulatedContent);
-                }
-            }
-
-            // After streaming completes, add the full message with code execution if present
-            if (accumulatedContent && !abortControllerRef.current?.signal.aborted) {
-                const assistantMessage: ChatMessage = {
-                    id: generateMessageId(),
-                    role: 'assistant',
-                    content: accumulatedContent,
-                    timestamp: new Date(),
-                    codeExecution: latestCodeExecution || undefined,
-                };
-                setMessages(prev => [...prev, assistantMessage]);
-                setStreamingContent('');
             }
         } catch (error) {
             if ((error as Error).name !== 'AbortError') {
-                const errorMessage: ChatMessage = {
-                    id: generateMessageId(),
+                addMessage({
                     role: 'assistant',
                     content: `❌ An error occurred: ${(error as Error).message}`,
-                    timestamp: new Date(),
-                };
-                setMessages(prev => [...prev, errorMessage]);
+                });
             }
-            setStreamingContent('');
         } finally {
             setIsLoading(false);
             abortControllerRef.current = null;
         }
-    }, [messages]);
+    }, [messages, addMessage]);
 
     const formatSessionDate = (date: Date) => {
         const now = new Date();
@@ -364,22 +331,22 @@ const AgentPage: React.FC = () => {
                 </List>
             </Drawer>
 
-            {/* Messages Container - takes full page with padding for input */}
+            {/* Messages Container */}
             <Box
                 ref={scrollContainerRef}
                 sx={{
                     position: 'absolute',
-                    top: 68, // navbar height
+                    top: 68,
                     left: 0,
                     right: 0,
                     bottom: 0,
                     overflowY: 'auto',
                     overflowX: 'hidden',
-                    pb: '100px', // Space for input bar
+                    pb: '100px',
                 }}
             >
                 <Container maxWidth="md" sx={{ py: 2 }}>
-                    {messages.length === 0 && !streamingContent ? (
+                    {messages.length === 0 ? (
                         <Box
                             sx={{
                                 display: 'flex',
@@ -416,19 +383,7 @@ const AgentPage: React.FC = () => {
                             {messages.map((message) => (
                                 <ChatMessageRenderer key={message.id} message={message} />
                             ))}
-                            {/* Show streaming content as a temporary message */}
-                            {streamingContent && (
-                                <ChatMessageRenderer
-                                    message={{
-                                        id: 'streaming',
-                                        role: 'assistant',
-                                        content: streamingContent,
-                                        timestamp: new Date(),
-                                        isStreaming: true,
-                                    }}
-                                />
-                            )}
-                            {isLoading && !streamingContent && messages[messages.length - 1]?.role === 'user' && (
+                            {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
                                 <MessageSkeleton />
                             )}
                         </>
@@ -436,7 +391,7 @@ const AgentPage: React.FC = () => {
                 </Container>
             </Box>
 
-            {/* Input Bar - absolute positioned at bottom */}
+            {/* Input Bar */}
             <Box
                 sx={{
                     position: 'absolute',

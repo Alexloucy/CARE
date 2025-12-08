@@ -1,11 +1,19 @@
 // Agent-related types for the chat interface
 
-export interface CodeExecutionResult {
+// Tool call that agent requested
+export interface ToolCall {
+    id: string;
+    name: string;
+    args: Record<string, unknown>;
+}
+
+// Result from tool execution
+export interface ToolResult {
     success: boolean;
-    error: string | null;
     output: string | null;
-    images: string[];
-    code: string;
+    error: string | null;
+    images?: string[];  // Base64 data URLs for generated images
+    code?: string;      // For code execution - the code that was run
 }
 
 export interface ChatMessage {
@@ -14,15 +22,14 @@ export interface ChatMessage {
     content: string;
     timestamp: Date;
     isStreaming?: boolean;
-    toolCalls?: ToolCallResult[];
-    images?: string[]; // Base64 data URLs for code execution results
-    codeExecution?: CodeExecutionResult; // Parsed code execution result
-}
 
-export interface ToolCallResult {
-    toolName: string;
-    args: Record<string, unknown>;
-    result: string;
+    // For role='assistant' - tool calls the AI requested
+    toolCalls?: ToolCall[];
+
+    // For role='tool' - result from tool execution
+    toolCallId?: string;
+    toolName?: string;
+    toolResult?: ToolResult;
 }
 
 export interface AgentSession {
@@ -36,11 +43,9 @@ export interface AgentSession {
 export interface AgentSettings {
     apiKey: string;
     model: string;
-    e2bApiKey: string;
 }
 
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
     apiKey: '',
-    model: 'gemini-flash-latest',
-    e2bApiKey: '',
+    model: 'gemini-2.0-flash',
 };

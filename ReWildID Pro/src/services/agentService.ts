@@ -3,12 +3,16 @@ import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { HumanMessage, AIMessage, BaseMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { ChatMessage, AgentSettings, DEFAULT_AGENT_SETTINGS } from '../types/agent';
+import { ChatMessage, AgentSettings, DEFAULT_AGENT_SETTINGS, ToolCall, ToolResult, AgentSession } from '../types/agent';
 
 // Define the secret reveal tool
 const revealSecretTool = tool(
     async () => {
-        return 'asoidfjaiosdfj';
+        return JSON.stringify({
+            success: true,
+            output: 'The secret is: asoidfjaiosdfj',
+            error: null,
+        });
     },
     {
         name: 'revealSecret',
@@ -32,6 +36,7 @@ const runPythonCodeTool = tool(
                 error: result.error,
                 output: result.output,
                 images: result.images || [],
+                code: code,
             });
         } catch (error) {
             console.error('[Python] Exception:', error);
@@ -40,19 +45,20 @@ const runPythonCodeTool = tool(
                 error: error instanceof Error ? error.message : 'Unknown error',
                 output: null,
                 images: [],
+                code: code,
             });
         }
     },
     {
         name: 'runPythonCode',
-        description: 'Execute Python code locally on the user\'s machine. Use this for calculations, data processing, and generating visualizations with matplotlib/seaborn. Code output and any generated images will be returned. Python must be installed on the system.',
+        description: 'Execute Python code locally on the user\'s machine. Use this for calculations, data processing, and generating visualizations with matplotlib/seaborn. Code output and any generated images will be returned.',
         schema: z.object({
             code: z.string().describe('The Python code to execute. Include necessary imports like "import matplotlib.pyplot as plt". Use plt.show() to display charts.'),
         }),
     }
 );
 
-// Get the tools list - Python runs locally, no API key needed
+// Get the tools list
 function getAvailableTools() {
     return [revealSecretTool, runPythonCodeTool as any];
 }
@@ -63,12 +69,11 @@ const SESSIONS_KEY = 'agent_sessions';
 const CURRENT_SESSION_KEY = 'agent_current_session';
 
 // Session management
-export function getSessions(): import('../types/agent').AgentSession[] {
+export function getSessions(): AgentSession[] {
     try {
         const stored = localStorage.getItem(SESSIONS_KEY);
         if (stored) {
             const sessions = JSON.parse(stored);
-            // Convert date strings back to Date objects
             return sessions.map((s: any) => ({
                 ...s,
                 createdAt: new Date(s.createdAt),
@@ -85,15 +90,14 @@ export function getSessions(): import('../types/agent').AgentSession[] {
     return [];
 }
 
-export function saveSession(session: import('../types/agent').AgentSession): void {
+export function saveSession(session: AgentSession): void {
     const sessions = getSessions();
     const existingIdx = sessions.findIndex(s => s.id === session.id);
     if (existingIdx >= 0) {
         sessions[existingIdx] = session;
     } else {
-        sessions.unshift(session); // Add to beginning
+        sessions.unshift(session);
     }
-    // Keep only last 50 sessions
     const trimmed = sessions.slice(0, 50);
     localStorage.setItem(SESSIONS_KEY, JSON.stringify(trimmed));
 }
@@ -139,23 +143,45 @@ function createModel(settings: AgentSettings): ChatGoogleGenerativeAI | null {
 
     return new ChatGoogleGenerativeAI({
         apiKey: settings.apiKey,
-        model: settings.model || 'gemini-flash-latest',
+        model: settings.model || 'gemini-2.0-flash',
         maxOutputTokens: 8192,
         temperature: 0.7,
-        streaming: true, // Enable streaming
     });
 }
 
 // Convert our messages to LangChain format
 function toLangChainMessages(messages: ChatMessage[]): BaseMessage[] {
-    return messages
-        .filter((m) => m.role !== 'tool') // Tool messages are handled separately
-        .map((m) => {
-            if (m.role === 'user') {
-                return new HumanMessage(m.content);
+    const result: BaseMessage[] = [];
+
+    for (const m of messages) {
+        if (m.role === 'user') {
+            result.push(new HumanMessage(m.content));
+        } else if (m.role === 'tool') {
+            // Tool result message
+            if (m.toolCallId) {
+                result.push(new ToolMessage({
+                    tool_call_id: m.toolCallId,
+                    content: JSON.stringify(m.toolResult || { success: true, output: m.content }),
+                }));
             }
-            return new AIMessage(m.content);
-        });
+        } else if (m.role === 'assistant') {
+            // Assistant message - may have tool calls
+            if (m.toolCalls && m.toolCalls.length > 0) {
+                result.push(new AIMessage({
+                    content: m.content || '',
+                    tool_calls: m.toolCalls.map(tc => ({
+                        id: tc.id,
+                        name: tc.name,
+                        args: tc.args,
+                    })),
+                }));
+            } else {
+                result.push(new AIMessage(m.content));
+            }
+        }
+    }
+
+    return result;
 }
 
 // System prompt for the agent
@@ -168,23 +194,56 @@ Available tools:
 
 When generating visualizations:
 1. Always use matplotlib.pyplot
-2. Use plt.savefig() is NOT needed - images are automatically captured
+2. Use plt.show() to display charts - images are automatically captured
 3. For nice charts, consider using seaborn
 4. Add proper titles, labels, and legends
 
 Be friendly, concise, and helpful. When users ask for data visualization or charts, proactively use the runPythonCode tool.`;
 
-// Stream a response from the agent with real token streaming
-export async function* streamAgentResponse(
-    messages: ChatMessage[],
-    onToolCall?: (toolName: string, args: Record<string, unknown>) => void
-): AsyncGenerator<{
-    type: 'text' | 'text_delta' | 'tool' | 'tool_result' | 'error';
-    content: string;
-    toolName?: string;
-    toolArgs?: Record<string, unknown>;
-    codeExecution?: import('../types/agent').CodeExecutionResult;
-}> {
+// Stream chunk types
+export type StreamChunk =
+    | { type: 'text'; content: string }
+    | { type: 'tool_call'; toolCall: ToolCall }
+    | { type: 'tool_result'; toolCallId: string; toolName: string; result: ToolResult }
+    | { type: 'error'; content: string }
+    | { type: 'done' };
+
+// Execute a tool and return the result
+async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
+    const tools = getAvailableTools();
+    const toolToExecute = tools.find((t: any) => t.name === toolCall.name);
+
+    if (!toolToExecute) {
+        return {
+            success: false,
+            error: `Tool "${toolCall.name}" not found`,
+            output: null,
+        };
+    }
+
+    try {
+        const resultStr = await toolToExecute.invoke(toolCall.args || {});
+        const parsed = JSON.parse(String(resultStr));
+        return {
+            success: parsed.success ?? true,
+            output: parsed.output ?? null,
+            error: parsed.error ?? null,
+            images: parsed.images,
+            code: parsed.code,
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Tool execution failed',
+            output: null,
+        };
+    }
+}
+
+// Run the agent with proper agentic loop
+export async function* runAgentLoop(
+    messages: ChatMessage[]
+): AsyncGenerator<StreamChunk> {
     const settings = getAgentSettings();
 
     if (!settings.apiKey) {
@@ -202,101 +261,83 @@ export async function* streamAgentResponse(
     const modelWithTools = model.bindTools(tools);
 
     try {
-        const langChainMessages: BaseMessage[] = [
+        // Build LangChain message history
+        const lcMessages: BaseMessage[] = [
             new SystemMessage(SYSTEM_PROMPT),
             ...toLangChainMessages(messages),
         ];
 
-        // Use streaming
-        const stream = await modelWithTools.stream(langChainMessages);
+        // Agentic loop - continue until no more tool calls
+        let iterations = 0;
+        const maxIterations = 10; // Safety limit
 
-        let fullContent = '';
-        let toolCalls: any[] = [];
+        while (iterations < maxIterations) {
+            iterations++;
+            console.log(`[Agent] Iteration ${iterations}`);
 
-        for await (const chunk of stream) {
-            // Handle text content streaming
-            if (chunk.content) {
-                const textContent = typeof chunk.content === 'string'
-                    ? chunk.content
-                    : '';
-                if (textContent) {
-                    fullContent += textContent;
-                    yield { type: 'text_delta', content: textContent };
-                }
+            // Call the model
+            const response = await modelWithTools.invoke(lcMessages);
+            console.log('[Agent] Response:', response);
+
+            // Check if response has tool calls
+            const toolCalls = response.tool_calls || [];
+            const hasToolCalls = toolCalls.length > 0;
+
+            // Get text content
+            const textContent = typeof response.content === 'string'
+                ? response.content
+                : '';
+
+            // If there's text content, yield it
+            if (textContent) {
+                yield { type: 'text', content: textContent };
             }
 
-            // Collect tool calls
-            if (chunk.tool_calls && chunk.tool_calls.length > 0) {
-                toolCalls = chunk.tool_calls;
+            // If no tool calls, we're done
+            if (!hasToolCalls) {
+                yield { type: 'done' };
+                break;
             }
-        }
 
-        // Handle tool calls after streaming completes
-        if (toolCalls.length > 0) {
-            for (const toolCall of toolCalls) {
-                yield {
-                    type: 'tool',
-                    content: `Calling tool: ${toolCall.name}`,
-                    toolName: toolCall.name,
-                    toolArgs: toolCall.args as Record<string, unknown>,
+            // Add the AI response to message history
+            lcMessages.push(response);
+
+            // Execute each tool call
+            for (const tc of toolCalls) {
+                const toolCall: ToolCall = {
+                    id: tc.id || `tc_${Date.now()}`,
+                    name: tc.name,
+                    args: tc.args as Record<string, unknown>,
                 };
 
-                if (onToolCall) {
-                    onToolCall(toolCall.name, toolCall.args as Record<string, unknown>);
-                }
+                yield { type: 'tool_call', toolCall };
 
                 // Execute the tool
-                const toolToExecute = tools.find((t: any) => t.name === toolCall.name);
-                if (toolToExecute) {
-                    const toolResult = await toolToExecute.invoke(toolCall.args || {});
+                const result = await executeTool(toolCall);
 
-                    // If this is a code execution tool, yield the result with code and images
-                    if (toolCall.name === 'runPythonCode') {
-                        try {
-                            const parsedResult = JSON.parse(String(toolResult));
-                            yield {
-                                type: 'tool_result' as any,
-                                content: 'Code execution complete',
-                                toolName: toolCall.name,
-                                codeExecution: {
-                                    success: parsedResult.success,
-                                    error: parsedResult.error,
-                                    output: parsedResult.output,
-                                    images: parsedResult.images || [],
-                                    code: (toolCall.args as any)?.code || '',
-                                },
-                            };
-                        } catch {
-                            // If parsing fails, just continue
-                        }
-                    }
+                yield {
+                    type: 'tool_result',
+                    toolCallId: toolCall.id,
+                    toolName: toolCall.name,
+                    result
+                };
 
-                    // Add the tool result to messages and get final response with streaming
-                    const messagesWithTool = [
-                        ...langChainMessages,
-                        new AIMessage({ content: fullContent, tool_calls: toolCalls }),
-                        new ToolMessage({
-                            tool_call_id: toolCall.id || 'unknown',
-                            content: String(toolResult),
-                        }),
-                    ];
-
-                    // Stream the final response after tool execution
-                    const finalStream = await model.stream(messagesWithTool);
-                    for await (const finalChunk of finalStream) {
-                        if (finalChunk.content) {
-                            const textContent = typeof finalChunk.content === 'string'
-                                ? finalChunk.content
-                                : '';
-                            if (textContent) {
-                                yield { type: 'text_delta', content: textContent };
-                            }
-                        }
-                    }
-                }
+                // Add tool result to message history
+                lcMessages.push(new ToolMessage({
+                    tool_call_id: toolCall.id,
+                    content: JSON.stringify(result),
+                }));
             }
+
+            // Loop continues - model will see tool results
         }
+
+        if (iterations >= maxIterations) {
+            yield { type: 'error', content: 'Agent reached maximum iterations limit.' };
+        }
+
     } catch (error) {
+        console.error('[Agent] Error:', error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         yield { type: 'error', content: `Error: ${errorMessage}` };
     }

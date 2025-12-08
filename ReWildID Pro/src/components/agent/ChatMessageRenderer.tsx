@@ -1,20 +1,10 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { Box, Typography, keyframes } from '@mui/material';
+import React from 'react';
+import { Box, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ChatMessage } from '../../types/agent';
 import CodeExecutionBlock from './CodeExecutionBlock';
-
-// Fade in animation for streaming text
-const fadeIn = keyframes`
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
-`;
 
 interface ChatMessageRendererProps {
     message: ChatMessage;
@@ -25,61 +15,46 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({ message }) =>
     const isDark = theme.palette.mode === 'dark';
     const isUser = message.role === 'user';
     const isTool = message.role === 'tool';
-    const isStreaming = message.isStreaming;
+    const isAssistantWithToolCalls = message.role === 'assistant' && message.toolCalls && message.toolCalls.length > 0;
 
-    // Track previous content length for streaming fade-in effect
-    const prevContentLengthRef = useRef(0);
-    const [displayParts, setDisplayParts] = useState<{ text: string; isNew: boolean }[]>([]);
-
-    // Update display parts when content changes during streaming
-    useEffect(() => {
-        if (isStreaming && message.content) {
-            const prevLength = prevContentLengthRef.current;
-            const currentContent = message.content;
-
-            if (currentContent.length > prevLength) {
-                const oldPart = currentContent.slice(0, prevLength);
-                const newPart = currentContent.slice(prevLength);
-
-                setDisplayParts([
-                    { text: oldPart, isNew: false },
-                    { text: newPart, isNew: true },
-                ]);
-
-                // After animation, merge all as old
-                const timer = setTimeout(() => {
-                    prevContentLengthRef.current = currentContent.length;
-                    setDisplayParts([{ text: currentContent, isNew: false }]);
-                }, 200);
-
-                return () => clearTimeout(timer);
-            }
-        } else {
-            // Reset for non-streaming messages
-            prevContentLengthRef.current = 0;
-            setDisplayParts([]);
-        }
-    }, [message.content, isStreaming]);
-
-    // Glassmorphic styles
+    // Get glass style based on message type
     const getGlassStyle = () => {
         if (isUser) {
             return {
                 background: isDark
-                    ? 'rgba(100, 149, 237, 0.2)'  // Cornflower blue tint
-                    : 'rgba(70, 130, 180, 0.15)', // Steel blue tint
+                    ? 'rgba(100, 149, 237, 0.2)'
+                    : 'rgba(70, 130, 180, 0.15)',
                 border: `1px solid ${isDark ? 'rgba(100, 149, 237, 0.3)' : 'rgba(70, 130, 180, 0.25)'}`,
             };
         }
         if (isTool) {
+            // Tool result - show based on success/failure
+            const isError = message.toolResult && !message.toolResult.success;
+            if (isError) {
+                return {
+                    background: isDark
+                        ? 'rgba(244, 67, 54, 0.15)'
+                        : 'rgba(244, 67, 54, 0.1)',
+                    border: `1px solid ${isDark ? 'rgba(244, 67, 54, 0.3)' : 'rgba(244, 67, 54, 0.25)'}`,
+                };
+            }
             return {
                 background: isDark
-                    ? 'rgba(255, 193, 7, 0.15)'  // Amber tint
+                    ? 'rgba(76, 175, 80, 0.15)'
+                    : 'rgba(76, 175, 80, 0.1)',
+                border: `1px solid ${isDark ? 'rgba(76, 175, 80, 0.3)' : 'rgba(76, 175, 80, 0.25)'}`,
+            };
+        }
+        if (isAssistantWithToolCalls) {
+            // Tool call request - amber tint
+            return {
+                background: isDark
+                    ? 'rgba(255, 193, 7, 0.15)'
                     : 'rgba(255, 193, 7, 0.1)',
                 border: `1px solid ${isDark ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 193, 7, 0.25)'}`,
             };
         }
-        // Assistant - darker for readability
+        // Regular assistant message
         return {
             background: isDark
                 ? 'rgba(255, 255, 255, 0.08)'
@@ -90,50 +65,72 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({ message }) =>
 
     const glassStyle = getGlassStyle();
 
-    // Render streaming content with fade-in effect
-    const renderStreamingContent = () => {
-        if (displayParts.length === 0) {
-            return (
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {message.content}
-                </ReactMarkdown>
-            );
-        }
-
+    // Render tool call request (assistant asking to use a tool)
+    if (isAssistantWithToolCalls) {
         return (
-            <>
-                {displayParts.map((part, idx) => (
-                    <Box
-                        key={idx}
-                        component="span"
-                        sx={{
-                            display: 'inline',
-                            animation: part.isNew ? `${fadeIn} 0.2s ease-out` : 'none',
-                        }}
-                    >
-                        {part.text}
-                    </Box>
-                ))}
-                {/* Blinking cursor */}
+            <Box
+                sx={{
+                    display: 'flex',
+                    justifyContent: 'flex-start',
+                    width: '100%',
+                    mb: 2,
+                }}
+            >
                 <Box
-                    component="span"
                     sx={{
-                        display: 'inline-block',
-                        width: '2px',
-                        height: '1em',
-                        backgroundColor: theme.palette.text.primary,
-                        marginLeft: '2px',
-                        animation: 'blink 1s infinite',
-                        '@keyframes blink': {
-                            '0%, 50%': { opacity: 1 },
-                            '51%, 100%': { opacity: 0 },
-                        },
+                        maxWidth: '75%',
+                        p: 1.5,
+                        borderRadius: '16px 16px 16px 4px',
+                        ...glassStyle,
+                        backdropFilter: 'blur(76px)',
+                        WebkitBackdropFilter: 'blur(76px)',
                     }}
-                />
-            </>
+                >
+                    {message.toolCalls!.map((tc, idx) => (
+                        <Typography
+                            key={idx}
+                            variant="body2"
+                            sx={{
+                                color: isDark ? 'rgba(255, 193, 7, 0.9)' : 'rgba(180, 140, 0, 1)',
+                                fontStyle: 'italic',
+                                fontSize: '0.85rem',
+                            }}
+                        >
+                            🔧 Calling tool: {tc.name}
+                        </Typography>
+                    ))}
+                </Box>
+            </Box>
         );
-    };
+    }
 
+    // Render tool result
+    if (isTool && message.toolResult) {
+        return (
+            <Box
+                sx={{
+                    display: 'flex',
+                    justifyContent: 'flex-start',
+                    width: '100%',
+                    mb: 2,
+                }}
+            >
+                <Box
+                    sx={{
+                        maxWidth: '85%',
+                        minWidth: '300px',
+                    }}
+                >
+                    <CodeExecutionBlock
+                        result={message.toolResult}
+                        toolName={message.toolName || 'Tool'}
+                    />
+                </Box>
+            </Box>
+        );
+    }
+
+    // Render regular message (user or assistant text)
     return (
         <Box
             sx={{
@@ -153,18 +150,7 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({ message }) =>
                     WebkitBackdropFilter: 'blur(76px)',
                 }}
             >
-                {isTool ? (
-                    <Typography
-                        variant="body2"
-                        sx={{
-                            color: isDark ? 'rgba(255, 193, 7, 0.9)' : 'rgba(200, 150, 0, 1)',
-                            fontStyle: 'italic',
-                            fontSize: '0.85rem',
-                        }}
-                    >
-                        🔧 {message.content}
-                    </Typography>
-                ) : isUser ? (
+                {isUser ? (
                     <Typography
                         variant="body1"
                         sx={{
@@ -213,57 +199,10 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({ message }) =>
                             lineHeight: 1.6,
                         }}
                     >
-                        {isStreaming ? renderStreamingContent() : (
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {message.content}
-                            </ReactMarkdown>
-                        )}
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {message.content}
+                        </ReactMarkdown>
                     </Box>
-                )}
-
-                {/* Show tool call results */}
-                {message.toolCalls && message.toolCalls.length > 0 && (
-                    <Box sx={{ mt: 1.5, pt: 1.5, borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}` }}>
-                        {message.toolCalls.map((tc, idx) => (
-                            <Typography
-                                key={idx}
-                                variant="caption"
-                                sx={{
-                                    display: 'block',
-                                    color: theme.palette.text.secondary,
-                                    fontFamily: 'monospace',
-                                    fontSize: '0.75rem',
-                                }}
-                            >
-                                Used: {tc.toolName} → {tc.result}
-                            </Typography>
-                        ))}
-                    </Box>
-                )}
-
-                {/* Show images from code execution */}
-                {message.images && message.images.length > 0 && (
-                    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {message.images.map((imgSrc, idx) => (
-                            <Box
-                                key={idx}
-                                component="img"
-                                src={imgSrc}
-                                alt={`Generated chart ${idx + 1}`}
-                                sx={{
-                                    maxWidth: '100%',
-                                    borderRadius: 2,
-                                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
-                                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.9)',
-                                }}
-                            />
-                        ))}
-                    </Box>
-                )}
-
-                {/* Show code execution result */}
-                {message.codeExecution && (
-                    <CodeExecutionBlock result={message.codeExecution} />
                 )}
             </Box>
         </Box>
