@@ -4,6 +4,7 @@ import { useTheme } from '@mui/material/styles';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ChatMessage } from '../../types/agent';
+import CodeExecutionBlock from './CodeExecutionBlock';
 
 // Fade in animation for streaming text
 const fadeIn = keyframes`
@@ -241,6 +242,31 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({ message }) =>
                             </Typography>
                         ))}
                     </Box>
+                )}
+
+                {/* Show images from code execution */}
+                {message.images && message.images.length > 0 && (
+                    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {message.images.map((imgSrc, idx) => (
+                            <Box
+                                key={idx}
+                                component="img"
+                                src={imgSrc}
+                                alt={`Generated chart ${idx + 1}`}
+                                sx={{
+                                    maxWidth: '100%',
+                                    borderRadius: 2,
+                                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+                                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.9)',
+                                }}
+                            />
+                        ))}
+                    </Box>
+                )}
+
+                {/* Show code execution result */}
+                {message.codeExecution && (
+                    <CodeExecutionBlock result={message.codeExecution} />
                 )}
             </Box>
         </Box>

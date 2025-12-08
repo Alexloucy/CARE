@@ -257,11 +257,19 @@ const SettingsPage: React.FC = () => {
     // AI Agent settings
     const [aiApiKey, setAiApiKey] = useState(() => getAgentSettings().apiKey);
     const [showApiKey, setShowApiKey] = useState(false);
+    const [e2bApiKey, setE2bApiKey] = useState(() => getAgentSettings().e2bApiKey);
+    const [showE2bKey, setShowE2bKey] = useState(false);
 
     const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newKey = e.target.value;
         setAiApiKey(newKey);
         saveAgentSettings({ apiKey: newKey });
+    };
+
+    const handleE2bKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newKey = e.target.value;
+        setE2bApiKey(newKey);
+        saveAgentSettings({ e2bApiKey: newKey });
     };
 
     // Load all settings from localStorage
@@ -558,9 +566,56 @@ const SettingsPage: React.FC = () => {
                                     />
                                 </Box>
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ mb: 2 }}>
                                 Using model: <strong>gemini-flash-latest</strong>
                             </Typography>
+
+                            {/* E2B Code Execution */}
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mt: 2 }}>
+                                <Key size={24} style={{ marginTop: 8 }} color={theme.palette.text.secondary} />
+                                <Box sx={{ flex: 1 }}>
+                                    <Typography variant="body2" fontWeight="medium" sx={{ mb: 0.5 }}>
+                                        E2B API Key (Code Execution)
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                        Optional. Enables Python code execution for diagrams.{' '}
+                                        <a
+                                            href="https://e2b.dev"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{ color: theme.palette.primary.main }}
+                                        >
+                                            e2b.dev
+                                        </a>
+                                    </Typography>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        type={showE2bKey ? 'text' : 'password'}
+                                        value={e2bApiKey}
+                                        onChange={handleE2bKeyChange}
+                                        placeholder="e2b_..."
+                                        InputProps={{
+                                            endAdornment: (
+                                                <InputAdornment position="end">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => setShowE2bKey(!showE2bKey)}
+                                                        edge="end"
+                                                    >
+                                                        <Eye size={18} weight={showE2bKey ? 'fill' : 'regular'} />
+                                                    </IconButton>
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                        sx={{
+                                            '& .MuiOutlinedInput-root': {
+                                                borderRadius: 2,
+                                            }
+                                        }}
+                                    />
+                                </Box>
+                            </Box>
                         </Box>
                     </AccordionDetails>
                 </Accordion>

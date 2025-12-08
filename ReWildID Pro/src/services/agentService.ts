@@ -4,6 +4,7 @@ import { HumanMessage, AIMessage, BaseMessage, SystemMessage, ToolMessage } from
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { ChatMessage, AgentSettings, DEFAULT_AGENT_SETTINGS } from '../types/agent';
+import { Sandbox } from '@e2b/code-interpreter';
 
 // Define the secret reveal tool
 const revealSecretTool = tool(
@@ -17,7 +18,101 @@ const revealSecretTool = tool(
     }
 );
 
-const tools = [revealSecretTool];
+// Define the Python code execution tool
+const runPythonCodeTool = tool(
+    async ({ code }: { code: string }) => {
+        const settings = getAgentSettings();
+        console.log('[E2B] Starting code execution, code length:', code.length);
+
+        if (!settings.e2bApiKey) {
+            console.log('[E2B] No API key configured');
+            return JSON.stringify({
+                success: false,
+                error: 'E2B API key not configured. Please add it in Settings.',
+                output: null,
+                images: [],
+            });
+        }
+
+        try {
+            console.log('[E2B] Creating sandbox...');
+            // Create sandbox with API key
+            const sandbox = await Sandbox.create({
+                apiKey: settings.e2bApiKey,
+            });
+            console.log('[E2B] Sandbox created');
+
+            try {
+                // Execute the code
+                console.log('[E2B] Running code...');
+                const execution = await sandbox.runCode(code);
+                console.log('[E2B] Execution complete. Results count:', execution.results.length);
+                console.log('[E2B] Stdout lines:', execution.logs.stdout.length);
+                console.log('[E2B] Stderr lines:', execution.logs.stderr.length);
+                console.log('[E2B] Error:', execution.error ? `${execution.error.name}: ${execution.error.value}` : 'none');
+
+                // Collect results - properly format error using name/value/traceback
+                const errorMessage = execution.error
+                    ? `${execution.error.name}: ${execution.error.value}\n${execution.error.traceback || ''}`
+                    : null;
+
+                const result = {
+                    success: !execution.error,
+                    error: errorMessage,
+                    output: [...execution.logs.stdout, ...execution.logs.stderr].join('\n'),
+                    images: [] as string[],
+                };
+
+                // Check for image results (matplotlib, etc.)
+                for (const output of execution.results) {
+                    console.log('[E2B] Result formats:', output.formats ? output.formats() : 'N/A');
+                    if (output.png) {
+                        console.log('[E2B] Found PNG image, length:', output.png.length);
+                        result.images.push(`data:image/png;base64,${output.png}`);
+                    }
+                    if (output.jpeg) {
+                        console.log('[E2B] Found JPEG image');
+                        result.images.push(`data:image/jpeg;base64,${output.jpeg}`);
+                    }
+                }
+
+                console.log('[E2B] Final result - success:', result.success, 'images:', result.images.length);
+                return JSON.stringify(result);
+            } finally {
+                // Always close the sandbox
+                console.log('[E2B] Killing sandbox...');
+                await sandbox.kill();
+            }
+        } catch (error) {
+            console.error('[E2B] Exception:', error);
+            return JSON.stringify({
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                output: null,
+                images: [],
+            });
+        }
+    },
+    {
+        name: 'runPythonCode',
+        description: 'Execute Python code in a secure sandbox. Use this for calculations, data processing, and generating visualizations with matplotlib/seaborn. Code output and any generated images will be returned.',
+        schema: z.object({
+            code: z.string().describe('The Python code to execute. Include necessary imports. For charts, use matplotlib.pyplot and they will be returned as images.'),
+        }),
+    }
+);
+
+// Get the tools list based on available API keys
+function getAvailableTools() {
+    const settings = getAgentSettings();
+    const availableTools = [revealSecretTool];
+
+    if (settings.e2bApiKey) {
+        availableTools.push(runPythonCodeTool as any);
+    }
+
+    return availableTools;
+}
 
 // Storage keys
 const SETTINGS_KEY = 'agent_settings';
@@ -123,14 +218,30 @@ function toLangChainMessages(messages: ChatMessage[]): BaseMessage[] {
 // System prompt for the agent
 const SYSTEM_PROMPT = `You are a helpful AI assistant for RewildID Pro, a wildlife re-identification application. 
 You help users with wildlife conservation tasks, image analysis, and general questions.
-You have access to a special tool called "revealSecret" that reveals a secret message when users ask for it.
-Be friendly, concise, and helpful.`;
+
+Available tools:
+- revealSecret: Reveals a secret message when users ask for it
+- runPythonCode: Execute Python code to perform calculations, data analysis, or generate charts/visualizations with matplotlib. Use this tool when users want to see graphs, charts, plots, or need computational tasks done.
+
+When generating visualizations:
+1. Always use matplotlib.pyplot
+2. Use plt.savefig() is NOT needed - images are automatically captured
+3. For nice charts, consider using seaborn
+4. Add proper titles, labels, and legends
+
+Be friendly, concise, and helpful. When users ask for data visualization or charts, proactively use the runPythonCode tool.`;
 
 // Stream a response from the agent with real token streaming
 export async function* streamAgentResponse(
     messages: ChatMessage[],
     onToolCall?: (toolName: string, args: Record<string, unknown>) => void
-): AsyncGenerator<{ type: 'text' | 'text_delta' | 'tool' | 'error'; content: string; toolName?: string; toolArgs?: Record<string, unknown> }> {
+): AsyncGenerator<{
+    type: 'text' | 'text_delta' | 'tool' | 'tool_result' | 'error';
+    content: string;
+    toolName?: string;
+    toolArgs?: Record<string, unknown>;
+    codeExecution?: import('../types/agent').CodeExecutionResult;
+}> {
     const settings = getAgentSettings();
 
     if (!settings.apiKey) {
@@ -144,6 +255,7 @@ export async function* streamAgentResponse(
         return;
     }
 
+    const tools = getAvailableTools();
     const modelWithTools = model.bindTools(tools);
 
     try {
@@ -191,9 +303,30 @@ export async function* streamAgentResponse(
                 }
 
                 // Execute the tool
-                const toolToExecute = tools.find((t) => t.name === toolCall.name);
+                const toolToExecute = tools.find((t: any) => t.name === toolCall.name);
                 if (toolToExecute) {
-                    const toolResult = await toolToExecute.invoke({});
+                    const toolResult = await toolToExecute.invoke(toolCall.args || {});
+
+                    // If this is a code execution tool, yield the result with code and images
+                    if (toolCall.name === 'runPythonCode') {
+                        try {
+                            const parsedResult = JSON.parse(String(toolResult));
+                            yield {
+                                type: 'tool_result' as any,
+                                content: 'Code execution complete',
+                                toolName: toolCall.name,
+                                codeExecution: {
+                                    success: parsedResult.success,
+                                    error: parsedResult.error,
+                                    output: parsedResult.output,
+                                    images: parsedResult.images || [],
+                                    code: (toolCall.args as any)?.code || '',
+                                },
+                            };
+                        } catch {
+                            // If parsing fails, just continue
+                        }
+                    }
 
                     // Add the tool result to messages and get final response with streaming
                     const messagesWithTool = [

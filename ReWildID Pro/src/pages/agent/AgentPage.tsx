@@ -5,7 +5,7 @@ import { ClockCounterClockwise, Trash, X } from '@phosphor-icons/react';
 import AgentInputBar from '../../components/agent/AgentInputBar';
 import ChatMessageRenderer from '../../components/agent/ChatMessageRenderer';
 import MessageSkeleton from '../../components/agent/MessageSkeleton';
-import { ChatMessage, AgentSession } from '../../types/agent';
+import { ChatMessage, AgentSession, CodeExecutionResult } from '../../types/agent';
 import {
     streamAgentResponse,
     generateMessageId,
@@ -190,6 +190,7 @@ const AgentPage: React.FC = () => {
         try {
             const allMessages = [...messages, userMessage];
             let accumulatedContent = '';
+            let latestCodeExecution: CodeExecutionResult | null = null;
 
             for await (const chunk of streamAgentResponse(allMessages)) {
                 // Check if aborted
@@ -220,6 +221,11 @@ const AgentPage: React.FC = () => {
                     setMessages(prev => [...prev, toolMessage]);
                 }
 
+                if (chunk.type === 'tool_result' && chunk.codeExecution) {
+                    // Store code execution result locally to attach to the final message
+                    latestCodeExecution = chunk.codeExecution;
+                }
+
                 if (chunk.type === 'text_delta') {
                     // Accumulate streaming content
                     accumulatedContent += chunk.content;
@@ -227,13 +233,14 @@ const AgentPage: React.FC = () => {
                 }
             }
 
-            // After streaming completes, add the full message
+            // After streaming completes, add the full message with code execution if present
             if (accumulatedContent && !abortControllerRef.current?.signal.aborted) {
                 const assistantMessage: ChatMessage = {
                     id: generateMessageId(),
                     role: 'assistant',
                     content: accumulatedContent,
                     timestamp: new Date(),
+                    codeExecution: latestCodeExecution || undefined,
                 };
                 setMessages(prev => [...prev, assistantMessage]);
                 setStreamingContent('');
