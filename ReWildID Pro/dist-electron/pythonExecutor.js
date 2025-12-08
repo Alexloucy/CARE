@@ -75,10 +75,15 @@ async function executePythonCode(code) {
         // Create a temp directory for this execution
         const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rewildid-py-'));
         const scriptPath = path.join(tempDir, 'script.py');
+        // Get the database path
+        const dbPath = path.join(process.cwd(), 'data', 'library.db').replace(/\\/g, '/');
         // Wrap the code to save matplotlib figures automatically
         const wrappedCode = `
 import sys
 import os
+
+# Database path for querying RewildID data
+DB_PATH = ${JSON.stringify(dbPath)}
 
 # Set the temp directory for saving figures
 _TEMP_DIR = ${JSON.stringify(tempDir)}
