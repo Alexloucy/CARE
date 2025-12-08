@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Box, Typography, Modal, IconButton, Fade, Backdrop, Paper, useTheme, Divider, Tooltip } from '@mui/material';
+import { Box, Typography, Modal, IconButton, Fade, Backdrop, Paper, useTheme, Divider, Tooltip, CircularProgress } from '@mui/material';
 import { X, MagnifyingGlassPlus, MagnifyingGlassMinus, CaretLeft, CaretRight, Trash, Sparkle, Sidebar } from '@phosphor-icons/react';
 import { FileDetails, Detection, ReidInfoForImage } from '../types/electron';
 import { LiquidGlassOverlay } from './LiquidGlassOverlay';
@@ -640,7 +640,11 @@ const ImageModal: React.FC<ImageModalProps> = ({
         };
     };
 
-    if (!file || !imageUrl) return null;
+    // Don't return null when imageUrl is empty - keep modal open with loading state
+    // This prevents flicker when navigating to virtualized images that haven't loaded yet
+    if (!file) return null;
+
+    const isLoading = !imageUrl;
 
     return (
         <Modal
@@ -711,22 +715,37 @@ const ImageModal: React.FC<ImageModalProps> = ({
                                 handleMouseUp();
                             }}
                         >
-                            <img
-                                ref={imageRef}
-                                src={imageUrl}
-                                alt={file.name}
-                                onLoad={handleImageLoad}
-                                style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    objectFit: 'contain',
-                                    transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
-                                    transition: isDragging ? 'none' : 'transform 0.1s ease-out',
-                                    userSelect: 'none'
-                                }}
-                                draggable={false}
-                                onDragStart={(e) => e.preventDefault()}
-                            />
+                            {isLoading ? (
+                                /* Loading placeholder when image URL is not yet available */
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '100%',
+                                        height: '100%'
+                                    }}
+                                >
+                                    <CircularProgress size={40} sx={{ opacity: 0.7 }} />
+                                </Box>
+                            ) : (
+                                <img
+                                    ref={imageRef}
+                                    src={imageUrl}
+                                    alt={file.name}
+                                    onLoad={handleImageLoad}
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'contain',
+                                        transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+                                        transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+                                        userSelect: 'none'
+                                    }}
+                                    draggable={false}
+                                    onDragStart={(e) => e.preventDefault()}
+                                />
+                            )}
 
                             {/* Bounding Box Overlay */}
                             {detections && detections.length > 0 && imageDimensions.natural.width > 0 && (
