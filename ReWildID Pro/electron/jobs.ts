@@ -91,10 +91,35 @@ export class JobManager {
             const job = this.activeJobs.get(id);
             if (job) {
                 job.status = 'cancelled';
-                // We cannot easily kill the async promise, but the job will check status
+                job.completedAt = Date.now();
+                // Only terminate subprocess for jobs that spawn Python processes
+                if (job.type === 'detect' || job.type === 'reid') {
+                    terminateSubprocess();
+                }
+                this.activeJobs.delete(id);
+                this.addToHistory(job);
                 this.emitUpdate();
             }
         }
+    }
+
+    retryJob(id: string): string | null {
+        // Find job in completed history
+        const jobIndex = this.completedJobs.findIndex(j => j.id === id);
+        if (jobIndex === -1) return null;
+
+        const originalJob = this.completedJobs[jobIndex];
+
+        // Only allow retry for detect and reid jobs that failed or were cancelled
+        if (!['detect', 'reid'].includes(originalJob.type)) return null;
+        if (!['failed', 'cancelled'].includes(originalJob.status)) return null;
+
+        // Remove from history
+        this.completedJobs.splice(jobIndex, 1);
+
+        // Re-queue with same payload
+        const newJobId = this.addJob(originalJob.type, originalJob.payload);
+        return newJobId;
     }
 
     private addToHistory(job: Job) {
@@ -166,10 +191,13 @@ export class JobManager {
                 job.error = error instanceof Error ? error.message : String(error);
             }
         } finally {
-            job.completedAt = Date.now();
-            this.activeJobs.delete(job.id);
-            this.addToHistory(job);
-            this.emitUpdate();
+            // Only process if job is still in activeJobs (not already handled by cancelJob)
+            if (this.activeJobs.has(job.id)) {
+                job.completedAt = Date.now();
+                this.activeJobs.delete(job.id);
+                this.addToHistory(job);
+                this.emitUpdate();
+            }
 
             // Trigger next job
             this.processQueue();

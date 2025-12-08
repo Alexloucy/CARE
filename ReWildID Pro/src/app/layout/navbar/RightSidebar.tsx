@@ -70,7 +70,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     px: 2,
-                    my: 2, // Add top margin for visual breathing room
+                    my: 1, // Add top margin for visual breathing room
                     // No background here - inherit from drawer paper
                 }}
             >

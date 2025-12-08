@@ -220,6 +220,7 @@ ipcMain.handle('deleteDetection', (_, id) => deleteDetection(id));
 // Job Management
 ipcMain.handle('getJobs', () => JobManager.getInstance().getJobs());
 ipcMain.handle('cancelJob', (_, id) => JobManager.getInstance().cancelJob(id));
+ipcMain.handle('retryJob', (_, id) => JobManager.getInstance().retryJob(id));
 
 // New Smart ReID (DB-based)
 ipcMain.handle('smartReID', (_, imageIds, species) => smartReID(imageIds, species));

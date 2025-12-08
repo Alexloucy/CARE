@@ -154,6 +154,7 @@ electron_1.ipcMain.handle('deleteDetection', (_, id) => (0, controller_1.deleteD
 // Job Management
 electron_1.ipcMain.handle('getJobs', () => jobs_1.JobManager.getInstance().getJobs());
 electron_1.ipcMain.handle('cancelJob', (_, id) => jobs_1.JobManager.getInstance().cancelJob(id));
+electron_1.ipcMain.handle('retryJob', (_, id) => jobs_1.JobManager.getInstance().retryJob(id));
 // New Smart ReID (DB-based)
 electron_1.ipcMain.handle('smartReID', (_, imageIds, species) => (0, controller_1.smartReID)(imageIds, species));
 electron_1.ipcMain.handle('getReidRuns', () => (0, controller_1.getReidRuns)());

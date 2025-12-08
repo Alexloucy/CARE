@@ -239,6 +239,7 @@ export interface ElectronApi {
     getPathForFile: (file: File) => string;
     getJobs: () => Promise<any[]>;
     cancelJob: (id: string) => Promise<void>;
+    retryJob: (id: string) => Promise<string | null>;
     onJobUpdate: (callback: (jobs: any[]) => void) => () => void;
 }
 

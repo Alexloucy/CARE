@@ -64,6 +64,7 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     // Jobs
     getJobs: () => electron_1.ipcRenderer.invoke('getJobs'),
     cancelJob: (id) => electron_1.ipcRenderer.invoke('cancelJob', id),
+    retryJob: (id) => electron_1.ipcRenderer.invoke('retryJob', id),
     onJobUpdate: (callback) => {
         const handler = (_event, jobs) => callback(jobs);
         electron_1.ipcRenderer.on('job-update', handler);

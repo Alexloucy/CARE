@@ -28,6 +28,7 @@ export function useJobs() {
     }, []);
 
     const cancelJob = (id: string) => window.api.cancelJob(id);
+    const retryJob = (id: string) => window.api.retryJob(id);
 
-    return { jobs, cancelJob };
+    return { jobs, cancelJob, retryJob };
 }

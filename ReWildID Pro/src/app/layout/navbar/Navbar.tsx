@@ -3,8 +3,6 @@ import { AppBar, Toolbar, Box, IconButton, Tooltip, Badge } from '@mui/material'
 import { useTheme as useMuiTheme } from '@mui/material/styles';
 import {
     Sidebar,
-    Sun,
-    Moon,
     ListChecks,
     CaretLeft,
     CaretRight,
@@ -44,7 +42,7 @@ export default function Navbar({
     rightSidebarOpen,
 }: NavbarProps) {
     const muiTheme = useMuiTheme();
-    const { toggleColorMode, colorTheme } = useColorMode();
+    const { colorTheme } = useColorMode();
     const isDarkMode = muiTheme.palette.mode === 'dark';
     const location = useLocation();
     const navigate = useNavigate();
@@ -292,7 +290,7 @@ export default function Navbar({
                         ...(inElectron && { WebkitAppRegion: 'no-drag' }),
                     }}
                 >
-                    <Tooltip title={isDarkMode ? 'Light Mode' : 'Dark Mode'}>
+                    {/*                     <Tooltip title={isDarkMode ? 'Light Mode' : 'Dark Mode'}>
                         <IconButton
                             color="inherit"
                             onClick={toggleColorMode}
@@ -300,7 +298,7 @@ export default function Navbar({
                         >
                             {isDarkMode ? <Sun size={24} /> : <Moon size={24} />}
                         </IconButton>
-                    </Tooltip>
+                    </Tooltip> */}
 
                     <Tooltip title="Tasks">
                         <IconButton

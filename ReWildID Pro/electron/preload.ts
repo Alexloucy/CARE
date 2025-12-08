@@ -72,6 +72,7 @@ contextBridge.exposeInMainWorld('api', {
     // Jobs
     getJobs: () => ipcRenderer.invoke('getJobs'),
     cancelJob: (id: string) => ipcRenderer.invoke('cancelJob', id),
+    retryJob: (id: string) => ipcRenderer.invoke('retryJob', id),
     onJobUpdate: (callback: (jobs: any[]) => void) => {
         const handler = (_event: any, jobs: any[]) => callback(jobs);
         ipcRenderer.on('job-update', handler);
