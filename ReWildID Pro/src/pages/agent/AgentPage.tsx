@@ -278,13 +278,12 @@ const AgentPage: React.FC = () => {
                 });
             }
 
-            // Add result message
+            // Add result as assistant message (not tool - avoids LangChain issues)
             addMessage({
-                role: 'tool',
-                content: '',
-                toolCallId: confirmationRequest.id,
-                toolName: 'updateMetadata',
-                toolResult: result,
+                role: 'assistant',
+                content: result.success
+                    ? `Update applied successfully. ${result.output || ''}`
+                    : `Update failed: ${result.error || 'Unknown error'}`,
             });
         } catch (error) {
             addMessage({
@@ -315,18 +314,17 @@ const AgentPage: React.FC = () => {
                 });
             }
 
-            // Add result message
+            // Add result as assistant message (not tool - avoids LangChain issues)
             addMessage({
-                role: 'tool',
-                content: '',
-                toolCallId: confirmationRequest.id,
-                toolName: 'revertMetadata',
-                toolResult: result,
+                role: 'assistant',
+                content: result.success
+                    ? `Revert completed. ${result.output || ''}`
+                    : `Revert failed: ${result.error || 'Unknown error'}`,
             });
         } catch (error) {
             addMessage({
                 role: 'assistant',
-                content: `❌ Failed to revert: ${(error as Error).message}`,
+                content: `Failed to revert: ${(error as Error).message}`,
             });
         } finally {
             setIsLoading(false);

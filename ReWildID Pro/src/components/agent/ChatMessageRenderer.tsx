@@ -138,34 +138,40 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({
                     <Collapse in={toolCallExpanded}>
                         <Box sx={{ mt: 1, pl: 3 }}>
                             {message.toolCalls!.map((tc, idx) => (
-                                <Box key={idx} sx={{ mb: 0.5 }}>
+                                <Box key={idx} sx={{ mb: 1 }}>
                                     <Typography
                                         variant="caption"
                                         sx={{
-                                            color: 'text.secondary',
+                                            color: isDark ? 'rgba(255, 193, 7, 0.8)' : 'rgba(180, 140, 0, 0.9)',
                                             fontFamily: 'monospace',
+                                            fontWeight: 600,
                                             fontSize: '0.75rem',
                                         }}
                                     >
                                         {tc.name}
                                     </Typography>
                                     {tc.args && Object.keys(tc.args).length > 0 && (
-                                        <Typography
-                                            variant="caption"
+                                        <Box
                                             component="pre"
                                             sx={{
-                                                color: 'text.secondary',
+                                                mt: 0.5,
+                                                p: 1,
+                                                borderRadius: 1,
+                                                background: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)',
+                                                maxHeight: 150,
+                                                overflowY: 'auto',
+                                                overflowX: 'auto',
                                                 fontSize: '0.7rem',
                                                 fontFamily: 'monospace',
-                                                mt: 0.25,
-                                                whiteSpace: 'pre-wrap',
-                                                wordBreak: 'break-all',
-                                                opacity: 0.7,
+                                                color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
+                                                whiteSpace: 'pre',
+                                                m: 0,
                                             }}
                                         >
-                                            {JSON.stringify(tc.args, null, 2).slice(0, 200)}
-                                            {JSON.stringify(tc.args).length > 200 && '...'}
-                                        </Typography>
+                                            <code>
+                                                {JSON.stringify(tc.args, null, 2)}
+                                            </code>
+                                        </Box>
                                     )}
                                 </Box>
                             ))}
