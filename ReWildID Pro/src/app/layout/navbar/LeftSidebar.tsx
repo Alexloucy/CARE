@@ -16,6 +16,7 @@ import {
     Sparkle,
     Fingerprint,
     Gear,
+    Robot,
 } from '@phosphor-icons/react';
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -53,6 +54,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
         { key: 'library', label: 'Library', path: '/library', icon: <Images weight="regular" size={20} /> },
         { key: 'classification', label: 'Classification', path: '/classification', icon: <Sparkle weight="regular" size={20} /> },
         { key: 'reid', label: 'Re-identification', path: '/reid', icon: <Fingerprint weight="regular" size={20} /> },
+        { key: 'agent', label: 'AI Agent', path: '/agent', icon: <Robot weight="regular" size={20} /> },
         { key: 'settings', label: 'Settings', path: '/settings', icon: <Gear weight="regular" size={20} /> },
     ];
 

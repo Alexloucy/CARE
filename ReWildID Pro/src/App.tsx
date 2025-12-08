@@ -6,6 +6,7 @@ import ClassificationPage from './pages/classification/ClassificationPage';
 import ReIDPage from './pages/reid/ReIDPage';
 import IndividualDetailView from './pages/reid/IndividualDetailView';
 import SettingsPage from './pages/settings/SettingsPage';
+import AgentPage from './pages/agent/AgentPage';
 import { Box, Typography } from '@mui/material';
 
 const Placeholder = ({ title }: { title: string }) => (
@@ -23,6 +24,7 @@ function App() {
                 <Route path="classification" element={<ClassificationPage />} />
                 <Route path="reid" element={<ReIDPage />} />
                 <Route path="reid/run/:runId/individual/:individualId" element={<IndividualDetailView />} />
+                <Route path="agent" element={<AgentPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="auth" element={<Placeholder title="Auth" />} />
                 <Route path="*" element={<Placeholder title="404 Not Found" />} />

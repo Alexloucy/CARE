@@ -17,8 +17,11 @@ import {
     IconButton,
     Tooltip,
     useTheme,
-    alpha
+    alpha,
+    TextField,
+    InputAdornment,
 } from '@mui/material';
+import { getAgentSettings, saveAgentSettings } from '../../services/agentService';
 import {
     CaretDown,
     GridFour,
@@ -37,7 +40,9 @@ import {
     Check,
     Sun,
     Moon,
-    Trash
+    Trash,
+    Robot,
+    Key,
 } from '@phosphor-icons/react';
 import StyledSwitch from '../../components/StyledSwitch';
 import { resetAllTours } from '../../components/OnboardingTour';
@@ -249,6 +254,16 @@ const SettingsPage: React.FC = () => {
     const { colorTheme, setColorTheme } = useColorMode();
     const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special || !!colorTheme.image;
 
+    // AI Agent settings
+    const [aiApiKey, setAiApiKey] = useState(() => getAgentSettings().apiKey);
+    const [showApiKey, setShowApiKey] = useState(false);
+
+    const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newKey = e.target.value;
+        setAiApiKey(newKey);
+        saveAgentSettings({ apiKey: newKey });
+    };
+
     // Load all settings from localStorage
     const [settings, setSettings] = useState<Record<string, any>>(() => {
         const initial: Record<string, any> = {};
@@ -443,6 +458,109 @@ const SettingsPage: React.FC = () => {
                                     </Typography>
                                 </Box>
                             ))}
+                        </Box>
+                    </AccordionDetails>
+                </Accordion>
+
+                {/* AI Agent Settings */}
+                <Accordion
+                    defaultExpanded
+                    disableGutters
+                    square
+                    elevation={0}
+                    sx={{
+                        mb: 2,
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: 2.5,
+                        '&:before': { display: 'none' },
+                        overflow: 'hidden',
+                        bgcolor: hasGradient
+                            ? (theme.palette.mode === 'dark' ? 'rgba(30, 30, 36, 0.75)' : 'rgba(247, 249, 251, 0.75)')
+                            : 'background.paper',
+                        backdropFilter: hasGradient ? 'blur(12px)' : 'none',
+                        WebkitBackdropFilter: hasGradient ? 'blur(12px)' : 'none',
+                    }}
+                >
+                    <AccordionSummary
+                        expandIcon={<CaretDown size={20} />}
+                        sx={{
+                            px: 2,
+                            minHeight: '56px',
+                            '& .MuiAccordionSummary-content': {
+                                my: '12px'
+                            },
+                            '&.Mui-expanded': {
+                                minHeight: '56px',
+                                borderBottom: `1px solid ${theme.palette.divider}`
+                            }
+                        }}
+                    >
+                        <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', pr: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Robot size={20} />
+                                <Typography variant="h6" fontWeight="600">
+                                    AI Agent
+                                </Typography>
+                            </Box>
+                            <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ mt: 0, lineHeight: 1.3, ml: 3.5 }}
+                            >
+                                Configure your Google AI Studio API key for the AI agent
+                            </Typography>
+                        </Box>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ pt: 2, px: 2, pb: 2 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                                <Key size={24} style={{ marginTop: 8 }} color={theme.palette.text.secondary} />
+                                <Box sx={{ flex: 1 }}>
+                                    <Typography variant="body2" fontWeight="medium" sx={{ mb: 0.5 }}>
+                                        Google AI Studio API Key
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                        Get your API key from{' '}
+                                        <a
+                                            href="https://aistudio.google.com/apikey"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{ color: theme.palette.primary.main }}
+                                        >
+                                            aistudio.google.com
+                                        </a>
+                                    </Typography>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        type={showApiKey ? 'text' : 'password'}
+                                        value={aiApiKey}
+                                        onChange={handleApiKeyChange}
+                                        placeholder="AIza..."
+                                        InputProps={{
+                                            endAdornment: (
+                                                <InputAdornment position="end">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => setShowApiKey(!showApiKey)}
+                                                        edge="end"
+                                                    >
+                                                        <Eye size={18} weight={showApiKey ? 'fill' : 'regular'} />
+                                                    </IconButton>
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                        sx={{
+                                            '& .MuiOutlinedInput-root': {
+                                                borderRadius: 2,
+                                            }
+                                        }}
+                                    />
+                                </Box>
+                            </Box>
+                            <Typography variant="caption" color="text.secondary">
+                                Using model: <strong>gemini-flash-latest</strong>
+                            </Typography>
                         </Box>
                     </AccordionDetails>
                 </Accordion>
