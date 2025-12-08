@@ -100,5 +100,12 @@ contextBridge.exposeInMainWorld('api', {
     clearEmbeddingsCache: () => ipcRenderer.invoke('clearEmbeddingsCache'),
 
     // Python Code Execution (for AI Agent)
-    executePythonCode: (code: string) => ipcRenderer.invoke('executePythonCode', code)
+    executePythonCode: (code: string) => ipcRenderer.invoke('executePythonCode', code),
+
+    // Database Backup (for AI Agent)
+    backupTable: (tableName: string, whereClause?: string, params?: any[]) =>
+        ipcRenderer.invoke('backupTable', tableName, whereClause, params),
+    listBackups: (tableName?: string) => ipcRenderer.invoke('listBackups', tableName),
+    restoreBackup: (backupPath: string) => ipcRenderer.invoke('restoreBackup', backupPath),
+    deleteBackup: (backupPath: string) => ipcRenderer.invoke('deleteBackup', backupPath)
 });

@@ -56,6 +56,7 @@ import {
 } from './controller';
 import { JobManager } from './jobs';
 import { executePythonCode } from './pythonExecutor';
+import { backupTable, listBackups, restoreBackup, deleteBackup } from './backup';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -249,6 +250,14 @@ ipcMain.handle('clearEmbeddingsCache', () => clearEmbeddingsCache());
 
 // Python Code Execution (for AI Agent)
 ipcMain.handle('executePythonCode', (_, code: string) => executePythonCode(code));
+
+// Database Backup (for AI Agent)
+ipcMain.handle('backupTable', (_, tableName: string, whereClause?: string, params?: any[]) =>
+    backupTable(tableName, whereClause, params)
+);
+ipcMain.handle('listBackups', (_, tableName?: string) => listBackups(tableName));
+ipcMain.handle('restoreBackup', (_, backupPath: string) => restoreBackup(backupPath));
+ipcMain.handle('deleteBackup', (_, backupPath: string) => deleteBackup(backupPath));
 
 
 app.on('ready', () => {

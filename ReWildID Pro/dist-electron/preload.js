@@ -89,5 +89,10 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     // Embeddings Cache
     clearEmbeddingsCache: () => electron_1.ipcRenderer.invoke('clearEmbeddingsCache'),
     // Python Code Execution (for AI Agent)
-    executePythonCode: (code) => electron_1.ipcRenderer.invoke('executePythonCode', code)
+    executePythonCode: (code) => electron_1.ipcRenderer.invoke('executePythonCode', code),
+    // Database Backup (for AI Agent)
+    backupTable: (tableName, whereClause, params) => electron_1.ipcRenderer.invoke('backupTable', tableName, whereClause, params),
+    listBackups: (tableName) => electron_1.ipcRenderer.invoke('listBackups', tableName),
+    restoreBackup: (backupPath) => electron_1.ipcRenderer.invoke('restoreBackup', backupPath),
+    deleteBackup: (backupPath) => electron_1.ipcRenderer.invoke('deleteBackup', backupPath)
 });

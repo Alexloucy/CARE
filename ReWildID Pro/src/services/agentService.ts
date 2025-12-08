@@ -3,7 +3,7 @@ import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { HumanMessage, AIMessage, BaseMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { ChatMessage, AgentSettings, DEFAULT_AGENT_SETTINGS, ToolCall, ToolResult, AgentSession } from '../types/agent';
+import { ChatMessage, AgentSettings, DEFAULT_AGENT_SETTINGS, ToolCall, ToolResult, AgentSession, ConfirmationRequest } from '../types/agent';
 
 // Define the secret reveal tool
 const revealSecretTool = tool(
@@ -51,16 +51,99 @@ const runPythonCodeTool = tool(
     },
     {
         name: 'runPythonCode',
-        description: 'Execute Python code locally on the user\'s machine. Use this for calculations, data processing, and generating visualizations with matplotlib/seaborn. Code output and any generated images will be returned.',
+        description: 'Execute Python code locally for READ-ONLY operations: calculations, data analysis, and generating visualizations. For database WRITES (updating metadata), use requestMetadataUpdate instead.',
         schema: z.object({
             code: z.string().describe('The Python code to execute. Include necessary imports like "import matplotlib.pyplot as plt". Use plt.show() to display charts.'),
         }),
     }
 );
 
+// Tool for requesting metadata updates (requires user confirmation)
+const requestMetadataUpdateTool = tool(
+    async ({
+        description,
+        filter_sql,
+        update_code
+    }: {
+        description: string;
+        filter_sql: string;
+        update_code: string;
+    }) => {
+        console.log('[MetadataUpdate] Requesting confirmation for:', description);
+
+        try {
+            // First, query to see how many rows will be affected
+            const previewCode = `
+import sqlite3
+import json
+
+conn = sqlite3.connect(DB_PATH)
+cursor = conn.cursor()
+cursor.execute("SELECT id, original_path, metadata FROM images WHERE ${filter_sql.replace(/"/g, '\\"')}")
+rows = cursor.fetchall()
+conn.close()
+
+result = {
+    "count": len(rows),
+    "preview": [row[1] for row in rows[:5]],  # First 5 paths
+    "ids": [row[0] for row in rows]
+}
+print(json.dumps(result))
+`;
+            const previewResult = await (window as any).api.executePythonCode(previewCode);
+
+            if (!previewResult.success) {
+                return JSON.stringify({
+                    success: false,
+                    error: previewResult.error || 'Failed to query affected rows',
+                    output: null,
+                    requiresConfirmation: false,
+                });
+            }
+
+            const parsed = JSON.parse(previewResult.output.trim());
+
+            // Return a special response that will trigger confirmation
+            return JSON.stringify({
+                success: true,
+                requiresConfirmation: true,
+                confirmationData: {
+                    id: `confirm_${Date.now()}`,
+                    action: 'update_metadata',
+                    description: description,
+                    affectedCount: parsed.count,
+                    preview: parsed.preview,
+                    pendingCode: update_code,
+                    filterSql: filter_sql,  // Store the filter for backup
+                    status: 'pending',
+                } as ConfirmationRequest,
+                output: `Found ${parsed.count} images matching the filter. Waiting for user confirmation.`,
+                error: null,
+            });
+        } catch (error) {
+            console.error('[MetadataUpdate] Exception:', error);
+            return JSON.stringify({
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                output: null,
+                requiresConfirmation: false,
+            });
+        }
+    },
+    {
+        name: 'requestMetadataUpdate',
+        description: 'Request to update image metadata in the database. This will show a confirmation dialog to the user before executing. Use this for any database WRITE operations.',
+        schema: z.object({
+            description: z.string().describe('Human-readable description of what will be updated, e.g., "Tag 45 forest images with location=ForestA"'),
+            filter_sql: z.string().describe('SQL WHERE clause to filter images, e.g., "original_path LIKE \'%forest%\'"'),
+            update_code: z.string().describe('Python code that will be executed after user confirms. This code should: 1) backup the table first, 2) then perform the update. Example: window.api.backupTable("images") then UPDATE images SET metadata...'),
+        }),
+    }
+);
+
 // Get the tools list
 function getAvailableTools() {
-    return [revealSecretTool, runPythonCodeTool as any];
+    return [revealSecretTool, runPythonCodeTool as any, requestMetadataUpdateTool as any];
 }
 
 // Storage keys
@@ -264,6 +347,37 @@ conn.close()
 - Images per day: \`SELECT date(created_at/1000, 'unixepoch') as day, COUNT(*) FROM groups GROUP BY day\`
 - Individual sighting counts: \`SELECT display_name, COUNT(*) FROM reid_individuals ri JOIN reid_members rm ON ri.id = rm.individual_id GROUP BY ri.id\`
 
+## Updating Metadata
+To update image metadata (tagging, adding location, etc.), use the \`requestMetadataUpdate\` tool. This requires user confirmation before executing.
+
+Example workflow:
+1. User: "Tag all forest images with location=ForestA"
+2. You call requestMetadataUpdate with filter_sql and update_code
+3. User sees confirmation dialog with preview of affected images
+4. After confirmation, the update executes with automatic backup
+
+The update_code should include backup first:
+\`\`\`python
+import sqlite3
+import json
+
+# Backup happens automatically before confirmation
+
+conn = sqlite3.connect(DB_PATH)
+cursor = conn.cursor()
+
+# Get existing metadata and merge
+cursor.execute("SELECT id, metadata FROM images WHERE original_path LIKE '%forest%'")
+for row in cursor.fetchall():
+    existing = json.loads(row[1]) if row[1] else {}
+    existing['location'] = 'ForestA'
+    cursor.execute("UPDATE images SET metadata = ? WHERE id = ?", (json.dumps(existing), row[0]))
+
+conn.commit()
+conn.close()
+print("Updated successfully")
+\`\`\`
+
 ## Visualization Guidelines
 1. Always use matplotlib.pyplot
 2. Use plt.show() to display charts - images are automatically captured
@@ -278,37 +392,58 @@ export type StreamChunk =
     | { type: 'text'; content: string }
     | { type: 'tool_call'; toolCall: ToolCall }
     | { type: 'tool_result'; toolCallId: string; toolName: string; result: ToolResult }
+    | { type: 'confirmation_request'; request: import('../types/agent').ConfirmationRequest }
     | { type: 'error'; content: string }
     | { type: 'done' };
 
-// Execute a tool and return the result
-async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
+// Execute a tool and return the result (with optional confirmation data)
+interface ToolExecutionResult {
+    result: ToolResult;
+    confirmationRequest?: ConfirmationRequest;
+}
+
+async function executeTool(toolCall: ToolCall): Promise<ToolExecutionResult> {
     const tools = getAvailableTools();
     const toolToExecute = tools.find((t: any) => t.name === toolCall.name);
 
     if (!toolToExecute) {
         return {
-            success: false,
-            error: `Tool "${toolCall.name}" not found`,
-            output: null,
+            result: {
+                success: false,
+                error: `Tool "${toolCall.name}" not found`,
+                output: null,
+            }
         };
     }
 
     try {
         const resultStr = await toolToExecute.invoke(toolCall.args || {});
         const parsed = JSON.parse(String(resultStr));
-        return {
+
+        const result: ToolResult = {
             success: parsed.success ?? true,
             output: parsed.output ?? null,
             error: parsed.error ?? null,
             images: parsed.images,
             code: parsed.code,
         };
+
+        // Check if this is a confirmation request
+        if (parsed.requiresConfirmation && parsed.confirmationData) {
+            return {
+                result,
+                confirmationRequest: parsed.confirmationData as ConfirmationRequest,
+            };
+        }
+
+        return { result };
     } catch (error) {
         return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Tool execution failed',
-            output: null,
+            result: {
+                success: false,
+                error: error instanceof Error ? error.message : 'Tool execution failed',
+                output: null,
+            }
         };
     }
 }
@@ -393,7 +528,14 @@ export async function* runAgentLoop(
                 yield { type: 'tool_call', toolCall };
 
                 // Execute the tool
-                const result = await executeTool(toolCall);
+                const { result, confirmationRequest } = await executeTool(toolCall);
+
+                // If this is a confirmation request, yield it and stop the loop
+                if (confirmationRequest) {
+                    yield { type: 'confirmation_request', request: confirmationRequest };
+                    yield { type: 'done' };
+                    return; // Exit the generator entirely - user must respond
+                }
 
                 yield {
                     type: 'tool_result',
@@ -435,4 +577,79 @@ export function generateSessionId(): string {
 // Generate a unique message ID
 export function generateMessageId(): string {
     return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Execute a confirmed metadata update (with backup)
+export async function executeConfirmedUpdate(
+    confirmationRequest: ConfirmationRequest
+): Promise<ToolResult> {
+    console.log('[ConfirmedUpdate] Executing:', confirmationRequest.description);
+
+    try {
+        // First, backup ONLY the affected rows using the filter
+        console.log('[ConfirmedUpdate] Creating backup for filter:', confirmationRequest.filterSql);
+        const backupResult = await (window as any).api.backupTable(
+            'images',
+            confirmationRequest.filterSql  // Only backup affected rows
+        );
+
+        if (!backupResult.success) {
+            return {
+                success: false,
+                error: `Backup failed: ${backupResult.error}`,
+                output: null,
+            };
+        }
+        console.log('[ConfirmedUpdate] Backup created:', backupResult.backupPath);
+
+        // Now execute the update code
+        const result = await (window as any).api.executePythonCode(confirmationRequest.pendingCode);
+
+        return {
+            success: result.success,
+            output: result.success
+                ? `✅ Updated ${confirmationRequest.affectedCount} images successfully. Backup saved.`
+                : null,
+            error: result.error,
+            code: confirmationRequest.pendingCode,
+            backupPath: backupResult.backupPath,  // Return backup path for reverting
+        };
+    } catch (error) {
+        console.error('[ConfirmedUpdate] Exception:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            output: null,
+        };
+    }
+}
+
+// Revert a previously applied update using backup
+export async function revertUpdate(backupPath: string): Promise<ToolResult> {
+    console.log('[RevertUpdate] Reverting from:', backupPath);
+
+    try {
+        const result = await (window as any).api.restoreBackup(backupPath);
+
+        if (!result.success) {
+            return {
+                success: false,
+                error: result.error || 'Failed to restore backup',
+                output: null,
+            };
+        }
+
+        return {
+            success: true,
+            output: `↩️ Reverted ${result.rowCount} rows from backup.`,
+            error: null,
+        };
+    } catch (error) {
+        console.error('[RevertUpdate] Exception:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            output: null,
+        };
+    }
 }

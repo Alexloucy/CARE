@@ -1,21 +1,32 @@
-import React from 'react';
-import { Box, Typography } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Typography, Button, Collapse } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChatMessage } from '../../types/agent';
+import { ChatMessage, ConfirmationRequest } from '../../types/agent';
 import CodeExecutionBlock from './CodeExecutionBlock';
+import { CheckCircle, ArrowCounterClockwise, Warning, CaretDown, CaretRight, CircleNotch } from '@phosphor-icons/react';
 
 interface ChatMessageRendererProps {
     message: ChatMessage;
+    onApplyConfirmation?: (messageId: string, confirmationRequest: ConfirmationRequest | undefined) => Promise<void>;
+    onRevertConfirmation?: (messageId: string, confirmationRequest: ConfirmationRequest | undefined) => Promise<void>;
+    isLoading?: boolean;
 }
 
-const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({ message }) => {
+const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({
+    message,
+    onApplyConfirmation,
+    onRevertConfirmation,
+    isLoading,
+}) => {
     const theme = useTheme();
     const isDark = theme.palette.mode === 'dark';
     const isUser = message.role === 'user';
     const isTool = message.role === 'tool';
+    const isConfirmation = message.role === 'confirmation';
     const isAssistantWithToolCalls = message.role === 'assistant' && message.toolCalls && message.toolCalls.length > 0;
+    const [toolCallExpanded, setToolCallExpanded] = useState(false);
 
     // Get glass style based on message type
     const getGlassStyle = () => {
@@ -54,6 +65,15 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({ message }) =>
                 border: `1px solid ${isDark ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 193, 7, 0.25)'}`,
             };
         }
+        if (isConfirmation) {
+            // Confirmation request - orange tint
+            return {
+                background: isDark
+                    ? 'rgba(255, 152, 0, 0.15)'
+                    : 'rgba(255, 152, 0, 0.1)',
+                border: `1px solid ${isDark ? 'rgba(255, 152, 0, 0.3)' : 'rgba(255, 152, 0, 0.25)'}`,
+            };
+        }
         // Regular assistant message
         return {
             background: isDark
@@ -84,21 +104,73 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({ message }) =>
                         ...glassStyle,
                         backdropFilter: 'blur(76px)',
                         WebkitBackdropFilter: 'blur(76px)',
+                        cursor: 'pointer',
                     }}
+                    onClick={() => setToolCallExpanded(!toolCallExpanded)}
                 >
-                    {message.toolCalls!.map((tc, idx) => (
+                    {/* Collapsed header */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CircleNotch
+                            size={16}
+                            weight="bold"
+                            color={isDark ? 'rgba(255, 193, 7, 0.9)' : 'rgba(180, 140, 0, 1)'}
+                        />
                         <Typography
-                            key={idx}
                             variant="body2"
                             sx={{
                                 color: isDark ? 'rgba(255, 193, 7, 0.9)' : 'rgba(180, 140, 0, 1)',
-                                fontStyle: 'italic',
+                                fontWeight: 500,
                                 fontSize: '0.85rem',
                             }}
                         >
-                            🔧 Calling tool: {tc.name}
+                            Analyzing
                         </Typography>
-                    ))}
+                        <Box sx={{ ml: 'auto' }}>
+                            {toolCallExpanded ? (
+                                <CaretDown size={14} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'} />
+                            ) : (
+                                <CaretRight size={14} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'} />
+                            )}
+                        </Box>
+                    </Box>
+
+                    {/* Expanded details */}
+                    <Collapse in={toolCallExpanded}>
+                        <Box sx={{ mt: 1, pl: 3 }}>
+                            {message.toolCalls!.map((tc, idx) => (
+                                <Box key={idx} sx={{ mb: 0.5 }}>
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            color: 'text.secondary',
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.75rem',
+                                        }}
+                                    >
+                                        {tc.name}
+                                    </Typography>
+                                    {tc.args && Object.keys(tc.args).length > 0 && (
+                                        <Typography
+                                            variant="caption"
+                                            component="pre"
+                                            sx={{
+                                                color: 'text.secondary',
+                                                fontSize: '0.7rem',
+                                                fontFamily: 'monospace',
+                                                mt: 0.25,
+                                                whiteSpace: 'pre-wrap',
+                                                wordBreak: 'break-all',
+                                                opacity: 0.7,
+                                            }}
+                                        >
+                                            {JSON.stringify(tc.args, null, 2).slice(0, 200)}
+                                            {JSON.stringify(tc.args).length > 200 && '...'}
+                                        </Typography>
+                                    )}
+                                </Box>
+                            ))}
+                        </Box>
+                    </Collapse>
                 </Box>
             </Box>
         );
@@ -125,6 +197,100 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({ message }) =>
                         result={message.toolResult}
                         toolName={message.toolName || 'Tool'}
                     />
+                </Box>
+            </Box>
+        );
+    }
+
+    // Render confirmation request
+    if (isConfirmation && message.confirmationRequest) {
+        const req = message.confirmationRequest;
+        return (
+            <Box
+                sx={{
+                    display: 'flex',
+                    justifyContent: 'flex-start',
+                    width: '100%',
+                    mb: 2,
+                }}
+            >
+                <Box
+                    sx={{
+                        maxWidth: '75%',
+                        p: 2,
+                        borderRadius: '16px 16px 16px 4px',
+                        ...glassStyle,
+                        backdropFilter: 'blur(16px)',
+                        WebkitBackdropFilter: 'blur(16px)',
+                    }}
+                >
+                    {/* Status indicator */}
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.75,
+                            mb: 1,
+                            color: req.status === 'applied'
+                                ? (isDark ? 'rgba(76, 175, 80, 0.9)' : 'rgba(56, 142, 60, 1)')
+                                : req.status === 'reverted'
+                                    ? (isDark ? 'rgba(158, 158, 158, 0.9)' : 'rgba(97, 97, 97, 1)')
+                                    : (isDark ? 'rgba(255, 152, 0, 0.9)' : 'rgba(200, 120, 0, 1)'),
+                        }}
+                    >
+                        {req.status === 'applied' ? (
+                            <CheckCircle size={18} weight="fill" />
+                        ) : req.status === 'reverted' ? (
+                            <ArrowCounterClockwise size={18} weight="bold" />
+                        ) : (
+                            <Warning size={18} weight="fill" />
+                        )}
+                        <Typography
+                            variant="body2"
+                            sx={{
+                                fontWeight: 600,
+                                color: 'inherit',
+                            }}
+                        >
+                            {req.status === 'applied' ? 'Applied' : req.status === 'reverted' ? 'Reverted' : 'Pending Confirmation'}
+                        </Typography>
+                    </Box>
+
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                        {req.description}
+                    </Typography>
+
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                        {req.affectedCount} image{req.affectedCount !== 1 ? 's' : ''} {req.status === 'applied' ? 'updated' : req.status === 'reverted' ? 'restored' : 'will be updated'}
+                    </Typography>
+
+                    {/* Action buttons */}
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                        {req.status === 'pending' && onApplyConfirmation && (
+                            <Button
+                                variant="contained"
+                                size="small"
+                                color="primary"
+                                disabled={isLoading}
+                                onClick={() => onApplyConfirmation(message.id, req)}
+                                sx={{ textTransform: 'none', fontWeight: 500 }}
+                            >
+                                Apply Update
+                            </Button>
+                        )}
+                        {req.status === 'applied' && req.backupPath && onRevertConfirmation && (
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                color="warning"
+                                disabled={isLoading}
+                                onClick={() => onRevertConfirmation(message.id, req)}
+                                sx={{ textTransform: 'none', fontWeight: 500 }}
+                            >
+                                Revert Changes
+                            </Button>
+                        )}
+                    </Box>
                 </Box>
             </Box>
         );

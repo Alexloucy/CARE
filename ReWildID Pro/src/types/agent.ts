@@ -14,11 +14,25 @@ export interface ToolResult {
     error: string | null;
     images?: string[];  // Base64 data URLs for generated images
     code?: string;      // For code execution - the code that was run
+    backupPath?: string;  // For updates - path to backup for reverting
+}
+
+// Confirmation request for destructive operations
+export interface ConfirmationRequest {
+    id: string;
+    action: 'update_metadata' | 'delete_rows' | 'other';
+    description: string;
+    affectedCount: number;
+    preview: string[];  // First few affected items for preview
+    pendingCode: string;  // Python code to execute if confirmed
+    filterSql: string;  // SQL WHERE clause for filtering affected rows
+    status: 'pending' | 'applied' | 'reverted';  // Track state
+    backupPath?: string;  // Path to backup file for reverting
 }
 
 export interface ChatMessage {
     id: string;
-    role: 'user' | 'assistant' | 'tool';
+    role: 'user' | 'assistant' | 'tool' | 'confirmation';
     content: string;
     timestamp: Date;
     isStreaming?: boolean;
@@ -30,6 +44,9 @@ export interface ChatMessage {
     toolCallId?: string;
     toolName?: string;
     toolResult?: ToolResult;
+
+    // For role='confirmation' - pending action requiring user approval
+    confirmationRequest?: ConfirmationRequest;
 }
 
 export interface AgentSession {

@@ -16,6 +16,8 @@ import {
     deleteSession,
     getCurrentSessionId,
     setCurrentSessionId,
+    executeConfirmedUpdate,
+    revertUpdate,
 } from '../../services/agentService';
 
 const AgentPage: React.FC = () => {
@@ -215,6 +217,15 @@ const AgentPage: React.FC = () => {
                         content: chunk.content,
                     });
                 }
+
+                if (chunk.type === 'confirmation_request') {
+                    // Add inline confirmation message (no dialog)
+                    addMessage({
+                        role: 'confirmation',
+                        content: chunk.request.description,
+                        confirmationRequest: chunk.request,
+                    });
+                }
             }
         } catch (error) {
             if ((error as Error).name !== 'AbortError') {
@@ -239,6 +250,88 @@ const AgentPage: React.FC = () => {
         if (days < 7) return `${days} days ago`;
         return date.toLocaleDateString();
     };
+
+    // Helper to update a specific message in state
+    const updateMessage = useCallback((messageId: string, updates: Partial<ChatMessage>) => {
+        setMessages(prev => prev.map(msg =>
+            msg.id === messageId ? { ...msg, ...updates } : msg
+        ));
+    }, []);
+
+    // Handle applying a confirmation inline (called from ChatMessageRenderer)
+    const handleApplyConfirmation = useCallback(async (messageId: string, confirmationRequest: ChatMessage['confirmationRequest']) => {
+        if (!confirmationRequest) return;
+
+        setIsLoading(true);
+
+        try {
+            const result = await executeConfirmedUpdate(confirmationRequest);
+
+            if (result.success && result.backupPath) {
+                // Update the confirmation message to show "applied" status
+                updateMessage(messageId, {
+                    confirmationRequest: {
+                        ...confirmationRequest,
+                        status: 'applied',
+                        backupPath: result.backupPath,
+                    }
+                });
+            }
+
+            // Add result message
+            addMessage({
+                role: 'tool',
+                content: '',
+                toolCallId: confirmationRequest.id,
+                toolName: 'updateMetadata',
+                toolResult: result,
+            });
+        } catch (error) {
+            addMessage({
+                role: 'assistant',
+                content: `❌ Failed to execute update: ${(error as Error).message}`,
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [updateMessage, addMessage]);
+
+    // Handle reverting an applied confirmation
+    const handleRevertConfirmation = useCallback(async (messageId: string, confirmationRequest: ChatMessage['confirmationRequest']) => {
+        if (!confirmationRequest || !confirmationRequest.backupPath) return;
+
+        setIsLoading(true);
+
+        try {
+            const result = await revertUpdate(confirmationRequest.backupPath);
+
+            if (result.success) {
+                // Update the confirmation message to show "reverted" status
+                updateMessage(messageId, {
+                    confirmationRequest: {
+                        ...confirmationRequest,
+                        status: 'reverted',
+                    }
+                });
+            }
+
+            // Add result message
+            addMessage({
+                role: 'tool',
+                content: '',
+                toolCallId: confirmationRequest.id,
+                toolName: 'revertMetadata',
+                toolResult: result,
+            });
+        } catch (error) {
+            addMessage({
+                role: 'assistant',
+                content: `❌ Failed to revert: ${(error as Error).message}`,
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [updateMessage, addMessage]);
 
     return (
         <Box
@@ -381,7 +474,13 @@ const AgentPage: React.FC = () => {
                     ) : (
                         <>
                             {messages.map((message) => (
-                                <ChatMessageRenderer key={message.id} message={message} />
+                                <ChatMessageRenderer
+                                    key={message.id}
+                                    message={message}
+                                    onApplyConfirmation={handleApplyConfirmation}
+                                    onRevertConfirmation={handleRevertConfirmation}
+                                    isLoading={isLoading}
+                                />
                             ))}
                             {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
                                 <MessageSkeleton />
@@ -408,6 +507,8 @@ const AgentPage: React.FC = () => {
                     onStopGeneration={handleStopGeneration}
                 />
             </Box>
+
+
         </Box>
     );
 };
