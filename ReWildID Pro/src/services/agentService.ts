@@ -410,6 +410,8 @@ Be friendly, concise, and helpful. Proactively use database queries when users a
 // Stream chunk types
 export type StreamChunk =
     | { type: 'text'; content: string }
+    | { type: 'text_delta'; content: string }  // Streaming text chunk
+    | { type: 'text_done' }  // End of streaming text
     | { type: 'tool_call'; toolCall: ToolCall }
     | { type: 'tool_result'; toolCallId: string; toolName: string; result: ToolResult }
     | { type: 'confirmation_request'; request: import('../types/agent').ConfirmationRequest }
@@ -503,30 +505,49 @@ export async function* runAgentLoop(
             iterations++;
             console.log(`[Agent] Iteration ${iterations}`);
 
-            // Call the model
-            const response = await modelWithTools.invoke(lcMessages);
-            console.log('[Agent] Response:', response);
+            // Stream the model response
+            let fullContent = '';
+            let toolCalls: any[] = [];
+            let hasStartedStreaming = false;
 
-            // Check if response has tool calls
-            const toolCalls = response.tool_calls || [];
+            // Use streaming for the response
+            const stream = await modelWithTools.stream(lcMessages);
+
+            for await (const chunk of stream) {
+                // Collect tool calls if present
+                if (chunk.tool_calls && chunk.tool_calls.length > 0) {
+                    toolCalls = chunk.tool_calls;
+                }
+
+                // Get text content from this chunk
+                let chunkText = '';
+                if (typeof chunk.content === 'string') {
+                    chunkText = chunk.content;
+                } else if (Array.isArray(chunk.content)) {
+                    chunkText = chunk.content
+                        .filter((part: any) => part && typeof part.text === 'string')
+                        .map((part: any) => part.text)
+                        .join('');
+                }
+
+                // Stream text chunks as they arrive
+                if (chunkText) {
+                    if (!hasStartedStreaming) {
+                        hasStartedStreaming = true;
+                    }
+                    fullContent += chunkText;
+                    yield { type: 'text_delta', content: chunkText };
+                }
+            }
+
+            // Signal end of text streaming if we streamed any text
+            if (hasStartedStreaming) {
+                yield { type: 'text_done' };
+            }
+
+            console.log('[Agent] Full response:', fullContent, 'Tool calls:', toolCalls.length);
+
             const hasToolCalls = toolCalls.length > 0;
-
-            // Get text content - handle both string and array content
-            let textContent = '';
-            if (typeof response.content === 'string') {
-                textContent = response.content;
-            } else if (Array.isArray(response.content)) {
-                // Gemini sometimes returns content as array of parts
-                textContent = response.content
-                    .filter((part: any) => part && typeof part.text === 'string')
-                    .map((part: any) => part.text)
-                    .join('');
-            }
-
-            // If there's text content, yield it
-            if (textContent) {
-                yield { type: 'text', content: textContent };
-            }
 
             // If no tool calls, we're done
             if (!hasToolCalls) {
@@ -535,7 +556,14 @@ export async function* runAgentLoop(
             }
 
             // Add the AI response to message history
-            lcMessages.push(response);
+            lcMessages.push(new AIMessage({
+                content: fullContent,
+                tool_calls: toolCalls.map(tc => ({
+                    id: tc.id,
+                    name: tc.name,
+                    args: tc.args,
+                })),
+            }));
 
             // Execute each tool call
             for (const tc of toolCalls) {

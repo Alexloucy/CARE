@@ -42,7 +42,7 @@ import {
     Sun,
     Moon,
     Trash,
-    Robot,
+    OpenAiLogo,
     Key,
 } from '@phosphor-icons/react';
 import StyledSwitch from '../../components/StyledSwitch';
@@ -236,13 +236,14 @@ const ThemeSwatch: React.FC<{
                             width: 20,
                             height: 20,
                             borderRadius: '50%',
-                            backgroundColor: muiTheme.palette.primary.main,
+                            backgroundColor: '#fff',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
                         }}
                     >
-                        <Check size={12} weight="bold" color="#fff" />
+                        <Check size={12} weight="bold" color="#000" />
                     </Box>
                 )}
             </Box>
@@ -504,7 +505,7 @@ const SettingsPage: React.FC = () => {
                     >
                         <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', pr: 1 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Robot size={20} />
+                                <OpenAiLogo size={20} />
                                 <Typography variant="h6" fontWeight="600">
                                     AI Agent
                                 </Typography>
@@ -567,7 +568,7 @@ const SettingsPage: React.FC = () => {
                             </Box>
                             {/* Model Selection */}
                             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mt: 1 }}>
-                                <Robot size={24} style={{ marginTop: 8 }} color={theme.palette.text.secondary} />
+                                <OpenAiLogo size={24} style={{ marginTop: 8 }} color={theme.palette.text.secondary} />
                                 <Box sx={{ flex: 1 }}>
                                     <Typography variant="body2" fontWeight="medium" sx={{ mb: 0.5 }}>
                                         AI Model

@@ -171,6 +171,8 @@ const AgentPage: React.FC = () => {
         try {
             const allMessages = [...messages, userMessage];
             let pendingToolCalls: ToolCall[] = [];
+            let streamingMessageId: string | null = null;
+            let streamingContent = '';
 
             for await (const chunk of runAgentLoop(allMessages)) {
                 if (abortControllerRef.current?.signal.aborted) {
@@ -210,8 +212,43 @@ const AgentPage: React.FC = () => {
                     pendingToolCalls = [];
                 }
 
+                if (chunk.type === 'text_delta') {
+                    // Streaming text chunk
+                    streamingContent += chunk.content;
+
+                    if (!streamingMessageId) {
+                        // Create new streaming message
+                        const msg = addMessage({
+                            role: 'assistant',
+                            content: streamingContent,
+                            isStreaming: true,
+                        });
+                        streamingMessageId = msg.id;
+                    } else {
+                        // Update existing message with new content
+                        setMessages(prev => prev.map(msg =>
+                            msg.id === streamingMessageId
+                                ? { ...msg, content: streamingContent }
+                                : msg
+                        ));
+                    }
+                }
+
+                if (chunk.type === 'text_done') {
+                    // Finalize the streaming message
+                    if (streamingMessageId) {
+                        setMessages(prev => prev.map(msg =>
+                            msg.id === streamingMessageId
+                                ? { ...msg, isStreaming: false }
+                                : msg
+                        ));
+                    }
+                    streamingMessageId = null;
+                    streamingContent = '';
+                }
+
                 if (chunk.type === 'text') {
-                    // Add final text response
+                    // Non-streaming text response (fallback)
                     addMessage({
                         role: 'assistant',
                         content: chunk.content,
