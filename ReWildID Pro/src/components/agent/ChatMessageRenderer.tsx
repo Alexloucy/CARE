@@ -281,7 +281,7 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({
                                 onClick={() => onApplyConfirmation(message.id, req)}
                                 sx={{ textTransform: 'none', fontWeight: 500 }}
                             >
-                                Apply Update
+                                Confirm
                             </Button>
                         )}
                         {req.status === 'applied' && req.backupPath && onRevertConfirmation && (

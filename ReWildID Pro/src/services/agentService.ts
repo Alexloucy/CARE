@@ -141,9 +141,119 @@ print(json.dumps(result))
     }
 );
 
+// Tool for requesting classification (detection) job
+const requestClassificationTool = tool(
+    async ({ image_ids, description }: { image_ids: number[]; description: string }) => {
+        console.log('[Classification] Requesting confirmation for:', description);
+
+        try {
+            // Get image info for preview - returns { ok, images } or { ok: false, error }
+            const response = await (window as any).api.getImagesByIds(image_ids);
+            if (!response.ok || !response.images || response.images.length === 0) {
+                return JSON.stringify({
+                    success: false,
+                    error: response.error || 'No valid images found with the provided IDs',
+                    output: null,
+                    requiresConfirmation: false,
+                });
+            }
+            const images = response.images;
+
+            // Return confirmation request
+            return JSON.stringify({
+                success: true,
+                requiresConfirmation: true,
+                confirmationData: {
+                    id: `confirm_classify_${Date.now()}`,
+                    action: 'run_classification',
+                    description: description,
+                    affectedCount: images.length,
+                    preview: images.slice(0, 5).map((img: any) => img.original_path),
+                    imageIds: image_ids,
+                    status: 'pending',
+                } as ConfirmationRequest,
+                output: `Ready to classify ${images.length} images. Waiting for user confirmation.`,
+                error: null,
+            });
+        } catch (error) {
+            console.error('[Classification] Exception:', error);
+            return JSON.stringify({
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                output: null,
+                requiresConfirmation: false,
+            });
+        }
+    },
+    {
+        name: 'requestClassification',
+        description: 'Request to run species classification (detection) on images. This will show a confirmation dialog to the user before starting the job.',
+        schema: z.object({
+            image_ids: z.array(z.number()).describe('Array of image IDs to classify'),
+            description: z.string().describe('Human-readable description, e.g., "Run classification on 50 forest images"'),
+        }),
+    }
+);
+
+// Tool for requesting ReID job
+const requestReIDTool = tool(
+    async ({ image_ids, species, description }: { image_ids: number[]; species: string; description: string }) => {
+        console.log('[ReID] Requesting confirmation for:', description);
+
+        try {
+            // Get image info for preview
+            const response = await (window as any).api.getImagesByIds(image_ids);
+            if (!response.ok || !response.images || response.images.length === 0) {
+                return JSON.stringify({
+                    success: false,
+                    error: response.error || 'No valid images found with the provided IDs',
+                    output: null,
+                    requiresConfirmation: false,
+                });
+            }
+            const images = response.images;
+
+            // Return confirmation request
+            return JSON.stringify({
+                success: true,
+                requiresConfirmation: true,
+                confirmationData: {
+                    id: `confirm_reid_${Date.now()}`,
+                    action: 'run_reid',
+                    description: description,
+                    affectedCount: images.length,
+                    preview: images.slice(0, 5).map((img: any) => img.original_path),
+                    imageIds: image_ids,
+                    species: species,
+                    status: 'pending',
+                } as ConfirmationRequest,
+                output: `Ready to run ReID for "${species}" on ${images.length} images. If images need classification first, it will run automatically. Waiting for user confirmation.`,
+                error: null,
+            });
+        } catch (error) {
+            console.error('[ReID] Exception:', error);
+            return JSON.stringify({
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                output: null,
+                requiresConfirmation: false,
+            });
+        }
+    },
+    {
+        name: 'requestReID',
+        description: 'Request to run re-identification (ReID) on images to identify individual animals. If images need classification first, it will run automatically. This will show a confirmation dialog to the user before starting.',
+        schema: z.object({
+            image_ids: z.array(z.number()).describe('Array of image IDs for ReID'),
+            species: z.string().describe('Species to identify, e.g., "deer", "boar", "wild pig"'),
+            description: z.string().describe('Human-readable description, e.g., "Identify individual deer in 30 images"'),
+        }),
+    }
+);
+
 // Get the tools list
 function getAvailableTools() {
-    return [revealSecretTool, runPythonCodeTool as any, requestMetadataUpdateTool as any];
+    return [revealSecretTool, runPythonCodeTool as any, requestMetadataUpdateTool as any, requestClassificationTool as any, requestReIDTool as any];
 }
 
 // Storage keys
@@ -274,6 +384,10 @@ You help users with wildlife conservation tasks, image analysis, data queries, a
 Available tools:
 - revealSecret: Reveals a secret message when users ask for it
 - runPythonCode: Execute Python code to perform calculations, data analysis, database queries, or generate charts/visualizations with matplotlib.
+- requestMetadataUpdate: Update image metadata (requires user confirmation)
+- requestClassification: Run species classification/detection on images (requires user confirmation)
+- requestReID: Run re-identification to identify individual animals (requires user confirmation). If images need classification first, it runs automatically.
+  - IMPORTANT: Currently only "stoat" is supported for ReID (use lowercase singular, NOT "stoats"). For other species, inform the user that ReID support is coming soon.
 
 ## Database Access
 IMPORTANT: The variable \`DB_PATH\` is ALREADY DEFINED and contains the path to the SQLite database. Do NOT redefine it. Just use it directly:
@@ -505,44 +619,36 @@ export async function* runAgentLoop(
             iterations++;
             console.log(`[Agent] Iteration ${iterations}`);
 
-            // Stream the model response
+            // Use non-streaming invoke (streaming has bugs with some Gemini models)
             let fullContent = '';
             let toolCalls: any[] = [];
-            let hasStartedStreaming = false;
 
-            // Use streaming for the response
-            const stream = await modelWithTools.stream(lcMessages);
+            try {
+                const response = await modelWithTools.invoke(lcMessages);
 
-            for await (const chunk of stream) {
-                // Collect tool calls if present
-                if (chunk.tool_calls && chunk.tool_calls.length > 0) {
-                    toolCalls = chunk.tool_calls;
-                }
-
-                // Get text content from this chunk
-                let chunkText = '';
-                if (typeof chunk.content === 'string') {
-                    chunkText = chunk.content;
-                } else if (Array.isArray(chunk.content)) {
-                    chunkText = chunk.content
+                // Extract content
+                if (typeof response.content === 'string') {
+                    fullContent = response.content;
+                } else if (Array.isArray(response.content)) {
+                    fullContent = response.content
                         .filter((part: any) => part && typeof part.text === 'string')
                         .map((part: any) => part.text)
                         .join('');
                 }
 
-                // Stream text chunks as they arrive
-                if (chunkText) {
-                    if (!hasStartedStreaming) {
-                        hasStartedStreaming = true;
-                    }
-                    fullContent += chunkText;
-                    yield { type: 'text_delta', content: chunkText };
+                // Extract tool calls
+                if (response.tool_calls && response.tool_calls.length > 0) {
+                    toolCalls = response.tool_calls;
                 }
-            }
 
-            // Signal end of text streaming if we streamed any text
-            if (hasStartedStreaming) {
-                yield { type: 'text_done' };
+                // Yield the text content (all at once since not streaming)
+                if (fullContent) {
+                    yield { type: 'text_delta', content: fullContent };
+                    yield { type: 'text_done' };
+                }
+            } catch (invokeError) {
+                console.error('[Agent] Invoke error:', invokeError);
+                throw invokeError;
             }
 
             console.log('[Agent] Full response:', fullContent, 'Tool calls:', toolCalls.length);
@@ -631,9 +737,56 @@ export function generateMessageId(): string {
 export async function executeConfirmedUpdate(
     confirmationRequest: ConfirmationRequest
 ): Promise<ToolResult> {
-    console.log('[ConfirmedUpdate] Executing:', confirmationRequest.description);
+    console.log('[ConfirmedUpdate] Executing:', confirmationRequest.description, 'action:', confirmationRequest.action);
 
     try {
+        // Handle job actions (classification, reid)
+        if (confirmationRequest.action === 'run_classification') {
+            if (!confirmationRequest.imageIds || confirmationRequest.imageIds.length === 0) {
+                return { success: false, error: 'No image IDs provided', output: null };
+            }
+
+            // Get image paths
+            const images = await (window as any).api.getImagesByIds(confirmationRequest.imageIds);
+            const paths = images.map((img: any) => img.original_path);
+
+            // Queue detection job
+            await (window as any).api.detect(paths, () => { }, confirmationRequest.imageIds);
+
+            return {
+                success: true,
+                output: `🚀 Classification job queued for ${confirmationRequest.imageIds.length} images. Check the Jobs panel for progress.`,
+                error: null,
+            };
+        }
+
+        if (confirmationRequest.action === 'run_reid') {
+            if (!confirmationRequest.imageIds || confirmationRequest.imageIds.length === 0) {
+                return { success: false, error: 'No image IDs provided', output: null };
+            }
+            if (!confirmationRequest.species) {
+                return { success: false, error: 'No species specified', output: null };
+            }
+
+            // Queue ReID job (smartReID handles detection if needed)
+            const result = await (window as any).api.smartReID(confirmationRequest.imageIds, confirmationRequest.species);
+
+            if (!result.ok) {
+                return { success: false, error: result.error, output: null };
+            }
+
+            return {
+                success: true,
+                output: `🚀 ReID job queued for ${confirmationRequest.imageIds.length} images targeting "${confirmationRequest.species}". Check the Jobs panel for progress.`,
+                error: null,
+            };
+        }
+
+        // Handle metadata update (existing logic)
+        if (!confirmationRequest.filterSql || !confirmationRequest.pendingCode) {
+            return { success: false, error: 'Missing filter or code for metadata update', output: null };
+        }
+
         // First, backup ONLY the affected rows using the filter
         console.log('[ConfirmedUpdate] Creating backup for filter:', confirmationRequest.filterSql);
         const backupResult = await (window as any).api.backupTable(

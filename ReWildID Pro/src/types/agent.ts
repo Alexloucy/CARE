@@ -20,14 +20,17 @@ export interface ToolResult {
 // Confirmation request for destructive operations
 export interface ConfirmationRequest {
     id: string;
-    action: 'update_metadata' | 'delete_rows' | 'other';
+    action: 'update_metadata' | 'delete_rows' | 'run_classification' | 'run_reid' | 'other';
     description: string;
     affectedCount: number;
     preview: string[];  // First few affected items for preview
-    pendingCode: string;  // Python code to execute if confirmed
-    filterSql: string;  // SQL WHERE clause for filtering affected rows
+    pendingCode?: string;  // Python code to execute if confirmed (for metadata updates)
+    filterSql?: string;  // SQL WHERE clause for filtering affected rows
     status: 'pending' | 'applied' | 'reverted';  // Track state
     backupPath?: string;  // Path to backup file for reverting
+    // Job-specific data
+    imageIds?: number[];  // Image IDs for classification/reid jobs
+    species?: string;  // Species for ReID job
 }
 
 export interface ChatMessage {
