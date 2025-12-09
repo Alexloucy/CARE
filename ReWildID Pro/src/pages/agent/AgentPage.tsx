@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Box, Typography, Container, IconButton, Tooltip, Drawer, List, ListItemButton, ListItemText, Divider } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
+import { useLocation } from 'react-router-dom';
 import { ClockCounterClockwise, Trash, X } from '@phosphor-icons/react';
 import AgentInputBar from '../../components/agent/AgentInputBar';
 import ChatMessageRenderer from '../../components/agent/ChatMessageRenderer';
@@ -30,6 +31,8 @@ const AgentPage: React.FC = () => {
     const [historyOpen, setHistoryOpen] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
+    const location = useLocation();
+    const initialMessageProcessed = useRef(false);
 
     // Load sessions and current session on mount
     useEffect(() => {
@@ -276,6 +279,25 @@ const AgentPage: React.FC = () => {
             abortControllerRef.current = null;
         }
     }, [messages, addMessage]);
+
+    // Handle initialMessage from navigation (e.g., from Ask AI search bar)
+    useEffect(() => {
+        const state = location.state as { initialMessage?: string } | null;
+        if (state?.initialMessage && !initialMessageProcessed.current && currentSessionId) {
+            initialMessageProcessed.current = true;
+            // Start a new chat and send the message
+            const newId = generateSessionId();
+            setCurrentSessionIdState(newId);
+            setCurrentSessionId(newId);
+            setMessages([]);
+            // Use setTimeout to ensure state is updated before sending
+            setTimeout(() => {
+                handleSendMessage(state.initialMessage!);
+            }, 100);
+            // Clear the state to prevent re-sending on navigation
+            window.history.replaceState({}, document.title);
+        }
+    }, [location.state, currentSessionId, handleSendMessage]);
 
     const formatSessionDate = (date: Date) => {
         const now = new Date();

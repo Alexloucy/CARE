@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AppBar, Toolbar, Box, IconButton, Tooltip, Badge } from '@mui/material';
+import { AppBar, Toolbar, Box, IconButton, Tooltip, Badge, InputBase } from '@mui/material';
 import { useTheme as useMuiTheme } from '@mui/material/styles';
 import {
     Sidebar,
@@ -9,13 +9,15 @@ import {
     X,
     Minus,
     CornersOut,
-    CornersIn
+    CornersIn,
+    OpenAiLogo,
 } from '@phosphor-icons/react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMediaQuery } from '@mui/material';
 import Breadcrumb from '../../../components/Breadcrumb';
 import { useColorMode } from '../../../features/theme/ThemeContext';
 import { useJobs } from '../../../hooks/useJobs';
+import { getAgentSettings } from '../../../services/agentService';
 
 interface NavbarProps {
     toggleLeftSidebar: () => void;
@@ -55,6 +57,11 @@ export default function Navbar({
     const activeJobsCount = jobs.filter(j => ['pending', 'running'].includes(j.status)).length;
 
     const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special || !!colorTheme.image;
+
+    // Ask AI search bar state
+    const [aiQuery, setAiQuery] = useState('');
+    const isLgUp = useMediaQuery(muiTheme.breakpoints.up('lg'));
+    const agentEnabled = getAgentSettings().enabled;
 
     useEffect(() => {
         // Function to update navigation state based on history
@@ -124,6 +131,21 @@ export default function Navbar({
 
     const handleClose = () => {
         if (windowControls) windowControls.close();
+    };
+
+    // Ask AI handlers
+    const handleAskAI = () => {
+        if (aiQuery.trim()) {
+            navigate('/agent', { state: { initialMessage: aiQuery.trim() } });
+            setAiQuery('');
+        }
+    };
+
+    const handleAIInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            handleAskAI();
+        }
     };
 
     let customBreadcrumbItems;
@@ -299,6 +321,46 @@ export default function Navbar({
                             {isDarkMode ? <Sun size={24} /> : <Moon size={24} />}
                         </IconButton>
                     </Tooltip> */}
+
+                    {/* Ask AI input (only visible on lg+ screens when agent is enabled and not on agent page) */}
+                    {isLgUp && agentEnabled && !location.pathname.startsWith('/agent') && (
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                width: '220px',
+                                padding: '4px 8px',
+                                alignItems: 'center',
+                                gap: '8px',
+                                borderRadius: '8px',
+                                backgroundColor: isDarkMode
+                                    ? 'rgba(255, 255, 255, 0.08)'
+                                    : 'rgba(0, 0, 0, 0.05)',
+                                flexShrink: 1,
+                                mr: 1,
+                                transition: muiTheme.transitions.create(['width', 'opacity'], {
+                                    easing: muiTheme.transitions.easing.sharp,
+                                    duration: muiTheme.transitions.duration.shorter,
+                                }),
+                            }}
+                        >
+                            <OpenAiLogo size={16} color={muiTheme.palette.text.secondary} />
+                            <InputBase
+                                placeholder="Ask AI..."
+                                inputProps={{ 'aria-label': 'ask ai' }}
+                                value={aiQuery}
+                                onChange={(e) => setAiQuery(e.target.value)}
+                                onKeyDown={handleAIInputKeyDown}
+                                sx={{
+                                    fontSize: '14px',
+                                    color: muiTheme.palette.text.primary,
+                                    width: '100%',
+                                    '& input': {
+                                        padding: '2px 0',
+                                    }
+                                }}
+                            />
+                        </Box>
+                    )}
 
                     <Tooltip title="Tasks">
                         <IconButton
