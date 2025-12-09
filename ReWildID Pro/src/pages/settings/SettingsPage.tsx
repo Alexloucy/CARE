@@ -20,6 +20,13 @@ import {
     alpha,
     TextField,
     InputAdornment,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+    Checkbox,
+    FormControlLabel,
 } from '@mui/material';
 import { getAgentSettings, saveAgentSettings } from '../../services/agentService';
 import { AVAILABLE_MODELS } from '../../types/agent';
@@ -44,6 +51,7 @@ import {
     Trash,
     OpenAiLogo,
     Key,
+    Warning,
 } from '@phosphor-icons/react';
 import StyledSwitch from '../../components/StyledSwitch';
 import { resetAllTours } from '../../components/OnboardingTour';
@@ -259,7 +267,12 @@ const SettingsPage: React.FC = () => {
     // AI Agent settings
     const [aiApiKey, setAiApiKey] = useState(() => getAgentSettings().apiKey);
     const [aiModel, setAiModel] = useState(() => getAgentSettings().model);
+    const [aiEnabled, setAiEnabled] = useState(() => getAgentSettings().enabled);
     const [showApiKey, setShowApiKey] = useState(false);
+
+    // Privacy agreement dialog state
+    const [privacyDialogOpen, setPrivacyDialogOpen] = useState(false);
+    const [privacyAgreed, setPrivacyAgreed] = useState(false);
 
     const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newKey = e.target.value;
@@ -270,6 +283,31 @@ const SettingsPage: React.FC = () => {
     const handleModelChange = (modelId: string) => {
         setAiModel(modelId);
         saveAgentSettings({ model: modelId });
+    };
+
+    const handleAiToggle = (checked: boolean) => {
+        if (checked) {
+            setPrivacyDialogOpen(true);
+            setPrivacyAgreed(false);
+        } else {
+            setAiEnabled(false);
+            saveAgentSettings({ enabled: false });
+            window.dispatchEvent(new Event('agentSettingsChanged'));
+        }
+    };
+
+    const handlePrivacyConfirm = () => {
+        if (privacyAgreed) {
+            setAiEnabled(true);
+            saveAgentSettings({ enabled: true, hasAgreedToTerms: true });
+            setPrivacyDialogOpen(false);
+            window.dispatchEvent(new Event('agentSettingsChanged'));
+        }
+    };
+
+    const handlePrivacyCancel = () => {
+        setPrivacyDialogOpen(false);
+        setPrivacyAgreed(false);
     };
 
     // Load all settings from localStorage
@@ -395,7 +433,7 @@ const SettingsPage: React.FC = () => {
         );
     };
 
-    return (
+    return (<>
         <Box sx={{ pt: '80px', minHeight: '100vh' }}>
             <Container maxWidth="md" sx={{ pb: 4 }}>
                 {/* Page Title */}
@@ -507,7 +545,7 @@ const SettingsPage: React.FC = () => {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <OpenAiLogo size={20} />
                                 <Typography variant="h6" fontWeight="600">
-                                    AI Agent
+                                    AI Agent (Experimental)
                                 </Typography>
                             </Box>
                             <Typography
@@ -521,90 +559,110 @@ const SettingsPage: React.FC = () => {
                     </AccordionSummary>
                     <AccordionDetails sx={{ pt: 2, px: 2, pb: 2 }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-                                <Key size={24} style={{ marginTop: 8 }} color={theme.palette.text.secondary} />
-                                <Box sx={{ flex: 1 }}>
-                                    <Typography variant="body2" fontWeight="medium" sx={{ mb: 0.5 }}>
-                                        Google AI Studio API Key
+                            {/* Enable/Disable Toggle */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1, borderBottom: `1px solid ${theme.palette.divider}` }}>
+                                <Box>
+                                    <Typography variant="body2" fontWeight="medium">
+                                        Enable AI Agent
                                     </Typography>
-                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                                        Get your API key from{' '}
-                                        <a
-                                            href="https://aistudio.google.com/apikey"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            style={{ color: theme.palette.primary.main }}
-                                        >
-                                            aistudio.google.com
-                                        </a>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {aiEnabled ? 'AI Agent is visible in the sidebar' : 'AI Agent is hidden from the sidebar'}
                                     </Typography>
-                                    <TextField
-                                        fullWidth
-                                        size="small"
-                                        type={showApiKey ? 'text' : 'password'}
-                                        value={aiApiKey}
-                                        onChange={handleApiKeyChange}
-                                        placeholder="AIza..."
-                                        InputProps={{
-                                            endAdornment: (
-                                                <InputAdornment position="end">
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => setShowApiKey(!showApiKey)}
-                                                        edge="end"
-                                                    >
-                                                        <Eye size={18} weight={showApiKey ? 'fill' : 'regular'} />
-                                                    </IconButton>
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                        sx={{
-                                            '& .MuiOutlinedInput-root': {
-                                                borderRadius: 2,
-                                            }
-                                        }}
-                                    />
                                 </Box>
+                                <StyledSwitch
+                                    checked={aiEnabled}
+                                    onChange={(e) => handleAiToggle(e.target.checked)}
+                                />
                             </Box>
-                            {/* Model Selection */}
-                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mt: 1 }}>
-                                <OpenAiLogo size={24} style={{ marginTop: 8 }} color={theme.palette.text.secondary} />
-                                <Box sx={{ flex: 1 }}>
-                                    <Typography variant="body2" fontWeight="medium" sx={{ mb: 0.5 }}>
-                                        AI Model
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                                        Select the Gemini model to use for the AI agent
-                                    </Typography>
-                                    <ToggleButtonGroup
-                                        value={aiModel}
-                                        exclusive
-                                        onChange={(_, newValue: string | null) => newValue && handleModelChange(newValue)}
-                                        size="small"
-                                        sx={{ flexWrap: 'wrap' }}
-                                    >
-                                        {AVAILABLE_MODELS.map(model => (
-                                            <ToggleButton
-                                                key={model.id}
-                                                value={model.id}
-                                                sx={{
-                                                    py: 0.75,
-                                                    px: 2,
-                                                    fontSize: '0.8rem',
-                                                    textTransform: 'none',
+                            {/* API Key and Model Selection - only show when enabled */}
+                            {aiEnabled && (
+                                <>
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                                        <Key size={24} style={{ marginTop: 8 }} color={theme.palette.text.secondary} />
+                                        <Box sx={{ flex: 1 }}>
+                                            <Typography variant="body2" fontWeight="medium" sx={{ mb: 0.5 }}>
+                                                Google AI Studio API Key
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                                Get your API key from{' '}
+                                                <a
+                                                    href="https://aistudio.google.com/app/api-keys"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    style={{ color: theme.palette.primary.main }}
+                                                >
+                                                    aistudio.google.com
+                                                </a>
+                                            </Typography>
+                                            <TextField
+                                                fullWidth
+                                                size="small"
+                                                type={showApiKey ? 'text' : 'password'}
+                                                value={aiApiKey}
+                                                onChange={handleApiKeyChange}
+                                                placeholder="AIza..."
+                                                InputProps={{
+                                                    endAdornment: (
+                                                        <InputAdornment position="end">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => setShowApiKey(!showApiKey)}
+                                                                edge="end"
+                                                            >
+                                                                <Eye size={18} weight={showApiKey ? 'fill' : 'regular'} />
+                                                            </IconButton>
+                                                        </InputAdornment>
+                                                    ),
                                                 }}
+                                                sx={{
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: 2,
+                                                    }
+                                                }}
+                                            />
+                                        </Box>
+                                    </Box>
+                                    {/* Model Selection */}
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mt: 1 }}>
+                                        <OpenAiLogo size={24} style={{ marginTop: 8 }} color={theme.palette.text.secondary} />
+                                        <Box sx={{ flex: 1 }}>
+                                            <Typography variant="body2" fontWeight="medium" sx={{ mb: 0.5 }}>
+                                                AI Model
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                                Select the Gemini model to use for the AI agent
+                                            </Typography>
+                                            <ToggleButtonGroup
+                                                value={aiModel}
+                                                exclusive
+                                                onChange={(_, newValue: string | null) => newValue && handleModelChange(newValue)}
+                                                size="small"
+                                                sx={{ flexWrap: 'wrap' }}
                                             >
-                                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                                                    <Typography variant="body2" fontWeight={500}>{model.name}</Typography>
-                                                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                                                        {model.description}
-                                                    </Typography>
-                                                </Box>
-                                            </ToggleButton>
-                                        ))}
-                                    </ToggleButtonGroup>
-                                </Box>
-                            </Box>
+                                                {AVAILABLE_MODELS.map(model => (
+                                                    <ToggleButton
+                                                        key={model.id}
+                                                        value={model.id}
+                                                        sx={{
+                                                            py: 0.75,
+                                                            px: 2,
+                                                            fontSize: '0.8rem',
+                                                            textTransform: 'none',
+                                                        }}
+                                                    >
+                                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                            <Typography variant="body2" fontWeight={500}>{model.name}</Typography>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                                                {model.description}
+                                                            </Typography>
+                                                        </Box>
+                                                    </ToggleButton>
+                                                ))}
+                                            </ToggleButtonGroup>
+                                        </Box>
+                                    </Box>
+                                </>
+                            )}
                         </Box>
                     </AccordionDetails>
                 </Accordion>
@@ -764,7 +822,77 @@ const SettingsPage: React.FC = () => {
                 </Box>
             </Container>
         </Box>
-    );
+
+        {/* Privacy Agreement Dialog */}
+        <Dialog open={privacyDialogOpen} onClose={handlePrivacyCancel} maxWidth="sm" fullWidth>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Warning size={24} color={theme.palette.warning.main} />
+                AI Agent Data Privacy Notice
+            </DialogTitle>
+            <DialogContent>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                        By enabling the AI Agent, you acknowledge and agree to the following:
+                    </Typography>
+
+                    <Box sx={{ bgcolor: alpha(theme.palette.warning.main, 0.1), p: 2, borderRadius: 2 }}>
+                        <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
+                            ⚠️ Data Privacy
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Your data (including image metadata and database information) may be sent to Google's servers for processing by Gemini AI models. Google may use this data according to their privacy policy. Later we might introduce NZ hosted AI models, but Gemini will be used during development.
+                        </Typography>
+                    </Box>
+
+                    <Box sx={{ bgcolor: alpha(theme.palette.info.main, 0.1), p: 2, borderRadius: 2 }}>
+                        <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
+                            🤖 AI Limitations
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            AI responses may contain errors or inaccuracies. Always verify AI-generated outputs before relying on them for important decisions.
+                        </Typography>
+                    </Box>
+
+                    <Box sx={{ bgcolor: alpha(theme.palette.error.main, 0.1), p: 2, borderRadius: 2 }}>
+                        <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
+                            📋 Disclaimer
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            The AI models are developed by Google. We are not responsible for any data privacy issues, AI errors, or consequences arising from the use of the AI Agent feature. This is an experimental feature, please do not use it if you are not comfortable with the risks involved, and by proceeding, you acknowledge and accept all risks (including data privacy issues) associated with the use of this feature.
+                        </Typography>
+                    </Box>
+
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                checked={privacyAgreed}
+                                onChange={(e) => setPrivacyAgreed(e.target.checked)}
+                                color="primary"
+                            />
+                        }
+                        label={
+                            <Typography variant="body2" fontWeight="medium">
+                                I understand and agree to the above terms (In particular, data privacy and AI risks. Do not use this feature if you have any concerns.)
+                            </Typography>
+                        }
+                        sx={{ mt: 1 }}
+                    />
+                </Box>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+                <Button onClick={handlePrivacyCancel} color="inherit">
+                    Cancel
+                </Button>
+                <Button
+                    onClick={handlePrivacyConfirm}
+                    variant="contained"
+                    disabled={!privacyAgreed}
+                >
+                    Enable AI Agent
+                </Button>
+            </DialogActions>
+        </Dialog>
+    </>);
 };
 
 export default SettingsPage;

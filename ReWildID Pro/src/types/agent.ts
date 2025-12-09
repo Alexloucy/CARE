@@ -63,6 +63,8 @@ export interface AgentSession {
 export interface AgentSettings {
     apiKey: string;
     model: string;
+    enabled: boolean;  // Whether AI Agent is enabled (shown in sidebar)
+    hasAgreedToTerms: boolean;  // Whether user has agreed to data privacy terms
 }
 
 // Available AI models for the agent (December 2025)
@@ -75,4 +77,6 @@ export const AVAILABLE_MODELS = [
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
     apiKey: '',
     model: 'gemini-flash-latest',
+    enabled: false,
+    hasAgreedToTerms: false,
 };

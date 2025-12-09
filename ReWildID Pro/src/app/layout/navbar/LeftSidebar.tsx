@@ -24,6 +24,7 @@ import { alpha } from '@mui/material/styles';
 import StoatIconWhiteBg from '../../../assets/stoat_icon_white_bg_v3.png';
 import StoatIconDarkBg from '../../../assets/stoat_icon_dark_bg_v3.png';
 import { useColorMode } from '../../../features/theme/ThemeContext';
+import { getAgentSettings } from '../../../services/agentService';
 
 interface LeftSidebarProps {
     open: boolean;
@@ -49,7 +50,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
 
     const hasGradient = colorTheme.gradient !== 'none' || !!colorTheme.special || !!colorTheme.image;
 
-    const navItems = [
+    const allNavItems = [
         { key: 'dashboard', label: 'Dashboard', path: '/', icon: <House weight="regular" size={20} /> },
         { key: 'library', label: 'Library', path: '/library', icon: <Images weight="regular" size={20} /> },
         { key: 'classification', label: 'Classification', path: '/classification', icon: <Sparkle weight="regular" size={20} /> },
@@ -57,6 +58,21 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ open, onClose }) => {
         { key: 'agent', label: 'AI Agent', path: '/agent', icon: <OpenAiLogo weight="regular" size={20} /> },
         { key: 'settings', label: 'Settings', path: '/settings', icon: <Gear weight="regular" size={20} /> },
     ];
+
+    // Track AI Agent enabled state with live updates
+    const [agentEnabled, setAgentEnabled] = React.useState(() => getAgentSettings().enabled);
+
+    React.useEffect(() => {
+        const handleSettingsChange = () => {
+            setAgentEnabled(getAgentSettings().enabled);
+        };
+
+        // Listen for custom event dispatched when settings change
+        window.addEventListener('agentSettingsChanged', handleSettingsChange);
+        return () => window.removeEventListener('agentSettingsChanged', handleSettingsChange);
+    }, []);
+
+    const navItems = allNavItems.filter(item => item.key !== 'agent' || agentEnabled);
 
     const isActivePath = (path: string) => {
         if (path === '/') return location.pathname === path;
