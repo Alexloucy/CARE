@@ -356,7 +356,25 @@ Example workflow:
 3. User sees confirmation dialog with preview of affected images
 4. After confirmation, the update executes with automatic backup
 
-The update_code should include backup first:
+The update_code should follow this pattern:
+
+**CRITICAL**: When iterating over rows and updating in the same loop, you MUST call \`fetchall()\` FIRST to load all rows into memory. If you iterate directly over \`cursor.execute()\` and call \`execute()\` again inside the loop, the cursor gets reset and only the first row is processed!
+
+WRONG (only updates first row):
+\`\`\`python
+for row in cursor.execute("SELECT ..."):  # Iterating directly over execute
+    cursor.execute("UPDATE ...")  # This RESETS the cursor! Loop stops after 1 row
+\`\`\`
+
+CORRECT (updates all rows):
+\`\`\`python
+cursor.execute("SELECT ...")
+rows = cursor.fetchall()  # Load ALL rows into memory first
+for row in rows:
+    cursor.execute("UPDATE ...")  # Safe - we're iterating over a list, not the cursor
+\`\`\`
+
+Full example:
 \`\`\`python
 import sqlite3
 import json
@@ -366,16 +384,18 @@ import json
 conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
-# Get existing metadata and merge
+# IMPORTANT: Use fetchall() to get all rows BEFORE iterating
 cursor.execute("SELECT id, metadata FROM images WHERE original_path LIKE '%forest%'")
-for row in cursor.fetchall():
+rows = cursor.fetchall()  # Load all rows into memory first!
+
+for row in rows:
     existing = json.loads(row[1]) if row[1] else {}
     existing['location'] = 'ForestA'
     cursor.execute("UPDATE images SET metadata = ? WHERE id = ?", (json.dumps(existing), row[0]))
 
 conn.commit()
 conn.close()
-print("Updated successfully")
+print(f"Updated {len(rows)} images successfully")
 \`\`\`
 
 ## Visualization Guidelines

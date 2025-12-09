@@ -62,7 +62,14 @@ export interface AgentSettings {
     model: string;
 }
 
+// Available AI models for the agent (December 2025)
+export const AVAILABLE_MODELS = [
+    { id: 'gemini-flash-latest', name: 'Gemini Flash', description: 'Hybrid reasoning, 1M context' },
+    { id: 'gemini-flash-lite-latest', name: 'Gemini Flash Lite', description: 'Fastest and cheapest' },
+    { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro', description: 'Most intelligent (preview)' },
+] as const;
+
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
     apiKey: '',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-flash-latest',
 };

@@ -16,6 +16,54 @@ let cache: ReidPageCache | null = null;
 // Cache expires after 5 minutes
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
+// Track seen completed job IDs to detect new completions
+const seenCompletedJobIds = new Set<string>();
+let listenerInitialized = false;
+
+// Initialize global listener for reid job completions
+// This auto-invalidates the cache when new reid jobs complete
+function initJobCompletionListener() {
+    if (listenerInitialized || typeof window === 'undefined' || !window.api?.onJobUpdate) {
+        return;
+    }
+    listenerInitialized = true;
+
+    // First, mark all currently completed reid jobs as "seen"
+    window.api.getJobs?.().then((jobs: { id: string; type: string; status: string }[]) => {
+        jobs.forEach(job => {
+            if (job.type === 'reid' && job.status === 'completed') {
+                seenCompletedJobIds.add(job.id);
+            }
+        });
+    }).catch(() => {
+        // Ignore errors during initialization
+    });
+
+    // Listen for job updates
+    window.api.onJobUpdate((jobs: { id: string; type: string; status: string }[]) => {
+        let hasNewReidCompletion = false;
+
+        jobs.forEach(job => {
+            if (
+                job.type === 'reid' &&
+                job.status === 'completed' &&
+                !seenCompletedJobIds.has(job.id)
+            ) {
+                seenCompletedJobIds.add(job.id);
+                hasNewReidCompletion = true;
+            }
+        });
+
+        // Auto-invalidate cache when a new reid job completes
+        if (hasNewReidCompletion && cache) {
+            cache = null;
+        }
+    });
+}
+
+// Initialize listener when module loads
+initJobCompletionListener();
+
 export function getReidPageCache(): ReidPageCache | null {
     if (!cache) return null;
 

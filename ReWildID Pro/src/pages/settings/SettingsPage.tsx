@@ -22,6 +22,7 @@ import {
     InputAdornment,
 } from '@mui/material';
 import { getAgentSettings, saveAgentSettings } from '../../services/agentService';
+import { AVAILABLE_MODELS } from '../../types/agent';
 import {
     CaretDown,
     GridFour,
@@ -256,12 +257,18 @@ const SettingsPage: React.FC = () => {
 
     // AI Agent settings
     const [aiApiKey, setAiApiKey] = useState(() => getAgentSettings().apiKey);
+    const [aiModel, setAiModel] = useState(() => getAgentSettings().model);
     const [showApiKey, setShowApiKey] = useState(false);
 
     const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newKey = e.target.value;
         setAiApiKey(newKey);
         saveAgentSettings({ apiKey: newKey });
+    };
+
+    const handleModelChange = (modelId: string) => {
+        setAiModel(modelId);
+        saveAgentSettings({ model: modelId });
     };
 
     // Load all settings from localStorage
@@ -558,9 +565,45 @@ const SettingsPage: React.FC = () => {
                                     />
                                 </Box>
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
-                                Using model: <strong>gemini-flash-latest</strong>
-                            </Typography>
+                            {/* Model Selection */}
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mt: 1 }}>
+                                <Robot size={24} style={{ marginTop: 8 }} color={theme.palette.text.secondary} />
+                                <Box sx={{ flex: 1 }}>
+                                    <Typography variant="body2" fontWeight="medium" sx={{ mb: 0.5 }}>
+                                        AI Model
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                        Select the Gemini model to use for the AI agent
+                                    </Typography>
+                                    <ToggleButtonGroup
+                                        value={aiModel}
+                                        exclusive
+                                        onChange={(_, newValue: string | null) => newValue && handleModelChange(newValue)}
+                                        size="small"
+                                        sx={{ flexWrap: 'wrap' }}
+                                    >
+                                        {AVAILABLE_MODELS.map(model => (
+                                            <ToggleButton
+                                                key={model.id}
+                                                value={model.id}
+                                                sx={{
+                                                    py: 0.75,
+                                                    px: 2,
+                                                    fontSize: '0.8rem',
+                                                    textTransform: 'none',
+                                                }}
+                                            >
+                                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                    <Typography variant="body2" fontWeight={500}>{model.name}</Typography>
+                                                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                                        {model.description}
+                                                    </Typography>
+                                                </Box>
+                                            </ToggleButton>
+                                        ))}
+                                    </ToggleButtonGroup>
+                                </Box>
+                            </Box>
                         </Box>
                     </AccordionDetails>
                 </Accordion>
