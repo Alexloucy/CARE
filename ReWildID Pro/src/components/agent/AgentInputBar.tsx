@@ -8,7 +8,7 @@ import {
     Typography,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { PaperPlaneRight, Stop, Image as ImageIcon, X } from '@phosphor-icons/react';
+import { PaperPlaneRight, Stop, Image as ImageIcon, X, Plus } from '@phosphor-icons/react';
 import AgentImageModal from './AgentImageModal';
 
 interface ImageFile {
@@ -24,6 +24,7 @@ interface AgentInputBarProps {
     onSendMessage: (message: string, images?: string[]) => void;
     isLoading: boolean;
     onStopGeneration?: () => void;
+    onNewChat?: () => void;
 }
 
 const MAX_IMAGES = 5;
@@ -34,6 +35,7 @@ const AgentInputBar: React.FC<AgentInputBarProps> = ({
     onSendMessage,
     isLoading,
     onStopGeneration,
+    onNewChat,
 }) => {
     const theme = useTheme();
     const isDark = theme.palette.mode === 'dark';
@@ -350,12 +352,12 @@ const AgentInputBar: React.FC<AgentInputBarProps> = ({
 
                 {/* Input Row */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                    {/* Image Upload Button */}
-                    <Tooltip title={images.length >= MAX_IMAGES ? `Max ${MAX_IMAGES} images` : "Add Image"}>
+                    {/* New Chat Button */}
+                    <Tooltip title="New Chat">
                         <span>
                             <IconButton
-                                onClick={handleImageButtonClick}
-                                disabled={isLoading || images.length >= MAX_IMAGES}
+                                onClick={onNewChat}
+                                disabled={isLoading}
                                 size="small"
                                 sx={{
                                     color: theme.palette.text.secondary,
@@ -366,7 +368,7 @@ const AgentInputBar: React.FC<AgentInputBarProps> = ({
                                     },
                                 }}
                             >
-                                <ImageIcon size={20} />
+                                <Plus size={20} weight="bold" />
                             </IconButton>
                         </span>
                     </Tooltip>
@@ -380,7 +382,6 @@ const AgentInputBar: React.FC<AgentInputBarProps> = ({
                         value={inputValue}
                         onChange={handleInputChange}
                         onKeyDown={handleKeyDown}
-                        disabled={isLoading}
                         multiline
                         maxRows={4}
                         InputProps={{

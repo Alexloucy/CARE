@@ -422,26 +422,7 @@ const AgentPage: React.FC = () => {
                 </IconButton>
             </Tooltip>
 
-            {/* New Chat button in top right */}
-            <Tooltip title="New Chat">
-                <IconButton
-                    onClick={handleNewChat}
-                    disabled={isLoading}
-                    sx={{
-                        position: 'absolute',
-                        top: 76,
-                        right: 16,
-                        zIndex: 10,
-                        bgcolor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
-                        backdropFilter: 'blur(12px)',
-                        '&:hover': {
-                            bgcolor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
-                        },
-                    }}
-                >
-                    <Plus size={20} weight="bold" />
-                </IconButton>
-            </Tooltip>
+
 
             {/* History Drawer */}
             <Drawer
@@ -460,6 +441,26 @@ const AgentPage: React.FC = () => {
                     <Typography variant="h6" fontWeight={600}>Chat History</Typography>
                     <IconButton size="small" onClick={() => setHistoryOpen(false)}>
                         <X size={18} />
+                    </IconButton>
+                </Box>
+                <Divider />
+                <Box sx={{ px: 2, py: 1.5 }}>
+                    <IconButton
+                        onClick={() => { handleNewChat(); setHistoryOpen(false); }}
+                        disabled={isLoading}
+                        sx={{
+                            width: '100%',
+                            borderRadius: 2,
+                            py: 1,
+                            gap: 1,
+                            bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                            '&:hover': {
+                                bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                            },
+                        }}
+                    >
+                        <Plus size={18} weight="bold" />
+                        <Typography variant="body2" fontWeight={500}>New Chat</Typography>
                     </IconButton>
                 </Box>
                 <Divider />
@@ -589,6 +590,7 @@ const AgentPage: React.FC = () => {
                     onSendMessage={handleSendMessage}
                     isLoading={isLoading}
                     onStopGeneration={handleStopGeneration}
+                    onNewChat={handleNewChat}
                 />
             </Box>
 

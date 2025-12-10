@@ -598,6 +598,7 @@ function createModel(settings: AgentSettings): ChatGoogleGenerativeAI | null {
         model: settings.model || 'gemini-2.0-flash',
         maxOutputTokens: 8192,
         temperature: 0.7,
+        maxRetries: 0, // Disable retries so we can catch 429 immediately
     });
 }
 
@@ -971,6 +972,12 @@ export async function* runAgentLoop(
                 }
             } catch (invokeError) {
                 console.error('[Agent] Invoke error:', invokeError);
+                // Check for 429 rate limit errors
+                const errorMessage = invokeError instanceof Error ? invokeError.message : String(invokeError);
+                if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('rate limit') || errorMessage.toLowerCase().includes('quota')) {
+                    yield { type: 'error', content: 'The AI provider is at capacity. Please check your API quota or try again in a few moments.' };
+                    return; // Terminate immediately
+                }
                 throw invokeError;
             }
 
