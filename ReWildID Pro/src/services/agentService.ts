@@ -1021,6 +1021,13 @@ export async function* runAgentLoop(
                     result
                 };
 
+                // Stop after image generation/editing - no need to continue the loop
+                if ((toolCall.name === 'generateImage' || toolCall.name === 'editImage') && result.success) {
+                    console.log('[Agent] Stopping after successful image generation');
+                    yield { type: 'done' };
+                    return;
+                }
+
                 // Add tool result to message history
                 lcMessages.push(new ToolMessage({
                     tool_call_id: toolCall.id,

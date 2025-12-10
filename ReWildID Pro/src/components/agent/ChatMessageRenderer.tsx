@@ -8,11 +8,25 @@ import CodeExecutionBlock from './CodeExecutionBlock';
 import AgentImageModal from './AgentImageModal';
 import { CheckCircle, ArrowCounterClockwise, Warning, CaretDown, CaretRight, CircleNotch } from '@phosphor-icons/react';
 
+// Inject spin animation keyframes once
+if (typeof document !== 'undefined' && !document.getElementById('spin-keyframes')) {
+    const style = document.createElement('style');
+    style.id = 'spin-keyframes';
+    style.textContent = `
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
 interface ChatMessageRendererProps {
     message: ChatMessage;
     onApplyConfirmation?: (messageId: string, confirmationRequest: ConfirmationRequest | undefined) => Promise<void>;
     onRevertConfirmation?: (messageId: string, confirmationRequest: ConfirmationRequest | undefined) => Promise<void>;
     isLoading?: boolean;
+    isLastMessage?: boolean;
 }
 
 const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({
@@ -20,6 +34,7 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({
     onApplyConfirmation,
     onRevertConfirmation,
     isLoading,
+    isLastMessage,
 }) => {
     const theme = useTheme();
     const isDark = theme.palette.mode === 'dark';
@@ -124,6 +139,9 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({
                             size={16}
                             weight="bold"
                             color={isDark ? 'rgba(255, 193, 7, 0.9)' : 'rgba(180, 140, 0, 1)'}
+                            style={{
+                                animation: isLastMessage && isLoading ? 'spin 1s linear infinite' : 'none',
+                            }}
                         />
                         <Typography
                             variant="body2"

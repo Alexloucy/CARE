@@ -13,6 +13,7 @@ const ThemedToaster = () => {
         <Toaster
             theme={isDark ? 'dark' : 'light'}
             position="bottom-right"
+            style={{ zIndex: 100000 }}
             toastOptions={{
                 style: {
                     background: isDark

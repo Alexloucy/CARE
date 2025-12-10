@@ -183,6 +183,20 @@ electron_1.ipcMain.handle('backupTable', (_, tableName, whereClause, params) => 
 electron_1.ipcMain.handle('listBackups', (_, tableName) => (0, backup_1.listBackups)(tableName));
 electron_1.ipcMain.handle('restoreBackup', (_, backupPath) => (0, backup_1.restoreBackup)(backupPath));
 electron_1.ipcMain.handle('deleteBackup', (_, backupPath) => (0, backup_1.deleteBackup)(backupPath));
+// Copy image to clipboard (for AI Agent generated images)
+electron_1.ipcMain.handle('copyImageToClipboard', (_, dataUrl) => {
+    try {
+        // Extract base64 data from data URL
+        const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+        const image = electron_1.nativeImage.createFromBuffer(Buffer.from(base64Data, 'base64'));
+        electron_1.clipboard.writeImage(image);
+        return { success: true };
+    }
+    catch (error) {
+        console.error('Failed to copy image to clipboard:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+});
 electron_1.app.on('ready', () => {
     createWindow();
     electron_1.app.on('activate', function () {

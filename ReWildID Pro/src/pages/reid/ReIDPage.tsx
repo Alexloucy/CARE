@@ -146,7 +146,7 @@ const RunGroup: React.FC<RunGroupProps> = ({ run, individuals, imageUrls, onIndi
     );
 };
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 24;
 
 const ReIDPage: React.FC = () => {
     const theme = useTheme();

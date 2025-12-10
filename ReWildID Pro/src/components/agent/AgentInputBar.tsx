@@ -8,7 +8,7 @@ import {
     Typography,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { PaperPlaneRight, Plus, Stop, Image as ImageIcon, X } from '@phosphor-icons/react';
+import { PaperPlaneRight, Stop, Image as ImageIcon, X } from '@phosphor-icons/react';
 import AgentImageModal from './AgentImageModal';
 
 interface ImageFile {
@@ -22,7 +22,6 @@ interface ImageFile {
 
 interface AgentInputBarProps {
     onSendMessage: (message: string, images?: string[]) => void;
-    onNewChat: () => void;
     isLoading: boolean;
     onStopGeneration?: () => void;
 }
@@ -33,7 +32,6 @@ const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4MB max for Gemini inline images
 
 const AgentInputBar: React.FC<AgentInputBarProps> = ({
     onSendMessage,
-    onNewChat,
     isLoading,
     onStopGeneration,
 }) => {
@@ -49,7 +47,14 @@ const AgentInputBar: React.FC<AgentInputBarProps> = ({
     const [imageModalOpen, setImageModalOpen] = useState(false);
     const [imageModalIndex, setImageModalIndex] = useState(0);
 
+    // Guard to prevent modal auto-opening when images are added
+    const lastImageAddTimeRef = useRef<number>(0);
+
     const handleImagePreviewClick = (index: number) => {
+        // Don't open modal if image was just added (within 500ms)
+        if (Date.now() - lastImageAddTimeRef.current < 500) {
+            return;
+        }
         setImageModalIndex(index);
         setImageModalOpen(true);
     };
@@ -119,6 +124,7 @@ const AgentInputBar: React.FC<AgentInputBarProps> = ({
 
     const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
         if (event.target.files) {
+            lastImageAddTimeRef.current = Date.now(); // Mark add time to prevent modal auto-open
             processFiles(Array.from(event.target.files));
         }
         if (event.target) event.target.value = '';
@@ -140,6 +146,7 @@ const AgentInputBar: React.FC<AgentInputBarProps> = ({
 
         if (filesToProcess.length > 0) {
             event.preventDefault();
+            lastImageAddTimeRef.current = Date.now(); // Mark add time to prevent modal auto-open
             processFiles(filesToProcess);
         }
     };
@@ -159,6 +166,7 @@ const AgentInputBar: React.FC<AgentInputBarProps> = ({
         setIsDragOver(false);
 
         const files = Array.from(event.dataTransfer.files);
+        lastImageAddTimeRef.current = Date.now(); // Mark add time to prevent modal auto-open
         processFiles(files);
     };
 
@@ -317,7 +325,10 @@ const AgentInputBar: React.FC<AgentInputBarProps> = ({
                                 )}
                                 <IconButton
                                     size="small"
-                                    onClick={() => handleRemoveImage(img.id)}
+                                    onClick={(e: React.MouseEvent) => {
+                                        e.stopPropagation(); // Prevent click from bubbling to parent and opening modal
+                                        handleRemoveImage(img.id);
+                                    }}
                                     sx={{
                                         position: 'absolute',
                                         top: 2,
@@ -339,25 +350,6 @@ const AgentInputBar: React.FC<AgentInputBarProps> = ({
 
                 {/* Input Row */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                    {/* New Chat Button */}
-                    <Tooltip title="New Chat">
-                        <IconButton
-                            onClick={onNewChat}
-                            disabled={isLoading}
-                            size="small"
-                            sx={{
-                                color: theme.palette.text.secondary,
-                                '&:hover': {
-                                    background: isDark
-                                        ? 'rgba(255, 255, 255, 0.1)'
-                                        : 'rgba(0, 0, 0, 0.08)',
-                                },
-                            }}
-                        >
-                            <Plus size={20} weight="bold" />
-                        </IconButton>
-                    </Tooltip>
-
                     {/* Image Upload Button */}
                     <Tooltip title={images.length >= MAX_IMAGES ? `Max ${MAX_IMAGES} images` : "Add Image"}>
                         <span>

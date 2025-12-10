@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, desktopCapturer, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, session, desktopCapturer, shell, clipboard, nativeImage } from 'electron';
 import path from 'path';
 import {
     browseDetectImage,
@@ -258,6 +258,20 @@ ipcMain.handle('backupTable', (_, tableName: string, whereClause?: string, param
 ipcMain.handle('listBackups', (_, tableName?: string) => listBackups(tableName));
 ipcMain.handle('restoreBackup', (_, backupPath: string) => restoreBackup(backupPath));
 ipcMain.handle('deleteBackup', (_, backupPath: string) => deleteBackup(backupPath));
+
+// Copy image to clipboard (for AI Agent generated images)
+ipcMain.handle('copyImageToClipboard', (_, dataUrl: string) => {
+    try {
+        // Extract base64 data from data URL
+        const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+        const image = nativeImage.createFromBuffer(Buffer.from(base64Data, 'base64'));
+        clipboard.writeImage(image);
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to copy image to clipboard:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+});
 
 
 app.on('ready', () => {

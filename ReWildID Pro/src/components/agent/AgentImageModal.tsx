@@ -98,17 +98,18 @@ const AgentImageModal: React.FC<AgentImageModalProps> = ({
         setIsDragging(false);
     };
 
-    // Copy image to clipboard
+    // Copy image to clipboard using Electron's native API
     const handleCopy = useCallback(async () => {
         if (!currentImageUrl) return;
 
         try {
-            const response = await fetch(currentImageUrl);
-            const blob = await response.blob();
-            await navigator.clipboard.write([
-                new ClipboardItem({ [blob.type]: blob })
-            ]);
-            setCopySuccess(true);
+            // Use Electron's native clipboard API via IPC
+            const result = await (window as any).api.copyImageToClipboard(currentImageUrl);
+            if (result.success) {
+                setCopySuccess(true);
+            } else {
+                console.error('Failed to copy image:', result.error);
+            }
         } catch (error) {
             console.error('Failed to copy image:', error);
         }

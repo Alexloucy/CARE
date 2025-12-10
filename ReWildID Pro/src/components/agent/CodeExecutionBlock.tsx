@@ -40,15 +40,16 @@ const CodeExecutionBlock: React.FC<CodeExecutionBlockProps> = ({ result, toolNam
     const hasImages = result.images && result.images.length > 0;
     const hasCollapsibleContent = result.code || result.output || result.error;
 
-    // Handle copy image
+    // Handle copy image using Electron's native clipboard
     const handleCopyImage = useCallback(async (imgSrc: string) => {
         try {
-            const response = await fetch(imgSrc);
-            const blob = await response.blob();
-            await navigator.clipboard.write([
-                new ClipboardItem({ [blob.type]: blob })
-            ]);
-            toast.success('Image copied to clipboard');
+            // Use Electron's native clipboard API via IPC
+            const result = await (window as any).api.copyImageToClipboard(imgSrc);
+            if (result.success) {
+                toast.success('Image copied to clipboard');
+            } else {
+                throw new Error(result.error || 'Unknown error');
+            }
         } catch (error) {
             console.error('Failed to copy image:', error);
             toast.error('Failed to copy image');

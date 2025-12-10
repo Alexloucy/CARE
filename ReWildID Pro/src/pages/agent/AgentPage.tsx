@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Box, Typography, Container, IconButton, Tooltip, Drawer, List, ListItemButton, ListItemText, Divider } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useLocation } from 'react-router-dom';
-import { ClockCounterClockwise, Trash, X } from '@phosphor-icons/react';
+import { ClockCounterClockwise, Trash, X, Plus } from '@phosphor-icons/react';
 import AgentInputBar from '../../components/agent/AgentInputBar';
 import ChatMessageRenderer from '../../components/agent/ChatMessageRenderer';
 import MessageSkeleton from '../../components/agent/MessageSkeleton';
@@ -422,6 +422,27 @@ const AgentPage: React.FC = () => {
                 </IconButton>
             </Tooltip>
 
+            {/* New Chat button in top right */}
+            <Tooltip title="New Chat">
+                <IconButton
+                    onClick={handleNewChat}
+                    disabled={isLoading}
+                    sx={{
+                        position: 'absolute',
+                        top: 76,
+                        right: 16,
+                        zIndex: 10,
+                        bgcolor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                        backdropFilter: 'blur(12px)',
+                        '&:hover': {
+                            bgcolor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+                        },
+                    }}
+                >
+                    <Plus size={20} weight="bold" />
+                </IconButton>
+            </Tooltip>
+
             {/* History Drawer */}
             <Drawer
                 anchor="left"
@@ -536,13 +557,14 @@ const AgentPage: React.FC = () => {
                         </Box>
                     ) : (
                         <>
-                            {messages.map((message) => (
+                            {messages.map((message, index) => (
                                 <ChatMessageRenderer
                                     key={message.id}
                                     message={message}
                                     onApplyConfirmation={handleApplyConfirmation}
                                     onRevertConfirmation={handleRevertConfirmation}
                                     isLoading={isLoading}
+                                    isLastMessage={index === messages.length - 1}
                                 />
                             ))}
                             {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
@@ -565,7 +587,6 @@ const AgentPage: React.FC = () => {
             >
                 <AgentInputBar
                     onSendMessage={handleSendMessage}
-                    onNewChat={handleNewChat}
                     isLoading={isLoading}
                     onStopGeneration={handleStopGeneration}
                 />

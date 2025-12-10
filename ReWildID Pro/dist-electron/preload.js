@@ -94,5 +94,7 @@ electron_1.contextBridge.exposeInMainWorld('api', {
     backupTable: (tableName, whereClause, params) => electron_1.ipcRenderer.invoke('backupTable', tableName, whereClause, params),
     listBackups: (tableName) => electron_1.ipcRenderer.invoke('listBackups', tableName),
     restoreBackup: (backupPath) => electron_1.ipcRenderer.invoke('restoreBackup', backupPath),
-    deleteBackup: (backupPath) => electron_1.ipcRenderer.invoke('deleteBackup', backupPath)
+    deleteBackup: (backupPath) => electron_1.ipcRenderer.invoke('deleteBackup', backupPath),
+    // Clipboard (for AI Agent generated images)
+    copyImageToClipboard: (dataUrl) => electron_1.ipcRenderer.invoke('copyImageToClipboard', dataUrl),
 });

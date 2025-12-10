@@ -107,5 +107,8 @@ contextBridge.exposeInMainWorld('api', {
         ipcRenderer.invoke('backupTable', tableName, whereClause, params),
     listBackups: (tableName?: string) => ipcRenderer.invoke('listBackups', tableName),
     restoreBackup: (backupPath: string) => ipcRenderer.invoke('restoreBackup', backupPath),
-    deleteBackup: (backupPath: string) => ipcRenderer.invoke('deleteBackup', backupPath)
+    deleteBackup: (backupPath: string) => ipcRenderer.invoke('deleteBackup', backupPath),
+
+    // Clipboard (for AI Agent generated images)
+    copyImageToClipboard: (dataUrl: string) => ipcRenderer.invoke('copyImageToClipboard', dataUrl),
 });
