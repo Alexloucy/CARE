@@ -486,7 +486,7 @@ const AgentPage: React.FC = () => {
                 ref={scrollContainerRef}
                 sx={{
                     position: 'absolute',
-                    top: 68,
+                    top: 0,
                     left: 0,
                     right: 0,
                     bottom: 0,
@@ -496,6 +496,8 @@ const AgentPage: React.FC = () => {
                 }}
             >
                 <Container maxWidth="md" sx={{ py: 2 }}>
+                    {/* Spacer to push content below navbar */}
+                    <Box sx={{ height: 68 }} />
                     {messages.length === 0 ? (
                         <Box
                             sx={{
