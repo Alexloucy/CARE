@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ChatMessage, ConfirmationRequest } from '../../types/agent';
 import CodeExecutionBlock from './CodeExecutionBlock';
+import AgentImageModal from './AgentImageModal';
 import { CheckCircle, ArrowCounterClockwise, Warning, CaretDown, CaretRight, CircleNotch } from '@phosphor-icons/react';
 
 interface ChatMessageRendererProps {
@@ -27,6 +28,15 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({
     const isConfirmation = message.role === 'confirmation';
     const isAssistantWithToolCalls = message.role === 'assistant' && message.toolCalls && message.toolCalls.length > 0;
     const [toolCallExpanded, setToolCallExpanded] = useState(false);
+
+    // Image modal state for user-attached images
+    const [imageModalOpen, setImageModalOpen] = useState(false);
+    const [imageModalIndex, setImageModalIndex] = useState(0);
+
+    const handleImageClick = (index: number) => {
+        setImageModalIndex(index);
+        setImageModalOpen(true);
+    };
 
     // Get glass style based on message type
     const getGlassStyle = () => {
@@ -323,16 +333,70 @@ const ChatMessageRenderer: React.FC<ChatMessageRendererProps> = ({
                 }}
             >
                 {isUser ? (
-                    <Typography
-                        variant="body1"
-                        sx={{
-                            color: theme.palette.text.primary,
-                            whiteSpace: 'pre-wrap',
-                            lineHeight: 1.6,
-                        }}
-                    >
-                        {message.content}
-                    </Typography>
+                    <Box>
+                        {/* Display attached images */}
+                        {message.images && message.images.length > 0 && (
+                            <Box sx={{
+                                display: 'flex',
+                                gap: 1,
+                                flexWrap: 'wrap',
+                                mb: message.content ? 1.5 : 0
+                            }}>
+                                {message.images.map((imageDataUrl, idx) => (
+                                    <Box
+                                        key={idx}
+                                        onClick={() => handleImageClick(idx)}
+                                        sx={{
+                                            width: 120,
+                                            height: 120,
+                                            borderRadius: '8px',
+                                            overflow: 'hidden',
+                                            border: `1px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}`,
+                                            cursor: 'pointer',
+                                            transition: 'transform 0.2s, box-shadow 0.2s',
+                                            '&:hover': {
+                                                transform: 'scale(1.02)',
+                                                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                                            },
+                                        }}
+                                    >
+                                        <img
+                                            src={imageDataUrl}
+                                            alt={`Attached ${idx + 1}`}
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: 'cover',
+                                            }}
+                                        />
+                                    </Box>
+                                ))}
+                            </Box>
+                        )}
+                        {message.content && (
+                            <Typography
+                                variant="body1"
+                                sx={{
+                                    color: theme.palette.text.primary,
+                                    whiteSpace: 'pre-wrap',
+                                    lineHeight: 1.6,
+                                }}
+                            >
+                                {message.content}
+                            </Typography>
+                        )}
+
+                        {/* Image Modal for user-attached images */}
+                        {message.images && message.images.length > 0 && (
+                            <AgentImageModal
+                                open={imageModalOpen}
+                                onClose={() => setImageModalOpen(false)}
+                                imageUrl={null}
+                                images={message.images}
+                                initialIndex={imageModalIndex}
+                            />
+                        )}
+                    </Box>
                 ) : (
                     <Box
                         sx={{

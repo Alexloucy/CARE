@@ -348,7 +348,27 @@ function toLangChainMessages(messages: ChatMessage[]): BaseMessage[] {
 
     for (const m of messages) {
         if (m.role === 'user') {
-            result.push(new HumanMessage(m.content));
+            // Handle multimodal messages with images
+            if (m.images && m.images.length > 0) {
+                const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+
+                // Add text content if present
+                if (m.content) {
+                    content.push({ type: 'text', text: m.content });
+                }
+
+                // Add images as base64 data URLs
+                for (const imageDataUrl of m.images) {
+                    content.push({
+                        type: 'image_url',
+                        image_url: { url: imageDataUrl }
+                    });
+                }
+
+                result.push(new HumanMessage({ content }));
+            } else {
+                result.push(new HumanMessage(m.content));
+            }
         } else if (m.role === 'tool') {
             // Tool result message
             if (m.toolCallId) {

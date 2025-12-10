@@ -39,6 +39,7 @@ export interface ChatMessage {
     content: string;
     timestamp: Date;
     isStreaming?: boolean;
+    images?: string[];  // Base64 data URLs for attached images (user messages)
 
     // For role='assistant' - tool calls the AI requested
     toolCalls?: ToolCall[];

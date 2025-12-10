@@ -155,7 +155,7 @@ const AgentPage: React.FC = () => {
         return newMsg;
     }, []);
 
-    const handleSendMessage = useCallback(async (content: string) => {
+    const handleSendMessage = useCallback(async (content: string, images?: string[]) => {
         const settings = getAgentSettings();
         if (!settings.apiKey) {
             addMessage({
@@ -165,8 +165,8 @@ const AgentPage: React.FC = () => {
             return;
         }
 
-        // Add user message
-        const userMessage = addMessage({ role: 'user', content });
+        // Add user message (with optional images)
+        const userMessage = addMessage({ role: 'user', content, images });
         setIsLoading(true);
 
         abortControllerRef.current = new AbortController();
