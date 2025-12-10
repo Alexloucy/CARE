@@ -19,6 +19,7 @@ import {
     setCurrentSessionId,
     executeConfirmedUpdate,
     revertUpdate,
+    setCurrentUserImages,
 } from '../../services/agentService';
 
 const AgentPage: React.FC = () => {
@@ -176,6 +177,9 @@ const AgentPage: React.FC = () => {
             let pendingToolCalls: ToolCall[] = [];
             let streamingMessageId: string | null = null;
             let streamingContent = '';
+
+            // Set current user images for the editImage tool to access
+            setCurrentUserImages(images || []);
 
             for await (const chunk of runAgentLoop(allMessages)) {
                 if (abortControllerRef.current?.signal.aborted) {

@@ -29,7 +29,7 @@ import {
     FormControlLabel,
 } from '@mui/material';
 import { getAgentSettings, saveAgentSettings } from '../../services/agentService';
-import { AVAILABLE_MODELS } from '../../types/agent';
+import { AVAILABLE_MODELS, IMAGE_GENERATION_MODELS, IMAGE_RESOLUTIONS } from '../../types/agent';
 import {
     CaretDown,
     GridFour,
@@ -269,6 +269,9 @@ const SettingsPage: React.FC = () => {
     const [aiModel, setAiModel] = useState(() => getAgentSettings().model);
     const [aiEnabled, setAiEnabled] = useState(() => getAgentSettings().enabled);
     const [showApiKey, setShowApiKey] = useState(false);
+    // Image generation settings
+    const [imageGenModel, setImageGenModel] = useState(() => getAgentSettings().imageGenerationModel || 'gemini-2.5-flash-image');
+    const [imageResolution, setImageResolution] = useState(() => getAgentSettings().imageResolution || '1K');
 
     // Privacy agreement dialog state
     const [privacyDialogOpen, setPrivacyDialogOpen] = useState(false);
@@ -283,6 +286,21 @@ const SettingsPage: React.FC = () => {
     const handleModelChange = (modelId: string) => {
         setAiModel(modelId);
         saveAgentSettings({ model: modelId });
+    };
+
+    const handleImageGenModelChange = (modelId: string) => {
+        setImageGenModel(modelId);
+        saveAgentSettings({ imageGenerationModel: modelId });
+        // Reset resolution to 1K if switching to non-Pro model
+        if (!modelId.includes('pro') && imageResolution !== '1K') {
+            setImageResolution('1K');
+            saveAgentSettings({ imageResolution: '1K' });
+        }
+    };
+
+    const handleImageResolutionChange = (resolution: string) => {
+        setImageResolution(resolution);
+        saveAgentSettings({ imageResolution: resolution });
     };
 
     const handleAiToggle = (checked: boolean) => {
@@ -656,6 +674,82 @@ const SettingsPage: React.FC = () => {
                                                                 {model.description}
                                                             </Typography>
                                                         </Box>
+                                                    </ToggleButton>
+                                                ))}
+                                            </ToggleButtonGroup>
+                                        </Box>
+                                    </Box>
+
+                                    {/* Image Generation Model Selection */}
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mt: 2, pt: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
+                                        <ImageIcon size={24} style={{ marginTop: 8 }} color={theme.palette.text.secondary} />
+                                        <Box sx={{ flex: 1 }}>
+                                            <Typography variant="body2" fontWeight="medium" sx={{ mb: 0.5 }}>
+                                                Image Generation Model
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                                Model used for generating and editing images
+                                            </Typography>
+                                            <ToggleButtonGroup
+                                                value={imageGenModel}
+                                                exclusive
+                                                onChange={(_, newValue: string | null) => newValue && handleImageGenModelChange(newValue)}
+                                                size="small"
+                                                sx={{ flexWrap: 'wrap' }}
+                                            >
+                                                {IMAGE_GENERATION_MODELS.map(model => (
+                                                    <ToggleButton
+                                                        key={model.id}
+                                                        value={model.id}
+                                                        sx={{
+                                                            py: 0.75,
+                                                            px: 2,
+                                                            fontSize: '0.8rem',
+                                                            textTransform: 'none',
+                                                        }}
+                                                    >
+                                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                            <Typography variant="body2" fontWeight={500}>{model.name}</Typography>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                                                {model.description}
+                                                            </Typography>
+                                                        </Box>
+                                                    </ToggleButton>
+                                                ))}
+                                            </ToggleButtonGroup>
+                                        </Box>
+                                    </Box>
+
+                                    {/* Image Resolution Selection (only for Pro model) */}
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mt: 1 }}>
+                                        <Box sx={{ width: 24 }} /> {/* Spacer for alignment */}
+                                        <Box sx={{ flex: 1 }}>
+                                            <Typography variant="body2" fontWeight="medium" sx={{ mb: 0.5, opacity: imageGenModel.includes('pro') ? 1 : 0.5 }}>
+                                                Output Resolution
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, opacity: imageGenModel.includes('pro') ? 1 : 0.5 }}>
+                                                {imageGenModel.includes('pro') ? 'Higher resolutions take longer to generate' : 'Only available with Nano Banana Pro'}
+                                            </Typography>
+                                            <ToggleButtonGroup
+                                                value={imageResolution}
+                                                exclusive
+                                                onChange={(_, newValue: string | null) => newValue && handleImageResolutionChange(newValue)}
+                                                size="small"
+                                                disabled={!imageGenModel.includes('pro')}
+                                            >
+                                                {IMAGE_RESOLUTIONS.map(res => (
+                                                    <ToggleButton
+                                                        key={res.id}
+                                                        value={res.id}
+                                                        disabled={!imageGenModel.includes('pro') && res.id !== '1K'}
+                                                        sx={{
+                                                            py: 0.5,
+                                                            px: 2,
+                                                            fontSize: '0.8rem',
+                                                            textTransform: 'none',
+                                                        }}
+                                                    >
+                                                        {res.name}
                                                     </ToggleButton>
                                                 ))}
                                             </ToggleButtonGroup>

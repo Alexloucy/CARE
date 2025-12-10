@@ -251,9 +251,268 @@ const requestReIDTool = tool(
     }
 );
 
+// Image Generation Tool (uses Gemini's native image generation - separate from LangChain)
+const generateImageTool = tool(
+    async ({ prompt, aspectRatio = '1:1' }: { prompt: string; aspectRatio?: string }) => {
+        console.log('[ImageGen] Generating image with prompt:', prompt.substring(0, 100));
+
+        try {
+            const settings = getAgentSettings();
+            if (!settings.apiKey) {
+                return JSON.stringify({
+                    success: false,
+                    error: 'API key not configured',
+                    output: null,
+                    images: [],
+                });
+            }
+
+            const model = settings.imageGenerationModel || 'gemini-2.5-flash-image';
+            const resolution = settings.imageResolution || '1K';
+            const isPro = model.includes('pro');
+
+            // Use fetch to call Gemini API directly for image generation
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.apiKey}`;
+
+            const requestBody: any = {
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                    responseModalities: ['IMAGE', 'TEXT'],
+                },
+            };
+
+            // Add image config for aspect ratio and resolution
+            if (isPro) {
+                requestBody.generationConfig.imageConfig = {
+                    aspectRatio: aspectRatio,
+                    imageSize: resolution,
+                };
+            }
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[ImageGen] API error:', errorText);
+                return JSON.stringify({
+                    success: false,
+                    error: `API error: ${response.status} - ${errorText}`,
+                    output: null,
+                    images: [],
+                });
+            }
+
+            const data = await response.json();
+            const parts = data.candidates?.[0]?.content?.parts || [];
+            const images: string[] = [];
+            let textOutput = '';
+
+            for (const part of parts) {
+                if (part.inlineData) {
+                    const base64 = part.inlineData.data;
+                    const mimeType = part.inlineData.mimeType || 'image/png';
+                    images.push(`data:${mimeType};base64,${base64}`);
+                } else if (part.text) {
+                    textOutput += part.text;
+                }
+            }
+
+            if (images.length === 0) {
+                return JSON.stringify({
+                    success: false,
+                    error: 'No image generated. The model may have declined due to content policy.',
+                    output: textOutput || null,
+                    images: [],
+                });
+            }
+
+            console.log('[ImageGen] Generated', images.length, 'image(s)');
+            return JSON.stringify({
+                success: true,
+                output: textOutput || `Generated ${images.length} image(s)`,
+                error: null,
+                images: images,
+            });
+        } catch (error) {
+            console.error('[ImageGen] Exception:', error);
+            return JSON.stringify({
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                output: null,
+                images: [],
+            });
+        }
+    },
+    {
+        name: 'generateImage',
+        description: 'Generate an image from a text description using Gemini\'s native image generation. Returns the generated image.',
+        schema: z.object({
+            prompt: z.string().describe('Detailed description of the image to generate. Be specific about style, lighting, composition, etc.'),
+            aspectRatio: z.string().optional().describe('Aspect ratio: "1:1", "16:9", "9:16", "4:3", "3:4" etc. Default "1:1"'),
+        }),
+    }
+);
+
+// Image Editing Tool (uses attached images from the conversation)
+// We need to store current user images in a module-level context so the tool can access them
+let currentUserImages: string[] = [];
+
+// Function to set current user images (called before agent loop)
+export function setCurrentUserImages(images: string[]) {
+    currentUserImages = images;
+    console.log('[ImageEdit] Set current user images:', images.length);
+}
+
+const editImageTool = tool(
+    async ({ prompt, imageIndex = 0 }: { prompt: string; imageIndex?: number }) => {
+        console.log('[ImageEdit] Editing image with prompt:', prompt.substring(0, 100), 'imageIndex:', imageIndex);
+
+        try {
+            const settings = getAgentSettings();
+            if (!settings.apiKey) {
+                return JSON.stringify({
+                    success: false,
+                    error: 'API key not configured',
+                    output: null,
+                    images: [],
+                });
+            }
+
+            // Get image from current context
+            if (currentUserImages.length === 0) {
+                return JSON.stringify({
+                    success: false,
+                    error: 'No image attached to the message. Please ask the user to attach an image first.',
+                    output: null,
+                    images: [],
+                });
+            }
+
+            if (imageIndex < 0 || imageIndex >= currentUserImages.length) {
+                return JSON.stringify({
+                    success: false,
+                    error: `Invalid image index. User has ${currentUserImages.length} image(s) attached (indices 0-${currentUserImages.length - 1}).`,
+                    output: null,
+                    images: [],
+                });
+            }
+
+            const imageDataUrl = currentUserImages[imageIndex];
+            console.log('[ImageEdit] Using image at index', imageIndex, 'length:', imageDataUrl.length);
+
+            const model = settings.imageGenerationModel || 'gemini-2.5-flash-image';
+            const resolution = settings.imageResolution || '1K';
+            const isPro = model.includes('pro');
+
+            // Extract base64 and mime type from data URL
+            const match = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (!match) {
+                return JSON.stringify({
+                    success: false,
+                    error: 'Invalid image format in attached image',
+                    output: null,
+                    images: [],
+                });
+            }
+            const [, mimeType, base64Data] = match;
+
+            // Use fetch to call Gemini API directly for image editing
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.apiKey}`;
+
+            const requestBody: any = {
+                contents: [{
+                    parts: [
+                        { text: prompt },
+                        { inlineData: { mimeType, data: base64Data } },
+                    ]
+                }],
+                generationConfig: {
+                    responseModalities: ['IMAGE', 'TEXT'],
+                },
+            };
+
+            // Add image config for resolution (Pro only)
+            if (isPro) {
+                requestBody.generationConfig.imageConfig = {
+                    imageSize: resolution,
+                };
+            }
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[ImageEdit] API error:', errorText);
+                return JSON.stringify({
+                    success: false,
+                    error: `API error: ${response.status} - ${errorText}`,
+                    output: null,
+                    images: [],
+                });
+            }
+
+            const data = await response.json();
+            const parts = data.candidates?.[0]?.content?.parts || [];
+            const images: string[] = [];
+            let textOutput = '';
+
+            for (const part of parts) {
+                if (part.inlineData) {
+                    const base64 = part.inlineData.data;
+                    const partMime = part.inlineData.mimeType || 'image/png';
+                    images.push(`data:${partMime};base64,${base64}`);
+                } else if (part.text) {
+                    textOutput += part.text;
+                }
+            }
+
+            if (images.length === 0) {
+                return JSON.stringify({
+                    success: false,
+                    error: 'No image generated. The model may have declined due to content policy.',
+                    output: textOutput || null,
+                    images: [],
+                });
+            }
+
+            console.log('[ImageEdit] Generated', images.length, 'edited image(s)');
+            return JSON.stringify({
+                success: true,
+                output: textOutput || `Edited image generated`,
+                error: null,
+                images: images,
+            });
+        } catch (error) {
+            console.error('[ImageEdit] Exception:', error);
+            return JSON.stringify({
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                output: null,
+                images: [],
+            });
+        }
+    },
+    {
+        name: 'editImage',
+        description: 'Edit an image that the user has attached to their message. Use this to modify, enhance, or transform user-provided images based on their request.',
+        schema: z.object({
+            prompt: z.string().describe('Description of how to edit the image. Be specific about what to add, remove, or change.'),
+            imageIndex: z.number().optional().describe('Index of the attached image to edit (0 for first image, 1 for second, etc.). Default is 0.'),
+        }),
+    }
+);
+
 // Get the tools list
 function getAvailableTools() {
-    return [revealSecretTool, runPythonCodeTool as any, requestMetadataUpdateTool as any, requestClassificationTool as any, requestReIDTool as any];
+    return [revealSecretTool, runPythonCodeTool as any, requestMetadataUpdateTool as any, requestClassificationTool as any, requestReIDTool as any, generateImageTool as any, editImageTool as any];
 }
 
 // Storage keys
@@ -372,9 +631,21 @@ function toLangChainMessages(messages: ChatMessage[]): BaseMessage[] {
         } else if (m.role === 'tool') {
             // Tool result message
             if (m.toolCallId) {
+                // Strip images from tool results to prevent token limit issues
+                // Images are still stored in the toolResult for display, but we don't send
+                // the base64 data back to the LLM
+                let toolResultForLLM: any = m.toolResult || { success: true, output: m.content };
+                if (toolResultForLLM.images && toolResultForLLM.images.length > 0) {
+                    // Create a copy without the images array, just reference the count
+                    const { images, ...rest } = toolResultForLLM;
+                    toolResultForLLM = {
+                        ...rest,
+                        imagesGenerated: images.length, // Just tell the LLM how many images were generated
+                    };
+                }
                 result.push(new ToolMessage({
                     tool_call_id: m.toolCallId,
-                    content: JSON.stringify(m.toolResult || { success: true, output: m.content }),
+                    content: JSON.stringify(toolResultForLLM),
                 }));
             }
         } else if (m.role === 'assistant') {

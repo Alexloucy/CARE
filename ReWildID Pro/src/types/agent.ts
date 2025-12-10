@@ -66,6 +66,9 @@ export interface AgentSettings {
     model: string;
     enabled: boolean;  // Whether AI Agent is enabled (shown in sidebar)
     hasAgreedToTerms: boolean;  // Whether user has agreed to data privacy terms
+    // Image generation settings
+    imageGenerationModel: string;  // 'gemini-2.5-flash-image' or 'gemini-3-pro-image-preview'
+    imageResolution: string;  // '1K', '2K', '4K' (only for Pro model)
 }
 
 // Available AI models for the agent (December 2025)
@@ -75,9 +78,25 @@ export const AVAILABLE_MODELS = [
     { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro', description: 'Most intelligent (preview)' },
 ] as const;
 
+// Available image generation models (Nano Banana / Nano Banana Pro)
+export const IMAGE_GENERATION_MODELS = [
+    { id: 'gemini-2.5-flash-image', name: 'Nano Banana', description: 'Fast, 1K resolution' },
+    { id: 'gemini-3-pro-image-preview', name: 'Nano Banana Pro', description: 'Advanced, up to 4K, thinking mode' },
+] as const;
+
+// Available resolutions (only 2K/4K for Pro model)
+export const IMAGE_RESOLUTIONS = [
+    { id: '1K', name: '1K', description: '~1024px' },
+    { id: '2K', name: '2K', description: '~2048px (Pro only)' },
+    { id: '4K', name: '4K', description: '~4096px (Pro only)' },
+] as const;
+
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
     apiKey: '',
     model: 'gemini-flash-latest',
     enabled: false,
     hasAgreedToTerms: false,
+    imageGenerationModel: 'gemini-2.5-flash-image',
+    imageResolution: '1K',
 };
+

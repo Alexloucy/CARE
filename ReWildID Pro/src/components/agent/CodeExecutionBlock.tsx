@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Box, Typography, Collapse, IconButton, Tooltip } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { CaretDown, CaretRight, Code, CheckCircle, XCircle, Terminal, Copy } from '@phosphor-icons/react';
+import { CaretDown, CaretRight, Code, CheckCircle, XCircle, Terminal, Copy, Image as ImageIcon, PaintBrush } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { ToolResult } from '../../types/agent';
 import AgentImageModal from './AgentImageModal';
@@ -20,8 +20,22 @@ const CodeExecutionBlock: React.FC<CodeExecutionBlockProps> = ({ result, toolNam
     const [hoveredImageIndex, setHoveredImageIndex] = useState<number | null>(null);
 
     const isCodeExecution = toolName === 'runPythonCode';
-    const displayName = isCodeExecution ? 'Python Code Execution' : toolName;
-    const Icon = isCodeExecution ? Code : Terminal;
+    const isImageGeneration = toolName === 'generateImage';
+    const isImageEditing = toolName === 'editImage';
+
+    // Determine display name and icon
+    let displayName = toolName;
+    let Icon = Terminal;
+    if (isCodeExecution) {
+        displayName = 'Python Code Execution';
+        Icon = Code;
+    } else if (isImageGeneration) {
+        displayName = 'Image Generation';
+        Icon = ImageIcon;
+    } else if (isImageEditing) {
+        displayName = 'Image Editing';
+        Icon = PaintBrush;
+    }
 
     const hasImages = result.images && result.images.length > 0;
     const hasCollapsibleContent = result.code || result.output || result.error;
@@ -181,7 +195,7 @@ const CodeExecutionBlock: React.FC<CodeExecutionBlockProps> = ({ result, toolNam
                 {hasImages && (
                     <Box sx={{ p: 2, pt: expanded ? 0 : 2 }}>
                         <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', mb: 1 }}>
-                            GENERATED CHARTS
+                            {isImageGeneration || isImageEditing ? 'GENERATED IMAGE' : 'GENERATED CHARTS'}
                         </Typography>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             {result.images!.map((imgSrc, idx) => (
@@ -194,7 +208,7 @@ const CodeExecutionBlock: React.FC<CodeExecutionBlockProps> = ({ result, toolNam
                                     <Box
                                         component="img"
                                         src={imgSrc}
-                                        alt={`Generated chart ${idx + 1}`}
+                                        alt={isImageGeneration || isImageEditing ? `Generated image ${idx + 1}` : `Generated chart ${idx + 1}`}
                                         onClick={() => handleImageClick(idx)}
                                         sx={{
                                             maxWidth: '100%',
